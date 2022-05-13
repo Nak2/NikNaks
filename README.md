@@ -2,9 +2,9 @@
  A library with various features for Gary's Mod I've created.
  It features a ByteBuffer, BSP Parser, NodeGraph, Navigation Mesh, PathFinding and more.
  
->***Note:** May not be reuploaded to workshop or any other Steam© services.
+>***Note:** May not be reuploaded to workshop or any other Steam© services without specific prior written permission.<br>
 See: https://github.com/Nak2/NikNaks/blob/main/LICENSE for more info.
-### ByteBuffer
+### [ByteBuffer](https://github.com/Nak2/NikNaks/wiki/ByteBuffer)
 ------
 ByteBuffers are simelar to file-objects as they store data in a 32-bit number-array.
 * They offer speeds up to 80x faster than the regular file-IO system. As they skip the Lua -> C -> Lua header.
@@ -12,7 +12,7 @@ ByteBuffers are simelar to file-objects as they store data in a 32-bit number-ar
 * Can both Read and Write at the same time.
 
 >***Note:** ByteBuffers have some limits, as reading and writing strings tent to be faster using the file-IO.
-### BSP Parser
+### [BSP Parser](https://github.com/Nak2/NikNaks/wiki/BSP-Parser)
 -------------
 BSP Parser allows you to read any Source-based maps Gary's Mod allow and retrive data and informations otherwise blocked off.
 * Can read any BSP file form version 17 to 21.
