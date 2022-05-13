@@ -45,7 +45,7 @@ function meta:GetColor()
 end
 
 ---Returns the model scale.
----@return any
+---@return number
 function meta:GetScale()
 	return self.UniformScale
 end
@@ -58,7 +58,7 @@ function meta:GetSolid()
 end
 
 ---Returns the lighting origion.
----@return any
+---@return Vector
 function meta:GetLightingOrigin()
 	return self.LightingOrigin
 end
