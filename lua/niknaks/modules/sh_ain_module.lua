@@ -531,6 +531,11 @@ do
 	function n_meta:GetNode( id )
 		return self._nodes[ id ]
 	end
+	---Returns a list of all nodes. With the ID as keys.
+	---@return table
+	function n_meta:GetAllNodes()
+		return self._nodes
+	end
 	---Returns the nearest node
 	---@param position Vector
 	---@param NODE_TYPE? number
@@ -888,7 +893,7 @@ do
 					newCostSoFar = current:GetCostSoFar() + heuristic_cost_estimate( current, neighbor, HULL ) * Multi
 				else -- Default generator
 					-- TODO: Elevator? Check L4D elevator maps and what they are.
-					newCostSoFar = generator( current, neighbor, CAP_MOVE, elevator, heuristic_cost_estimate( current, neighbor, HULL ) )
+					newCostSoFar = current:GetCostSoFar() + generator( current, neighbor, CAP_MOVE, BitCapability, heuristic_cost_estimate( current, neighbor, HULL ) * Multi )
 				end
 				if newCostSoFar < 0 or MaxDistance and newCostSoFar > MaxDistance then -- Check if we went over max-distance
 					continue

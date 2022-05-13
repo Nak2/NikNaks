@@ -91,14 +91,11 @@ do
 	---@param end_pos Vector|Entity
 	---@param callback function 		-- Returns the result. LPathFollower or false
 	---@param NODE_TYPE? number
+	---@param options? table
 	---@param HULL_SIZE? number
-	---@param BitCapability? number
-	---@param JumpMultiplier? number 	-- How much jumping / flying cost over walking
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
-	---@param MaxDistance? number		-- Searching with in a range, can lower the cost over longer / difficult terrain.
-	---@param UseZone? boolean			-- Setting this to false will make it slower, but work on broken NodeGraphs.
-	function NodeGraph.PathFindASync( start_pos, end_pos, callback, NODE_TYPE, HULL_SIZE, BitCapability, JumpMultiplier, generator, MaxDistance, UseZone )
-		return NGarph and NGarph:PathFindASync( start_pos, end_pos, callback, NODE_TYPE, HULL_SIZE, BitCapability, JumpMultiplier, generator, MaxDistance, UseZone )
+	function NodeGraph.PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
+		return NGarph and NGarph:PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
 	end
 
 	---Returns true if the nodegraph for the current map has loaded
