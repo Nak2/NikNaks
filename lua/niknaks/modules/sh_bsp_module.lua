@@ -393,7 +393,6 @@ do
 	local function CreateStaticProp(f, version, m, staticSize)
 		local s = f:Tell()
 		local obj = {}
-		setmetatable(obj, sp_meta)
 		-- Version 4
 			obj.Origin = f:ReadVector()								-- Vector (3 float) 12 bytes
 			obj.Angles = Angle( f:ReadFloat(),f:ReadFloat(),f:ReadFloat() )	-- Angle (3 float) 	12 bytes
@@ -449,6 +448,7 @@ do
 				f:Seek(s + staticSize - bSkip - 4)
 				obj.DisableX360 = f:ReadLong() ~= 0	-- bool (4 bytes)
 			end
+			setmetatable(obj, sp_meta)
 		return obj,f:Tell() - s + bSkip
 	end
 
@@ -503,7 +503,7 @@ do
 		end
 		-- We calculate the amount of static props within this space. It is more stable.
 		local staticStart = b:Tell()
-		local endPos = b:Size() + 1
+		local endPos = b:Size()
 		local staticSize = (endPos - b:Tell()) / count
 		local staticUsed = 0
 		self._staticprops = {}
