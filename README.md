@@ -2,7 +2,7 @@
  A library with various features for Gary's Mod I've created.
  It features a ByteBuffer, BSP Parser, NodeGraph, Navigation Mesh, PathFinding and more.
  
->***Note:** May not be reuploaded to workshop or any other Steam© services.
+>***Note:** May not be reuploaded to workshop or any other Steam© services without specific prior written permission.<br>
 See: https://github.com/Nak2/NikNaks/blob/main/LICENSE for more info.
 ### [ByteBuffer](https://github.com/Nak2/NikNaks/wiki/ByteBuffer)
 ------
