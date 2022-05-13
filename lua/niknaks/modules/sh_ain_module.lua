@@ -829,7 +829,7 @@ do
 		return total_path
 	end
 	-- Finds the best move option
-	local function getMultiplier(moveoptions, canWalk, canJump, canClimb, canFly, JumpMultiplier )
+	local function getMultiplier(moveoptions, canWalk, canJump, canClimb, canFly, JumpMultiplier, ClimbMultiplier )
 		if canFly and bit.band(moveoptions, CAP_MOVE_FLY) ~= 0 then -- Flying seems to always be the best option
 			return CAP_MOVE_FLY, 1
 		else
@@ -840,7 +840,7 @@ do
 			if canWalk and bit.band(moveoptions, CAP_MOVE_GROUND)~=0 then
 				return CAP_MOVE_GROUND, 1
 			elseif canClimb and bit.band(moveoptions, CAP_MOVE_CLIMB)~=0 then -- %20 climb cost
-				return CAP_MOVE_CLIMB, 1.2
+				return CAP_MOVE_CLIMB, ClimbMultiplier
 			elseif canJump and bit.band(moveoptions, CAP_MOVE_JUMP)~=0 then
 				return CAP_MOVE_JUMP, JumpMultiplier
 			end
@@ -853,7 +853,7 @@ do
 		false = Unable to pathfind at all
 		table = List of nodes from goal towards the start
 	]]
-	local function AStart(node_start, node_goal, HULL, BitCapability, JumpMultiplier, generator, MaxDistance )
+	local function AStart(node_start, node_goal, HULL, BitCapability, JumpMultiplier, ClimbMultiplier, generator, MaxDistance )
 		if not node_start or not node_goal then return false end
 		if node_start == node_goal then return true end
 		node_start:ClearSearchLists()
@@ -879,7 +879,7 @@ do
 				if not neighbor then continue end
 				local moveoptions =  bit.band( BitCapability, tab[2] or 0 )
 				if moveoptions == 0 then continue end -- Unable to use this link. No options
-				local CAP_MOVE, Multi = getMultiplier(moveoptions, canWalk, canJump, canClimb, canFly, JumpMultiplier  )
+				local CAP_MOVE, Multi = getMultiplier(moveoptions, canWalk, canJump, canClimb, canFly, JumpMultiplier, ClimbMultiplier  )
 				if not CAP_MOVE then continue end
 				
 				-- Cost calculator
@@ -918,22 +918,24 @@ do
 		return false
 	end
 
+
 	---A* pathfinding using the NodeGraph.
 	---@param start_pos Vector|Entity
 	---@param end_pos Vector|Entity
 	---@param NODE_TYPE? number
+	---@param options? table
 	---@param HULL_SIZE? number
-	---@param BitCapability? number
-	---@param JumpMultiplier? number 	-- How much jumping / flying cost over walking
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
-	---@param MaxDistance? number		-- Searching with in a range, can lower the cost over longer / difficult terrain.
-	---@param UseZone? boolean			-- Setting this to false will make it slower, but work on broken NodeGraphs.
 	---@return LPathFollower|boolean
-	function n_meta:PathFind( start_pos, end_pos, NODE_TYPE, HULL_SIZE, BitCapability, JumpMultiplier, generator, MaxDistance, UseZone )
+	function n_meta:PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
 		if UseZone == nil then UseZone = true end
-		if not BitCapability then 
-			BitCapability = NODE_TYPE == NODE_TYPE_AIR and CAP_MOVE_FLY or CAP_MOVE_GROUND -- Make default walk, unless NODE_TYPE is fly
-		end
+		if not options then options = {} end
+		
+		local MaxDistance 		= options.MaxDistance or 100000
+		local BitCapability 	= options.BitCapability or ( NODE_TYPE == NODE_TYPE_AIR and CAP_MOVE_FLY or CAP_MOVE_GROUND ) -- Make default walk, unless NODE_TYPE is fly )
+		local JumpMultiplier 	= options.JumpMultiplier or 1.4
+		local ClimbMultiplier 	= options.ClimbMultiplier or 1.2
+
 		if not JumpMultiplier then JumpMultiplier = 1.4 			-- Default, make it kinda hate jumping around
 		elseif JumpMultiplier < 0.3 then JumpMultiplier = 0.3 end	-- Make sure it can't go below 0.3. Can inf loop if so.
 				
@@ -960,10 +962,10 @@ do
 		local start_node= self:FindNode( start_pos,	NODE_TYPE )
 		if not start_node then return false end
 		local offset = start_pos - start_node:GetPos( HULL_SIZE ) -- Sway the position a bit for the node to be located
-		local end_node 	= self:FindNode( end_pos + offset,	NODE_TYPE, UseZone and start_node:GetZone() ) -- Find an end-node. matching the starting node's zone.
+		local end_node 	= self:FindNode( end_pos + offset,	NODE_TYPE, start_node:GetZone() ) -- Find an end-node. matching the starting node's zone.
 		if not end_node then return false end
 		-- Path find to location
-		local t = AStart(start_node, end_node, HULL_SIZE, BitCapability, JumpMultiplier, generator, MaxDistance)
+		local t = AStart(start_node, end_node, HULL_SIZE, BitCapability, JumpMultiplier, ClimbMultiplier, generator, MaxDistance)
 		local def_cap = NODE_TYPE == NODE_TYPE_AIR and CAP_MOVE_FLY or CAP_MOVE_GROUND
 		if t == false then -- Unable to pathfind to location
 			return false
@@ -1054,13 +1056,10 @@ do
 	---@param end_pos Vector|Entity
 	---@param callback function 		-- Returns the result. LPathFollower or false
 	---@param NODE_TYPE? number
+	---@param options? table
 	---@param HULL_SIZE? number
-	---@param BitCapability? number
-	---@param JumpMultiplier? number 	-- How much jumping / flying cost over walking
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
-	---@param MaxDistance? number		-- Searching with in a range, can lower the cost over longer / difficult terrain.
-	---@param UseZone? boolean			-- Setting this to false will make it slower, but work on broken NodeGraphs.
-	function n_meta:PathFindASync( start_pos, end_pos, callback, NODE_TYPE, HULL_SIZE, BitCapability, JumpMultiplier, generator, MaxDistance, UseZone )
+	function n_meta:PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
 		add_hook() -- Make sure the async runs
 		local count = 0
 		local function awaitGen( current, neighbor, CAP_MOVE, elevator, h_cost_estimate )

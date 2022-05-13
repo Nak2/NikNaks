@@ -67,15 +67,11 @@ do
 	---@param end_pos Vector|Entity
 	---@param NODE_TYPE? number
 	---@param HULL_SIZE? number
-	---@param BitCapability? number
-	---@param JumpMultiplier? number 	-- How much jumping / flying cost over walking
+	---@param options? table
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
-	---@param MaxDistance? number		-- Searching with in a range, can lower the cost over longer / difficult terrain.
-	---@param UseZone? boolean			-- Setting this to false will make it slower, but work on broken NodeGraphs.
-	---@param UseEntity? Entity			-- Calls the CanWalk, CanClimb, CanFly and CanClimb functions within the generator
 	---@return LPathFollower|boolean
-	function NodeGraph.PathFind( start_pos, end_pos, NODE_TYPE, HULL_SIZE, BitCapability, JumpMultiplier, generator, MaxDistance, UseZone )
-		return NGarph and NGarph:PathFind( start_pos, end_pos, NODE_TYPE, HULL_SIZE, BitCapability, JumpMultiplier, generator, MaxDistance, UseZone )
+	function NodeGraph.PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
+		return NGarph and NGarph:PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
 	end
 
 	---A cheap lookup function. Checks to see if we can reach the position using nearby nodes.
@@ -180,7 +176,8 @@ do
 			local v = A:OBBMaxs() - A:OBBMins()
 			local s = SysTime()
 			local result = NNN_Mesh:PathFind( A:GetPos(), B:GetPos(), 16 or math.max(v.x, v.y), v.z, options, nil)
-			local result2 = NodeGraph.PathFind( A:GetPos(), C:GetPos(), NODE_TYPE_GROUND, HULL_HUMAN, bit.bor(CAP_MOVE_GROUND, CAP_MOVE_CLIMB) )
+			local result2 = NodeGraph.PathFind( A:GetPos(), C:GetPos(), NODE_TYPE_GROUND, nil, HULL_HUMAN )
+
 			cost = SysTime() - s
 			if result == false then
 				local ang = EyeAngles()
