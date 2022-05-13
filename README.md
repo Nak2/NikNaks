@@ -3,7 +3,7 @@
  It features a ByteBuffer, BSP Parser, NodeGraph, Navigation Mesh, PathFinding and more.
  
 >***Note:** May not be reuploaded to workshop or any other Steam© services.
-See: https://github.com/Nak2/NikNaks/LICENSE for more info.
+See: https://github.com/Nak2/NikNaks/blob/main/LICENSE for more info.
 ### ByteBuffer
 ------
 ByteBuffers are simelar to file-objects as they store data in a 32-bit number-array.
