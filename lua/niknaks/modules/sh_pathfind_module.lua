@@ -249,10 +249,17 @@ do
 	end
 
 	---Returns the closest sequence.
-	---@param position any
+	---@param position Vector
 	---@return table
 	function meta:FindClosestSeg( position )
 		return findClosestSeg( self, position)
+	end
+
+	---Returns the distance from the path.
+	---@param position Vector
+	---@return number
+	function meta:FindDistanceFromPath( position )
+		return self:GetClosestPosition( position ):Distance( position )
 	end
 
 	
