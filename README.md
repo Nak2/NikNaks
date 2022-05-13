@@ -1,5 +1,5 @@
 # NikNaks
- A library with various features for Gary's Mod I've created.
+ A library with various features for Garry's Mod I've created.
  It features a ByteBuffer, BSP Parser, NodeGraph, Navigation Mesh, PathFinding and more.
  
 >***Note:** May not be reuploaded to workshop or any other Steam© services without specific prior written permission.<br>
@@ -14,7 +14,7 @@ ByteBuffers are simelar to file-objects as they store data in a 32-bit number-ar
 >***Note:** ByteBuffers have some limits, as reading and writing strings tent to be faster using the file-IO.
 ### [BSP Parser](https://github.com/Nak2/NikNaks/wiki/BSP-Parser)
 -------------
-BSP Parser allows you to read any Source-based maps Gary's Mod allow and retrive data and informations otherwise blocked off.
+BSP Parser allows you to read any Source-based maps Garry's Mod allow and retrive data and informations otherwise blocked off.
 * Can read any BSP file form version 17 to 21.
 * Holds map informations (Version, MapSize, IsCold, .. ect)
 * Can List all map entities and their data.
