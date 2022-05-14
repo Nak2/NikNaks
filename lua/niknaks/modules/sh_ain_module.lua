@@ -57,7 +57,10 @@ do
 				endpos = t.pos - Vector( 0,0,128 ),
 				mask = MASK_SOLID_BRUSHONLY
 			})
-			t.pos = trace.Hit and trace.HitPos or t.pos
+			-- Sometimes trace-line fails for some reason.
+			if trace then
+				t.pos = trace.Hit and trace.HitPos or t.pos
+			end
 		end
 		setmetatable(t, ain_node)
 		return t
