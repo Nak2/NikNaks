@@ -512,10 +512,8 @@ do
 			endpos = to,
 			mask = MASK_SOLID_BRUSHONLY
 		})
+		if not trace then return false end
 		local b = not trace.Hit and trace.Fraction < 1
-		if b then
-			PrintTable( trace )
-		end
 		return b
 	end
 	---Returns the AIN version. Should be 37.
