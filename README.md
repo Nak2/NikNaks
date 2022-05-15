@@ -27,7 +27,7 @@ BSP Parser allows you to read any Source-based maps Garry's Mod allow and retriv
 ------
 NikNaks comes two two valid types of PathFind-systems. Both returns the same LPathFollow object. Allowing your NPCs to choose between the two systems.
 ***Note:** These can only be loaded after `InitPostEntity`.
-##### NodeGraph
+#### NodeGraph
 A fast lua-based system to mimic, load, edit and patch Valves NodeGraphs ( AIN files ).
 * Has all basic nodes ( Ground, Air, Climb, Hint .. ect)
 * Uses a grid-system to speed up PathFinding.
@@ -35,7 +35,7 @@ A fast lua-based system to mimic, load, edit and patch Valves NodeGraphs ( AIN f
 * Has PathFinding and AsyncPathFinding.
 * Allows multiple NodeGraphs to be loaded at the same time.
 * And more ...
-##### NikNav
+#### NikNav
 NikNaks own navigationmesh. Can be compiled from NAV + BSP -> NikNav or manually created.
 * Up to 99% less file-size than NAV.
 * Uses a grid-system to speed up PathFinding.
