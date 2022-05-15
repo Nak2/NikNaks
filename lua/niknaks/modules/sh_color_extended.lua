@@ -9,12 +9,14 @@ local min, max, abs = math.min, math.max, math.abs
 local string_format, string_sub = string.format, string.sub
 
 -- Color enums
-	color_server= Color(156, 241, 255, 200)
-	color_client= Color(255, 241, 122, 200)
-	color_menu 	= Color(100, 220, 100, 200)
+	SERVER_COLOR= Color(156, 241, 255, 200)
+	CLIENT_COLOR= Color(255, 241, 122, 200)
+	MENU_COLOR 	= Color(100, 220, 100, 200)
+	REALM_COLOR = SERVER and SERVER_COLOR or CLIENT and CLIENT_COLOR or MENU_DLL and MENU_COLOR
 	color_error_server	= Color(136, 221, 255)
 	color_error_client	= Color(255, 221, 102)
 	color_error_menu 	= Color(120, 220, 100)
+	
 
 	---Returns the luminance amount. How "bright" a color is between 0 and 255.
 	---@param color Color
