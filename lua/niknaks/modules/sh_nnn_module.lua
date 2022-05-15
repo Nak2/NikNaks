@@ -64,7 +64,7 @@ function NNN.CreateNew()
 	t.m_movepoints	= {}	-- A special link between two points the NPC can use. Can be ladders, crawl or a narrow walk line.
 	t.m_directory	= {}	-- A list if names for NAV areas
 	t.m_higestID = 0
-	t.m_grid = {}
+	t._grid = {}
 	return t
 end
 
@@ -91,9 +91,9 @@ do
 	function mesh:GetArea( position, beneathLimit )
 		local x,y = chop(position)
 		local c, d
-		if self.m_grid[x] and self.m_grid[x][y] then
+		if self._grid[x] and self._grid[x][y] then
 			-- Check to see if the area is within
-			for id, area in pairs( self.m_grid[x][y] ) do
+			for id, area in pairs( self._grid[x][y] ) do
 				if not area then continue end -- Unknown area?
 				if beneathLimit and area.m_pos.z > beneathLimit then continue end
 				if area:IsWithin( position ) then return area end -- Position is within this area. Return it.
@@ -124,9 +124,9 @@ do
 		-- Add the area to the grid, also add a 1 grid padding, to make it better
 		for x = x1 - 1, x2 + 1 do
 			for y = y1 - 1, y2 + 1 do
-				if not self.m_grid[x] then self.m_grid[x] = {} end
-				if not self.m_grid[x][y] then self.m_grid[x][y] = {} end
-				self.m_grid[x][y][area.m_id] = area
+				if not self._grid[x] then self._grid[x] = {} end
+				if not self._grid[x][y] then self._grid[x][y] = {} end
+				self._grid[x][y][area.m_id] = area
 			end
 		end
 	end
@@ -137,16 +137,16 @@ do
 		-- Add the area to the grid, also add a 1 grid padding, to make it better
 		for x = x1 - 1, x2 + 1 do
 			for y = y1 - 1, y2 + 1 do
-				if not self.m_grid[x] then continue end
-				if not self.m_grid[x][y] then continue end
-				self.m_grid[x][y][area.m_id] = nil
+				if not self._grid[x] then continue end
+				if not self._grid[x][y] then continue end
+				self._grid[x][y][area.m_id] = nil
 			end
 		end
 	end
 
 	---This function re-generated the grid lookup table. This speeds up locating areas and other stuff.
 	function mesh:CalculateGrid()
-		self.m_grid = {}
+		self._grid = {}
 		for id, area in pairs( self.m_areas ) do
 			self:AddToGrid( area )
 		end
@@ -192,9 +192,9 @@ do
 		local x,y = chop(position)
 		local c, d
 		-- check Grid first
-		if self.m_grid[x] and self.m_grid[x][y] then
+		if self._grid[x] and self._grid[x][y] then
 			-- Check to see if the area is within
-			for id, area in pairs( self.m_grid[x][y] ) do
+			for id, area in pairs( self._grid[x][y] ) do
 				if not area then continue end -- Unknown area?
 				if hasAttrobutes and not area:HasAttributes( hasAttributes ) then continue end
 				if area:IsWithin( position ) then return area, true end -- Position is within this area. Return it.
@@ -1187,8 +1187,8 @@ if CLIENT then
 		local lpv = EyeVector()
 		cam.IgnoreZ( true )
 		local x,y = math.ceil(lp.x / GRID_SIZE), math.ceil(lp.y / GRID_SIZE)
-		if self.m_grid[x] and self.m_grid[x][y] then
-			for id, area in pairs( self.m_grid[x][y] ) do
+		if self._grid[x] and self._grid[x][y] then
+			for id, area in pairs( self._grid[x][y] ) do
 				local v = (lp - area.m_center):GetNormalized()
 				local n = v:Dot(lpv)
 				if n > 0  then continue end
