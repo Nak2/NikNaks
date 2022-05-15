@@ -6,9 +6,7 @@ local band = bit.band
 local ColorToLuminance, ComputeLighting = ColorToLuminance, render and render.ComputeLighting
 
 local function clamp( _in, low, high )
-	if _in < low then return low end
-	if _in > high then return high end
-	return _in
+	return min( max(_in, low), high )
 end
 
 -- Makes it easier to read
