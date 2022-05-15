@@ -47,9 +47,9 @@ BSP_ERROR_TOO_NEW 		= 2
 BSP_ERROR_FILENOTFOUND 	= 3
 AIN_ERROR_VERSIONNUM	= 4
 AIN_ERROR_ZONEPATCH		= 5	-- This error is thrown when the AIN-parser repairs the data. It will still return the data successfully.
-NNN_ERROR_NAVNOTFOUND	= 6
-NNN_ERROR_BSPNOTFOUND	= 7
-NNN_ERROR_FILECANTOPEN	= 8
+NikNav_ERROR_NAVNOTFOUND	= 6
+NikNav_ERROR_BSPNOTFOUND	= 7
+NikNav_ERROR_FILECANTOPEN	= 8
 
 -- naksbot
 PATHTYPE_NONE=-1	-- In case there are no path-options on the map

@@ -7,16 +7,16 @@ local TraceLine = util.TraceLine
 
 local ColorToLuminance, ComputeLighting = ColorToLuminance, render and render.ComputeLighting
 -- Nik Naks Navigation
-NNN = {}
-NNN.Version = 0.1
+NikNav = {}
+NikNav.Version = 0.1
 
 local GRID_SIZE = 800
 
----@class NNN_Mesh
+---@class NikNav_Mesh
 local mesh = {}
 mesh.__index = mesh
-mesh.MetaName = "NNN_Mesh"
-debug.getregistry().NNN_Mesh = mesh
+mesh.MetaName = "NikNav_Mesh"
+debug.getregistry().NikNav_Mesh = mesh
 
 -- Makes it easier to read
 local NORTH_WEST = 0
@@ -30,10 +30,10 @@ local EAST  = 1	-- +X
 local SOUTH = 2	-- +Y
 local WEST  = 3	-- -X
 
-local meta_area = FindMetaTable("NNN_Area")
-local meta_connection = FindMetaTable("NNN_Connection")
-local meta_movep= FindMetaTable("NNN_MovePoint")
-local meta_hintp= FindMetaTable("NNN_HintPoint")
+local meta_area = FindMetaTable("NikNav_Area")
+local meta_connection = FindMetaTable("NikNav_Connection")
+local meta_movep= FindMetaTable("NikNav_MovePoint")
+local meta_hintp= FindMetaTable("NikNav_HintPoint")
 
 -- Calculates a normal from 4 vector-points
 local function CalcNormal(a, b, c, d)
@@ -53,12 +53,12 @@ local function CalcNormal(a, b, c, d)
 	return (n + n2):GetNormalized()
 end
 
-function NNN.CreateNew()
+function NikNav.CreateNew()
 	local t = {}
 	setmetatable(t, mesh)
-	t.m_version = NNN.Version
+	t.m_version = NikNav.Version
 	t.m_map = file.Size("maps/" .. game.GetMap() .. ".bsp", "GAME")
-	t.m_wasonmap = false		-- A flag to tell if the NNN have been loaded on the map. If this is false, then we need to trace-to-ground the points.
+	t.m_wasonmap = false		-- A flag to tell if the NikNav have been loaded on the map. If this is false, then we need to trace-to-ground the points.
 	t.m_areas 	= {}
 	t.m_hintpoints 	= {}	-- Hint points are points of activity / interest for the NPC. Antlions use these to burrow, or combine use "window" points.
 	t.m_movepoints	= {}	-- A special link between two points the NPC can use. Can be ladders, crawl or a narrow walk line.
@@ -87,7 +87,7 @@ do
 	---Locates the nearest area to the given position
 	---@param position Vector
 	---@param beneathLimit? number
-	---@return NNN_Area
+	---@return NikNav_Area
 	function mesh:GetArea( position, beneathLimit )
 		local x,y = chop(position)
 		local c, d
@@ -117,7 +117,7 @@ do
 		return c
 	end
 	---(Interla) Adds an area to the gird.
-	---@param area NNN_Area
+	---@param area NikNav_Area
 	function mesh:AddToGrid( area )
 		local x1,y1 = chop( area.m_corner[0] )
 		local x2,y2 = chop( area.m_corner[2] )
@@ -160,7 +160,7 @@ do
 
 	---Returns the area by the given ID
 	---@param id number
-	---@return NNN_AREA|nil
+	---@return NikNav_AREA|nil
 	function mesh:GetAreaByID( id )
 		return self.m_areas[id]
 	end
@@ -186,7 +186,7 @@ do
 	---@param maxDist? number
 	---@param checkLOS? boolean
 	---@param hasAttrobutes? number
-	---@return NNN_AREA|nil
+	---@return NikNav_AREA|nil
 	function mesh:GetNearestArea( position, maxDist, checkLOS, hasAttributes)
 		maxDist = maxDist or 10000
 		local x,y = chop(position)
@@ -248,7 +248,7 @@ do
 	---@param nez? number
 	---@param swz? number
 	---@param force_id? number
-	---@return NNN_Area
+	---@return NikNav_Area
 	function mesh:CreateArea( corner, opposite_corner, swz, nez, force_id )
 		local t = {}
 		local nw, se, ne, sw
@@ -300,7 +300,7 @@ do
 	end
 
 	---Deletes an area
-	---@param NNN_Area
+	---@param NikNav_Area
 	function mesh:RemoveArea( area )
 		area:RemoveAllConnections() -- Remove all connections to this area.
 		self:RemoveFromGrid( area ) -- Remove the area from the grid lookup table.
@@ -327,8 +327,8 @@ end
 -- Area Merge functions
 do
 	---Returns true if the two areas can be merged.
-	---@param area NNN_Area
-	---@param area2 NNN_Area
+	---@param area NikNav_Area
+	---@param area2 NikNav_Area
 	---@param fuzzy? number		"Fuzzyness" of the angles.
 	---@return boolean
 	function mesh:CanMerge(area, area2, fuzzy)
@@ -369,8 +369,8 @@ do
 	end
 
 	---Tries to merge the two areas together.
-	---@param area NNN_Area
-	---@param area2 NNN_Area
+	---@param area NikNav_Area
+	---@param area2 NikNav_Area
 	---@param fuzzy? number		"Fuzzyness" of the angles.
 	---@return boolean
 	function mesh:MergeAreas(area, area2, fuzzy)
@@ -480,7 +480,7 @@ do
 	end
 
 	---Removes the placename from the area.
-	---@param area NNN_Area
+	---@param area NikNav_Area
 	---@return boolean
 	function mesh:RemovePlace( area )
 		local oldid = area.m_directory
@@ -492,7 +492,7 @@ do
 	end
 	
 	---Sets the place-name for the given area. Note; only supports 255 diffrent names.
-	---@param area NNN_Area
+	---@param area NikNav_Area
 	---@param place string|number
 	---@return boolean success
 	function mesh:SetPlace(area, place )
@@ -562,7 +562,7 @@ do
 	---@param moveflag number
 	---@param radius? number
 	---@param oneway? boolean
-	---@return NNN_MovePoint
+	---@return NikNav_MovePoint
 	function mesh:CreateMovePoint( from_pos, to_pos, moveflag, radius, oneway )
 		local t = {}
 		t.m_id = #self.m_movepoints + 1
@@ -585,7 +585,7 @@ do
 	---@param yaw? number
 	---@param fov? number
 	---@param hintactivity? number
-	---@return NNN_HintPoint
+	---@return NikNav_HintPoint
 	function mesh:CreateHintPoint( position, hint, yaw, fov, hintactivity )
 		local t = {}
 		t.m_id = #self.m_hintpoints + 1
@@ -602,14 +602,14 @@ do
 	end
 
 	---Removes a move point.
-	---@param move_point NNN_MovePoint
+	---@param move_point NikNav_MovePoint
 	function mesh:RemoveMovePoint( move_point )
 		move_point:DecoupleArea()
 		self.m_movepoints[move_point.m_id] = nil
 	end
 
 	---Removes a move point.
-	---@param hint_point NNN_HintPoint
+	---@param hint_point NikNav_HintPoint
 	function mesh:RemoveHintPoint( hint_point )
 		hint_point:DecoupleArea()
 		self.m_hintpoints[hint_point.m_id] = nil
@@ -618,82 +618,82 @@ end
 
 -- Save / Load
 do
-	---Loads the NNN
+	---Loads the NikNav
 	---@param filename? string
-	---@return NNN_Mesh|nil
-	function NNN.Load( filename )
-		filename = filename or "nnn/" .. game.GetMap() .. ".dat"
-		local nnn = ByteBuffer.OpenFile(filename, "DATA", true)
-		if not nnn then print("FILE NOT FOUND!") return end -- Unable to open file
-		if nnn:ReadULong() ~= 0xCAFEC0DE then return end -- Invalid file
-		local mesh = NNN.CreateNew()
-		mesh.m_version = nnn:ReadUShort()
-		mesh.m_map = nnn:ReadULong()
+	---@return NikNav_Mesh|nil
+	function NikNav.Load( filename )
+		filename = filename or "niknav/" .. game.GetMap() .. ".dat"
+		local niknav = ByteBuffer.OpenFile(filename, "DATA", true)
+		if not niknav then print("FILE NOT FOUND!") return end -- Unable to open file
+		if niknav:ReadULong() ~= 0xCAFEC0DE then return end -- Invalid file
+		local mesh = NikNav.CreateNew()
+		mesh.m_version = niknav:ReadUShort()
+		mesh.m_map = niknav:ReadULong()
 		if mesh.m_map ~= file.Size("maps/" .. game.GetMap() .. ".bsp", "GAME") then
-			NikNaks.Msg("Warning. This NNN file was built using a different version than the current map!")
+			NikNaks.Msg("Warning. This NikNav file was built using a different version than the current map!")
 		end
-		mesh.m_wasonmap = nnn:ReadBool() -- Unsure if we should keep this.
+		mesh.m_wasonmap = niknav:ReadBool() -- Unsure if we should keep this.
 		-- Load directory
-		for i = 1, nnn:ReadByte() do
-			mesh.m_directory[i] =  nnn:ReadString()
+		for i = 1, niknav:ReadByte() do
+			mesh.m_directory[i] =  niknav:ReadString()
 		end
 		-- Load areas
-		for i = 1, nnn:ReadULong() do
-			meta_area.__load( mesh, nnn )
+		for i = 1, niknav:ReadULong() do
+			meta_area.__load( mesh, niknav )
 		end
 		-- Read connections
-		meta_connection.__loadAll( mesh, nnn )
+		meta_connection.__loadAll( mesh, niknav )
 		-- Calculate the grid
 		--mesh:CalculateGrid()
 		-- Load movepoints
-		for i = 1, nnn:ReadUShort() do
-			meta_movep.__load( mesh, nnn )
+		for i = 1, niknav:ReadUShort() do
+			meta_movep.__load( mesh, niknav )
 		end
 		-- Load hintpoints
-		for i = 1, nnn:ReadUShort() do
-			meta_hintp.__load( mesh, nnn )
+		for i = 1, niknav:ReadUShort() do
+			meta_hintp.__load( mesh, niknav )
 		end
-		if nnn:ReadULong() == 0xCAFEC0DE then
+		if niknav:ReadULong() == 0xCAFEC0DE then
 			return mesh
 		end
 	end
 
-	---Saves the NNN
+	---Saves the NikNav
 	---@param filename? string
 	function mesh:Save( filename )
-		filename = filename or "nnn/" .. game.GetMap() .. ".dat"
-		local nnn = ByteBuffer.Create()
-		nnn:WriteULong( 0xCAFEC0DE )
-		nnn:WriteUShort( NNN.Version )
-		nnn:WriteULong( file.Size("maps/" .. game.GetMap() .. ".bsp", "GAME") )
-		nnn:WriteBool( self.m_wasonmap )
+		filename = filename or "niknav/" .. game.GetMap() .. ".dat"
+		local niknav = ByteBuffer.Create()
+		niknav:WriteULong( 0xCAFEC0DE )
+		niknav:WriteUShort( NikNav.Version )
+		niknav:WriteULong( file.Size("maps/" .. game.GetMap() .. ".bsp", "GAME") )
+		niknav:WriteBool( self.m_wasonmap )
 		-- Write directory
-		nnn:WriteByte(#self.m_directory)
+		niknav:WriteByte(#self.m_directory)
 		for i = 1, #self.m_directory do
-			nnn:WriteString( self.m_directory[i] )
+			niknav:WriteString( self.m_directory[i] )
 		end
 		-- Write areas
-		nnn:WriteULong( table.Count(self.m_areas) )
+		niknav:WriteULong( table.Count(self.m_areas) )
 		local c = 0
 		local connections = {}
 		for _, area in pairs( self.m_areas ) do
-			area:__save( nnn )
+			area:__save( niknav )
 		end
 		-- Write connections
-		meta_connection.__saveAll( self, nnn )
+		meta_connection.__saveAll( self, niknav )
 		-- Write movepoints
-		nnn:WriteUShort( #self.m_movepoints )
+		niknav:WriteUShort( #self.m_movepoints )
 		for _, move_p in ipairs( self.m_movepoints ) do
-			move_p:__save( nnn )
+			move_p:__save( niknav )
 		end
 		-- Write hintpoints
-		nnn:WriteUShort( #self.m_hintpoints )
+		niknav:WriteUShort( #self.m_hintpoints )
 		for _, hint_p in ipairs( self.m_hintpoints ) do
-			hint_p:__save( nnn )
+			hint_p:__save( niknav )
 		end
-		nnn:WriteULong( 0xCAFEC0DE )
+		niknav:WriteULong( 0xCAFEC0DE )
 		file.CreateDir( string.GetPathFromFilename(filename) ) -- Ensure the dirs are there
-		nnn:SaveToFile( filename, true )
+		niknav:SaveToFile( filename, true )
 	end
 
 	do
@@ -897,11 +897,11 @@ do
 		end
 	end
 
-	---Generates NNN, by using NAV and BSP files.
+	---Generates NikNav, by using NAV and BSP files.
 	---@param NAVFile? string The nav file to generate from
 	---@param BSPFile? string The map file to generate from
-	---@return NNN_Mesh|nil
-	function NNN.GenerateFromNav( NAVFile, BSPFile )
+	---@return NikNav_Mesh|nil
+	function NikNav.GenerateFromNav( NAVFile, BSPFile )
 		local NAV, BSP, navVersion
 		-- Handle / locate input data
 		do
@@ -931,9 +931,9 @@ do
 			end
 		
 			-- Start generation
-			NikNaks.Msg("Generating NNN from NAV and BSP ..")
+			NikNaks.Msg("Generating NikNav from NAV and BSP ..")
 			local m_isAnalyzed = navVersion >= 14 and NAV:ReadByte() ~= 0 or false
-			self = NNN.CreateNew()
+			self = NikNav.CreateNew()
 		
 			-- Parse directory
 			for id, placeName in ipairs( loadPlaceData( NAV, navVersion ) ) do
@@ -1032,7 +1032,7 @@ do
 		for k, area in pairs( self.m_areas ) do
 			area:CompileAllConnectionSize()
 		end
-		NikNaks.Msg((string.format("NAV + BSP -> NNN parser took: %fms", SysTime() - starttime)))
+		NikNaks.Msg((string.format("NAV + BSP -> NikNav parser took: %fms", SysTime() - starttime)))
 		return self
 	end
 end
@@ -1071,7 +1071,7 @@ do
 		return place
 	end
 
-	-- Loads a NAV area, and converts it to NNN area
+	-- Loads a NAV area, and converts it to NikNav area
 	-- Link: https://github.com/ValveSoftware/source-sdk-2013/blob/0d8dceea4310fde5706b3ce1c70609d72a38efdf/mp/src/game/server/nav_file.cpp#L389 
 	local function loadNavArea( self, NAV, NAVVersion )
 		local area = {}

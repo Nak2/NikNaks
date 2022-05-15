@@ -23,25 +23,25 @@ local EAST  = 1	-- +X
 local SOUTH = 2	-- +Y
 local WEST  = 3	-- -X
 
----@class NNN_Area
+---@class NikNav_Area
 local meta_area = {}
-meta_area.MetaName = "NNN_Area"
+meta_area.MetaName = "NikNav_Area"
 meta_area.__index = meta_area
 meta_area.__eq = function( a, b )
 	return a.m_id == b.m_id
 end
-debug.getregistry().NNN_Area = meta_area
+debug.getregistry().NikNav_Area = meta_area
 
----@class NNN_Connection
+---@class NikNav_Connection
 local meta_connection = {}
 meta_connection.__index = meta_connection
-meta_connection.MetaName = "NNN_Connection"
-debug.getregistry().NNN_Connection = meta_connection
+meta_connection.MetaName = "NikNav_Connection"
+debug.getregistry().NikNav_Connection = meta_connection
 
 -- Connections meta-functions
 do
 	---Returns the area it connects to
-	---@return NNN_Area
+	---@return NikNav_Area
 	function meta_connection:GetArea()
 		return self.m_area
 	end
@@ -98,7 +98,7 @@ do
 	end
 
 	---Returns the mirrored connection
-	---@return NNN_Connection
+	---@return NikNav_Connection
 	function meta_connection:GetMirrorConnection()
 		return self.m_other
 	end
@@ -249,7 +249,7 @@ do
 	end
 
 	---Returns the distance to the position
-	---@param position Vector|NNN_Area
+	---@param position Vector|NikNav_Area
 	---@return number
 	function meta_area:Distance( position )
 		if position.MetaName and position.MetaName == meta_area.MetaName then
@@ -259,7 +259,7 @@ do
 	end
 
 	---Returns the squared distance to the position
-	---@param position Vector|NNN_Area
+	---@param position Vector|NikNav_Area
 	---@return number
 	function meta_area:DistToSqr( position )
 		if position.MetaName and position.MetaName == meta_area.MetaName then
@@ -319,11 +319,11 @@ do
 	end
 
 
-	---Calculates the height difference between the two nnn_areas. Unlike nav, this calculates from the closest point.
-	---@param nnn_area NNN_Area
-	function meta_area:ComputeGroundHeightChange( nnn_area )
-		local a = self:GetClosestGoundPointOnArea( nnn_area.m_center )
-		local b = nnn_area:GetClosestGoundPointOnArea( a )
+	---Calculates the height difference between the two niknav_areas. Unlike nav, this calculates from the closest point.
+	---@param niknav_areas NikNav_Area
+	function meta_area:ComputeGroundHeightChange( niknav_areas )
+		local a = self:GetClosestGoundPointOnArea( niknav_areas.m_center )
+		local b = niknav_areas:GetClosestGoundPointOnArea( a )
 		return b.z - a.z
 	end
 end
@@ -334,8 +334,8 @@ do
 	local C_SMALLER = 1
 	local C_BIGGER	= 2
 	local C_MIX		= 3
-	function meta_area:HasConnection( nnn_area )
-		return nnn_area.m_connections[self.m_id] and self.m_connections[nnn_area.m_id]
+	function meta_area:HasConnection( niknav_areas )
+		return niknav_areas.m_connections[self.m_id] and self.m_connections[niknav_areas.m_id]
 	end
 
 	-- Locates the middle between the two areas, and the width
@@ -459,20 +459,20 @@ do
 	end
 
 	---Creates a connection between the area and another
-	---@param nnn_area NNN_Area
-	function meta_area:CreateConnection( nnn_area )
-		if self:HasConnection( nnn_area ) then return end
-		local closest = nnn_area:GetClosestGoundPointOnArea( self.m_center )
-		local dir = self:ComputeDirection( nnn_area.m_center )
-		local from, to, size, _typeA, _typeB = findSidePos( self, nnn_area, dir )
-		local dist = self:Distance( nnn_area )
-		local height = self:ComputeGroundHeightChange( nnn_area )
+	---@param niknav_areas NikNav_Area
+	function meta_area:CreateConnection( niknav_areas )
+		if self:HasConnection( niknav_areas ) then return end
+		local closest = niknav_areas:GetClosestGoundPointOnArea( self.m_center )
+		local dir = self:ComputeDirection( niknav_areas.m_center )
+		local from, to, size, _typeA, _typeB = findSidePos( self, niknav_areas, dir )
+		local dist = self:Distance( niknav_areas )
+		local height = self:ComputeGroundHeightChange( niknav_areas )
 
 		-- Connection A
 		local A, B
 		do
 			local connection = {}
-			connection.m_area	= nnn_area
+			connection.m_area	= niknav_areas
 			connection.m_dir	= dir
 			connection.m_dist	= dist
 			connection.m_height	= height
@@ -482,7 +482,7 @@ do
 			connection.m_enabled= true
 			connection._TYPE = _typeA
 			setmetatable(connection, meta_connection)
-			self.m_connections[nnn_area.m_id] = connection
+			self.m_connections[niknav_areas.m_id] = connection
 			A = connection
 		end
 		-- Connection B
@@ -498,14 +498,14 @@ do
 			connection.m_enabled= true
 			connection._TYPE = _typeB
 			setmetatable(connection, meta_connection)
-			nnn_area.m_connections[self.m_id] = connection
+			niknav_areas.m_connections[self.m_id] = connection
 			B = connection
 		end
 		-- Tell A about B and revese
 		A.m_other = B
 		B.m_other = A
 		-- Calculate Z the areas touches
-		A.m_zheight = math.min( self.m_maxz, nnn_area.m_maxz ) - math.max( A.m_from.z, A.m_to.z )
+		A.m_zheight = math.min( self.m_maxz, niknav_areas.m_maxz ) - math.max( A.m_from.z, A.m_to.z )
 		B.m_zheight	= A.m_zheight
 		-- LineMath
 		calcLM(A)
@@ -513,10 +513,10 @@ do
 	end
 
 	---Deletes the connection between the two areas.
-	---@param nnn_area NNN_Area
-	function meta_area:RemoveConnection( nnn_area )
-		self.m_connections[nnn_area.m_id] = nil
-		nnn_area.m_connections[self.m_id] = nil
+	---@param niknav_areas NikNav_Area
+	function meta_area:RemoveConnection( niknav_areas )
+		self.m_connections[niknav_areas.m_id] = nil
+		niknav_areas.m_connections[self.m_id] = nil
 	end
 
 	--Deletes all connections
@@ -600,17 +600,17 @@ end
 
 -- Save & Load
 do
-	function meta_area.__save( NNN_Area, bytebuffer )
-		bytebuffer:WriteULong(NNN_Area.m_id)
-		bytebuffer:WriteVector(NNN_Area.m_corner[0])
-		bytebuffer:WriteVector(NNN_Area.m_corner[2])
-		bytebuffer:WriteFloat(NNN_Area.m_corner[3].z)
-		bytebuffer:WriteFloat(NNN_Area.m_corner[1].z)
-		bytebuffer:WriteFloat(NNN_Area.m_maxz)
-		bytebuffer:WriteULong(NNN_Area.m_attributeFlags or 0)
-		bytebuffer:WriteByte(NNN_Area.m_directory or 0)
+	function meta_area.__save( NikNav_Area, bytebuffer )
+		bytebuffer:WriteULong(NikNav_Area.m_id)
+		bytebuffer:WriteVector(NikNav_Area.m_corner[0])
+		bytebuffer:WriteVector(NikNav_Area.m_corner[2])
+		bytebuffer:WriteFloat(NikNav_Area.m_corner[3].z)
+		bytebuffer:WriteFloat(NikNav_Area.m_corner[1].z)
+		bytebuffer:WriteFloat(NikNav_Area.m_maxz)
+		bytebuffer:WriteULong(NikNav_Area.m_attributeFlags or 0)
+		bytebuffer:WriteByte(NikNav_Area.m_directory or 0)
 		for i = 0, 3 do
-			bytebuffer:WriteByte( NNN_Area.m_lightIntensity[i] )
+			bytebuffer:WriteByte( NikNav_Area.m_lightIntensity[i] )
 		end
 	end
 
@@ -636,7 +636,6 @@ do
 
 	-- Connections are a bit different, as we save and load all of them
 	function meta_connection.__saveAll( mesh, bytebuffer )
-		print("Connection Save All")
 		-- Collect all connections on the mesh and generate a list.
 		local connections = {}
 		for id, area in pairs( mesh.m_areas ) do

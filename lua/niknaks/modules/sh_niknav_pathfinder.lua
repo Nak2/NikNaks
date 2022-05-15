@@ -2,11 +2,11 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 
 local band = bit.band
-local mesh = FindMetaTable("NNN_Mesh")
+local mesh = FindMetaTable("NikNav_Mesh")
 
 -- A* PathFinder
 do
-	local connectionName = FindMetaTable("NNN_Connection").MetaName
+	local connectionName = FindMetaTable("NikNav_Connection").MetaName
 	local LPFMeta = FindMetaTable("LPathFollower")
 	--	Each connection hold direction, distance and valid-move flags
 	--	+------+       +------+

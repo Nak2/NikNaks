@@ -112,33 +112,33 @@ end
 
 -- NikNaks Alis and logic
 do
-	local NNN_Mesh
-	hook.Add("InitPostEntity", "NN_Load_NNN", function()
-		if file.Exists("nnn/" .. game.GetMap() .. ".dat", "GAME") then
-			NNN_Mesh = NNN.Load()
-		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NNN
-			NNN_Mesh = NNN.GenerateFromNav()
-			if not NNN_Mesh then return end
-			NNN_Mesh:Save()
-			NikNaks.Msg("Generated NNN!")
+	local NikNav_Mesh
+	hook.Add("InitPostEntity", "NN_Load_NikNav", function()
+		if file.Exists("niknav/" .. game.GetMap() .. ".dat", "GAME") then
+			NikNav_Mesh = NikNav.Load()
+		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NikNav
+			NikNav_Mesh = NikNav.GenerateFromNav()
+			if not NikNav_Mesh then return end
+			NikNav_Mesh:Save()
+			NikNaks.Msg("Generated NikNav!")
 		end
 	end)
 
-	---Returns true if the NNN has loaded
+	---Returns true if the NikNav has loaded
 	---@return boolean
-	function NNN.HasLoaded()
-		return NNN_Mesh and true or false
+	function NikNav.HasLoaded()
+		return NikNav_Mesh and true or false
 	end
 
-	---Tries to load or generate the NNN
-	function NNN.Reload()
-		if file.Exists("nnn/" .. game.GetMap() .. ".dat", "GAME") then
-			NNN_Mesh = NNN.Load()
-		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NNN
-			NNN_Mesh = NNN.GenerateFromNav()
-			if not NNN_Mesh then return end
-			NNN_Mesh:Save()
-			NikNaks.Msg("Generated NNN!")
+	---Tries to load or generate the NikNav
+	function NikNav.Reload()
+		if file.Exists("niknav/" .. game.GetMap() .. ".dat", "GAME") then
+			NikNav_Mesh = NikNav.Load()
+		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NikNav
+			NikNav_Mesh = NikNav.GenerateFromNav()
+			if not NikNav_Mesh then return end
+			NikNav_Mesh:Save()
+			NikNaks.Msg("Generated NikNav!")
 		end
 	end
 
@@ -148,12 +148,12 @@ do
 	---@param height? number
 	---@param options? table				A table of options: 
 	---@param generator? function 			A function to modify the cost: func( FromArea, ToArea, connection, BitCapability, CurrentCost )
-	function NNN.PathFind( start_position, end_position, width, height, options, generator )
-		if not NNN_Mesh then return end
-		return NNN_Mesh:PathFind( start_position, end_position, width, height, options, generator )
+	function NikNav.PathFind( start_position, end_position, width, height, options, generator )
+		if not NikNav_Mesh then return end
+		return NikNav_Mesh:PathFind( start_position, end_position, width, height, options, generator )
 	end
 
-	if false and CLIENT then
+	if  CLIENT then
 		local t = ents.FindByClass("prop_physics")
 		local A = t[1]
 		local B = t[2]
@@ -164,17 +164,17 @@ do
 		options.StepHeight = 30
 		options.ClimbMultiplier = 0.8
 		hook.Add("PostDrawOpaqueRenderables", "T", function(a, b)
-			if NNN_Mesh and NNN then
-				NNN_Mesh:DebugRender()
+			if NikNav_Mesh and NikNav then
+				NikNav_Mesh:DebugRender()
 			else 
 				return
 			end
 			if not A or not B then return end
 			local v = A:OBBMaxs() - A:OBBMins()
 			local s = SysTime()
-			local result = NNN_Mesh:PathFind( A:GetPos(), B:GetPos(), 16 or math.max(v.x, v.y), v.z, options, nil)
-			local result2 = NodeGraph.PathFind( A:GetPos(), C:GetPos(), NODE_TYPE_GROUND, nil, HULL_HUMAN )
-
+			local result = NikNav_Mesh:PathFind( A:GetPos(), B:GetPos(), 16 or math.max(v.x, v.y), v.z, options, nil)
+			--local result2 = NodeGraph.PathFind( A:GetPos(), C:GetPos(), NODE_TYPE_GROUND, nil, HULL_HUMAN )
+			
 			cost = SysTime() - s
 			if result == false then
 				local ang = EyeAngles()

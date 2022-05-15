@@ -35,8 +35,8 @@ A fast lua-based system to mimic, load, edit and patch Valves NodeGraphs ( AIN f
 * Has PathFinding and AsyncPathFinding.
 * Allows multiple NodeGraphs to be loaded at the same time.
 * And more ...
-##### NNN
-NikNaks own navigationmesh. Can be compiled from NAV + BSP -> NNN or manually created.
+##### NikNav
+NikNaks own navigationmesh. Can be compiled from NAV + BSP -> NikNav or manually created.
 * Up to 99% less file-size than NAV.
 * Uses a grid-system to speed up PathFinding.
 * Supports hintpoints, move-points and other features.

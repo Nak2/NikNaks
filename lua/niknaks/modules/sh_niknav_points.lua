@@ -3,17 +3,17 @@
 
 local band = bit.band
 
----@class NNN_HintPoint
+---@class NikNav_HintPoint
 local meta_hintp = {}
 meta_hintp.__index = meta_hintp
-meta_hintp.MetaName = "NNN_HintPoint"
-debug.getregistry().NNN_HintPoint = meta_hintp
+meta_hintp.MetaName = "NikNav_HintPoint"
+debug.getregistry().NikNav_HintPoint = meta_hintp
 
----@class NNN_MovePoint
+---@class NikNav_MovePoint
 local meta_movep = {}
 meta_movep.__index = meta_movep
-meta_movep.MetaName = "NNN_MovePoint"
-debug.getregistry().NNN_MovePoint = meta_movep
+meta_movep.MetaName = "NikNav_MovePoint"
+debug.getregistry().NikNav_MovePoint = meta_movep
 
 -- Hint Point meta-functions
 do
@@ -51,7 +51,7 @@ do
 		[1001]= "HL1 World: Blinking Light",
 		[1002]= "HL1 World: Human Blood",
 		[1003]= "HL1 World: Alien Blood",
-		--- NNN Variables
+		--- NikNav Variables
 		[1020]= "Sniper Spot",			-- A point where the NPC can snipe
 		[1021]= "Perfect sniper Spot",	-- A perfect point where the NPC can snipe
 		[1022]= "Exposed Spot"			-- Aspot in the open, usually on a ledge or cliff
@@ -204,7 +204,7 @@ end
 
 -- Area <-> MovePoint & HintPoint
 do
-	local meta_area = FindMetaTable( "NNN_Area" )
+	local meta_area = FindMetaTable( "NikNav_Area" )
 	---Returns a list of all hint points near the area
 	---@return table
 	function meta_area:GetHintPoints()
