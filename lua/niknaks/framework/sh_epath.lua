@@ -152,8 +152,8 @@ do
 		if not NikNav_Mesh then return end
 		return NikNav_Mesh:PathFind( start_position, end_position, width, height, options, generator )
 	end
-
-	if  CLIENT then
+	-- Debug
+	if false and CLIENT then
 		local t = ents.FindByClass("prop_physics")
 		local A = t[1]
 		local B = t[2]
