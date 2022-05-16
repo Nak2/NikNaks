@@ -111,10 +111,16 @@ end
 
 -- Areas meta-functions
 do
-		---Returns the ID
+	---Returns the ID
 	---@return number
 	function meta_area:GetID()
 		return self.m_id
+	end
+
+	---Returns the zone-ID.
+	---@return number
+	function meta_area:GetZone()
+		return self.m_zone or -1
 	end
 
 	---Returns the center of the area
@@ -541,6 +547,20 @@ do
 		return self.m_connections
 	end
 
+	--Returns a list of all areas attached to this area. (A bit slow)
+	---@return table
+	function meta_area:GetAllAreasConnectioned( done )
+		done = done or {}
+		done[self.m_id] = self
+		for id, connect in pairs( self.m_connections ) do
+			local area = connect.m_area
+			if not area or done[area.m_id] then continue end
+			done[area.m_id] = connect.m_area
+			area:GetAllAreasConnectioned( done )
+		end
+		return done
+	end
+
 	---Returns the connections for said direction
 	---@param NavDir number
 	---@return table
@@ -707,10 +727,10 @@ do
 		local d = dx1 * dy2 - dy1 * dx2
 		if d == 0 then return end
 		local t = (dx2 * dy3 - dy2 * dx3) / d
-		if t < 0 then return end
-		if t > 1 then return end
+		--if t < 0 then return end
+		--if t > 1 then return end
 		local t2= (dx1 * dy3 - dy1 * dx3) / d
-		if t2 <0 or t2 >1 then return end
+		--if t2 <0 or t2 >1 then return end
 		return A1.x + t*dx1, A1.y + t * dy1
 	end
 
@@ -721,23 +741,20 @@ do
 	---@param positin_goal Vector
 	---@param size number
 	---@return Vector
-	function meta_connection:FindBestPathPos( position_start, position_goal, size )
+	function meta_connection:FindBestPathPos( position_start, position_goal, size ) -- LastPosition, StartPosition
+		--if true then return self.m_from end
 		-- A-Line
-		local X, Y = findIntersectin(position_start, position_goal, self._start, self._end)
-		if not X then
-			return self.m_from
+		local X, Y = self.m_from.x, self.m_from.y
+		if self.m_dir == NORTH then
+			X = X + size
+		elseif self.m_dir == SOUTH then
+			X = X - size
+		elseif self.m_dir == EAST then
+			Y = Y - size
 		else
-			if self.m_dir == NORTH then
-				X = X + size
-			elseif self.m_dir == SOUTH then
-				X = X - size
-			elseif self.m_dir == EAST then
-				Y = Y - size
-			else
-				Y = Y + size
-			end
-			return Vector(X, Y,self.m_from.z)
+			Y = Y + size
 		end
+		return Vector(X, Y,self.m_from.z)
 
 	end
 

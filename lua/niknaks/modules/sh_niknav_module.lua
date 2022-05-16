@@ -186,16 +186,24 @@ do
 	---@param maxDist? number
 	---@param checkLOS? boolean
 	---@param hasAttrobutes? number
+	---@param matchZone? number
 	---@return NikNav_AREA|nil
-	function mesh:GetNearestArea( position, maxDist, checkLOS, hasAttributes)
+	function mesh:GetNearestArea( position, maxDist, checkLOS, hasAttributes, matchZone)
 		maxDist = maxDist or 10000
 		local x,y = chop(position)
-		local c, d
+		local c, d, z
 		-- check Grid first
 		if self._grid[x] and self._grid[x][y] then
 			-- Check to see if the area is within
 			for id, area in pairs( self._grid[x][y] ) do
 				if not area then continue end -- Unknown area?
+				if matchZone then
+					local n = area:GetZone()
+					if n >= 0 and n ~= matchZone then
+						z = true 
+						continue
+					end
+				end
 				if hasAttrobutes and not area:HasAttributes( hasAttributes ) then continue end
 				if area:IsWithin( position ) then return area, true end -- Position is within this area. Return it.
 				local checkPos = checkLOS and area:GetClosestPointOnArea( position ) or area.m_center
@@ -209,9 +217,11 @@ do
 			end
 			if c then return c end
 		end
+		if z or checkLOS then return end
 		-- No grid or area found. This is going to be costly.
 		for _, area in pairs( self.m_areas ) do
 			if not area then continue end -- Unknown area?
+			if matchZone and area.m_zone >= 0 and area.m_zone ~= matchZone then continue end
 			if hasAttrobutes and not area:HasAttributes( hasAttributes ) then continue end
 			local checkPos = checkLOS and area:GetClosestPointOnArea( position ) or area.m_center
 			if maxDist and checkPos:Distance( position ) > maxDist then continue end
@@ -249,7 +259,7 @@ do
 	---@param swz? number
 	---@param force_id? number
 	---@return NikNav_Area
-	function mesh:CreateArea( corner, opposite_corner, swz, nez, force_id )
+	function mesh:CreateArea( corner, opposite_corner, swz, nez, force_id, zone )
 		local t = {}
 		local nw, se, ne, sw
 		if (corner.x + corner.y) < (opposite_corner.x + opposite_corner.y) then
@@ -439,6 +449,35 @@ do
 		-- Fix the new area to the grid
 		self:AddToGrid( area )	
 		return true
+	end
+end
+
+-- Zone
+do
+	---Generates all area-zones on the map.
+	function mesh:GenerateZones()
+		-- Create a list of all areas on the mesh.
+		local s= SysTime()
+		local tab = {}
+		for i = 1, self.m_higestID do
+			local area = self.m_areas[i]
+			if not area then continue end
+			tab[i] = area
+		end
+		-- For each node ..
+		local zone = 0
+		for i = 1, #tab do
+			local id, area = next( tab )
+			if not area then break end -- Done
+			tab[id] = nil
+			area.m_zone = zone
+			for id, area in pairs( area:GetAllAreasConnectioned() ) do
+				area.m_zone = zone
+				tab[id] = nil
+			end
+			zone = zone + 1
+		end
+		print(string.format("%f", SysTime() - s))
 	end
 end
 
@@ -655,6 +694,7 @@ do
 			meta_hintp.__load( mesh, niknav )
 		end
 		if niknav:ReadULong() == 0xCAFEC0DE then
+			mesh:GenerateZones()
 			return mesh
 		end
 	end
@@ -1033,6 +1073,7 @@ do
 		for k, area in pairs( self.m_areas ) do
 			area:CompileAllConnectionSize()
 		end
+		self:GenerateZones()
 		NikNaks.Msg((string.format("NAV + BSP -> NikNav parser took: %fms", SysTime() - starttime)))
 		return self
 	end

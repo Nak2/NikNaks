@@ -152,8 +152,13 @@ do
 		if not NikNav_Mesh then return end
 		return NikNav_Mesh:PathFind( start_position, end_position, width, height, options, generator )
 	end
+
+	function NikNaks.NikNav._mesh()
+		return NikNav_Mesh
+	end
+
 	-- Debug
-	if  CLIENT then
+	if false and CLIENT then
 		local t = ents.FindByClass("prop_physics")
 		local A = t[1]
 		local B = t[2]
@@ -172,7 +177,7 @@ do
 			if not A or not B then return end
 			local v = A:OBBMaxs() - A:OBBMins()
 			local s = SysTime()
-			local result = NikNav_Mesh:PathFind( A:GetPos(), B:GetPos(), 16 or math.max(v.x, v.y), v.z, options, nil)
+			local result = NikNav_Mesh:PathFind( A:GetPos(), B:GetPos(), 32 or math.max(v.x, v.y), v.z, options, nil)
 			--local result2 = NodeGraph.PathFind( A:GetPos(), C:GetPos(), NODE_TYPE_GROUND, nil, HULL_HUMAN )
 			
 			cost = SysTime() - s

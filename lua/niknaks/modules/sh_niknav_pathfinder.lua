@@ -19,12 +19,8 @@ do
 	--
 
 	-- A "guess" cost using a connection
-	local function heuristic_cost_estimate( start, goal, connection )
-		if connection.m_dir == NORTH or connection.m_dir == SOUTH then
-			return (start:GetSizeX() + goal:GetSizeX()) / 2 + connection.m_dist
-		else
-			return (start:GetSizeY() + goal:GetSizeY()) / 2 + connection.m_dist
-		end
+	local function heuristic_cost_estimate( next_area, connection, end_position )
+		return connection.m_from:Distance(next_area:GetClosestGoundPointOnArea( end_position ))
 	end
 	-- A "guess" cost using distance alone
 	local function heuristic_cost_estimate_dis( start, goal )
@@ -156,13 +152,11 @@ do
 				if not neighbor then continue end -- Invalid neighbor?	
 				if not IgnoreWater and neighbor.m_haswater then continue end -- This area has water
 				-- Cost calculator
-				local newCostSoFar, h_cost
-				if SF then -- The first area, is the one we start in. Cost from here should not be from center, but from the start_position
-					h_cost = heuristic_cost_estimate_dis(neighbor, start_position) * mul
-					SF = false
-				else
-					h_cost = heuristic_cost_estimate( current, neighbor, connection ) * mul
+				local newCostSoFar, h_cost = nil, 0
+				if SF then -- This is the first area, and we're inside of it. Calculate the cost from start_pos and out.
+					h_cost = start_position:Distance( connection.m_from ) * 1.2
 				end
+				h_cost = h_cost + heuristic_cost_estimate( neighbor, connection, end_position ) * mul
 				if not generator then -- Custom generator
 					newCostSoFar = current:GetCostSoFar() + h_cost
 				else -- Default generator
@@ -180,7 +174,7 @@ do
 					continue
 				else
 					neighbor:SetCostSoFar( newCostSoFar );
-					neighbor:SetTotalCost( newCostSoFar + heuristic_cost_estimate_dis( neighbor, area_end ) )
+					neighbor:SetTotalCost( newCostSoFar + heuristic_cost_estimate_dis( neighbor, end_position ) )
 					
 					if ( neighbor:IsClosed() ) then
 						neighbor:RemoveFromClosedList()
@@ -194,6 +188,7 @@ do
 					cameFrom[ neighbor ] = { current, connection, move_type }
 				end
 			end
+			SF = false
 			-- Check movepoints
 			if not next( current.m_movepoints ) then continue end
 			for id, move_point in pairs( current.m_movepoints ) do
@@ -270,14 +265,21 @@ do
 	---@param options? table				A table of options: 
 	---@param generator? function 			A function to modify the cost: func( FromArea, ToArea, connection, BitCapability, CurrentCost )
 	function mesh:PathFind( start_position, end_position, width, height, options, generator )
-		local start_area, SB = self:GetNearestArea( start_position, 600, true )
+		local start_area, SB = self:GetNearestArea( start_position, 300, true )
 		if not start_area then return false end
-
-		local end_area, EB = self:GetNearestArea( end_position, 600, true )
-		if not end_area then return false end
 
 		options = options or {}
 		options.BitCapability = options.BitCapability or NikNaks.CAP_MOVE_GROUND
+		local canFly = band( options.BitCapability, NikNaks.CAP_MOVE_FLY ) ~= 0
+
+		local zone_match = start_area.m_zone
+		local end_area, EB = self:GetNearestArea( end_position, 300, true, nil, canFly and zone_match >= 0 and zone_match )
+		if not end_area then return false end
+		if not canFly and zone_match >= 0 and zone_match~=end_area:GetZone() then
+			return false
+		end
+
+		
 		local result = AStart(start_area, end_area, width, height, options, generator, start_position, end_position, SB, EB )
 		if result == false then return false end
 		if result == true then
