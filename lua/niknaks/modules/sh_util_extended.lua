@@ -1,12 +1,15 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
+local NikNaks = NikNaks
+local tostring, tonumber, tobool, Angle, Vector, string_ToColor = tostring, tonumber, tobool, Angle, Vector, string.ToColor
+
 
 ---Same as AccessorFunc, but will make 'Set' functions return self. Allowing you to chain-call.
 ---@param tab table
 ---@param varname string
 ---@param name string
 ---@param iForce? number
-function AccessorFuncEx( tab, varname, name, iForce )
+function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
 	if ( !tab ) then debug.Trace() end
 
 	tab[ "Get" .. name ] = function( self ) return self[ varname ] end
@@ -30,7 +33,7 @@ function AccessorFuncEx( tab, varname, name, iForce )
 	if ( iForce == FORCE_COLOR ) then
 		tab[ "Set" .. name ] = function( self, v )
 			if ( type( v ) == "Vector" ) then self[ varname ] = v:ToColor()
-			else self[ varname ] = string.ToColor( tostring( v ) ) end
+			else self[ varname ] = string_ToColor( tostring( v ) ) end
 			return self
 		end
 	return end
@@ -45,39 +48,39 @@ function AccessorFuncEx( tab, varname, name, iForce )
 
 	tab[ "Set" .. name ] = function( self, v ) self[ varname ] = v return self end
 end
-
+NikNaks.util = {}
 -- Hull
 do
 	---Returns a HULL_ENUM fitting the hull given.
 	---@param vecMin Vector
 	---@param vecMax Vector
 	---@return number HULL_ENUM
-	function util.FindHull( vecMin, vecMax )
+	function NikNaks.util.FindHull( vecMin, vecMax )
 		assert(type( vecMin ) == "Vector", "bad argument #1 to FindHull (Vector expected, got " .. type(vecMin) ..")")
 		assert(type( vecMax ) == "Vector", "bad argument #2 to FindHull (Vector expected, got " .. type(vecMax) ..")")
 		local wide = max(-vecMin.x, -vecMin.y, vecMax.x, vecMax.y)
 		local high = vecMax.z - vecMin.z
 		if wide <= 16 and high <= 8 then
-			return HULL_TINY_CENTERED
+			return NikNaks.HULL_TINY_CENTERED
 		elseif wide <= 24 and high <= 24 then
-			return HULL_TINY
+			return NikNaks.HULL_TINY
 		elseif wide <= 40 and high <= 40 then
-			return HULL_SMALL_CENTERED
+			return NikNaks.HULL_SMALL_CENTERED
 		elseif wide <= 36 and high <= 65 then
-			return HULL_MEDIUM
+			return NikNaks.HULL_MEDIUM
 		elseif wide <= 32 and high <= 73 then
-			return HULL_HUMAN
+			return NikNaks.HULL_HUMAN
 		elseif wide <= 36 and high <= 100 then
-			return HULL_MEDIUM_TALL
+			return NikNaks.HULL_MEDIUM_TALL
 		else
-			return HULL_LARGE
+			return NikNaks.HULL_LARGE
 		end
 	end
 
 	---Returns a HULL_ENUM matching the entitys hull.
 	---@param ent Entity
 	---@return number HULL_ENUM
-	function util.FindEntityHull( entity )
+	function NikNaks.util.FindEntityHull( entity )
 		if entity.GetHull then return entity:GetHull() end
 		local mi, ma = entity:OBBMins(), entity:OBBMaxs()
 		return FindHull(mi, ma)

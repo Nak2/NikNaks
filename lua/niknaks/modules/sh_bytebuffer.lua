@@ -1,9 +1,9 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
-local s_char,s_byte, tostring, sub = string.char, string.byte, tostring, string.sub
+local NikNaks = NikNaks
+local s_char,s_byte, tostring, sub, string_reverse = string.char, string.byte, tostring, string.sub, string_reverse
 local band, rshift, lshift, bor = bit.band, bit.rshift, bit.lshift, bit.bor
-local ldexp, frexp, floor, min, ceil, max = math.ldexp, math.frexp, math.floor, math.min, math.ceil, math.max
+local ldexp, frexp, floor, min, ceil, max, rawget, setmetatable = math.ldexp, math.frexp, math.floor, math.min, math.ceil, math.max, rawget, setmetatable
 
 --[[
 	A bytebuffer object that allows read / write, and has all the functions of file.*
@@ -123,7 +123,7 @@ do
 			self._rba[_bp] = data
 		end
 		self._wba[_bp] = data
-		rawset(self,"_s", math.max( rawget(self,"_s") , pos ))
+		rawset(self,"_s", max( rawget(self,"_s") , pos ))
 	end
 	-- Write
 	--function datastream.__newindexz(self, pos, data)
@@ -219,12 +219,12 @@ meta.__le		= function(self, other ) -- <=
 	return self:Size() <= other:Size()
 end
 
-ByteBuffer = {}
+NikNaks.ByteBuffer = {}
 
 ---Creates a string buffer.
 ---@param data? string
 ---@return ByteBuffer
-function ByteBuffer.Create( data )
+function NikNaks.ByteBuffer.Create( data )
 	local t = {}
 	setmetatable(t, meta)
 	t._data = createDatastream()
@@ -239,14 +239,14 @@ end
 ---Converts a max 4 char string into an int.
 ---@param str string
 ---@return number
-function ByteBuffer.StringToInt( str )
+function NikNaks.ByteBuffer.StringToInt( str )
 	local l = min(#str or "", 4)
 	if l < 1 then 
 		return 0
 	elseif l < 2 then 
 		return s_byte(str, 0, 1)
 	end
-	local a,b,c,d = s_byte( string.reverse( str ) , 0, l)
+	local a,b,c,d = s_byte( string_reverse( str ) , 0, l)
 	local int = _pack(l, a, b, c, d)
 	if int < 0 then int = bor(int, 0x80000000) end -- If it is lower than 0, that means we reached the 32bit negative-flag.
 	return int
@@ -256,17 +256,17 @@ end
 ---@param int number
 ---@param bytes? number
 ---@return string
-function ByteBuffer.IntToString( int, bytes )
+function NikNaks.ByteBuffer.IntToString( int, bytes )
 	bytes = bytes or 4
 	if bytes < 1 then return 0
 	elseif bytes < 2 then return s_char( int ) end
 	if int < 0 then int = bor(int, 0x80000000) end 
-	return string.reverse( s_char( _unpack(int, bytes) ) )
+	return string_reverse( s_char( _unpack(int, bytes) ) )
 end
 
 -- Calling ByteBuffer, will create a new one.
-setmetatable(ByteBuffer,{
-	__call = function(_, data) return ByteBuffer.Create( data ) end
+setmetatable(NikNaks.ByteBuffer,{
+	__call = function(_, data) return NikNaks.ByteBuffer.Create( data ) end
 })
 
 -- Writes a byte to said position
@@ -736,7 +736,7 @@ do
 	---@param gamePath? string
 	---@param lzma? boolean
 	---@return ByteBuffer
-	function ByteBuffer.OpenFile( fileName, gamePath, lzma )
+	function NikNaks.ByteBuffer.OpenFile( fileName, gamePath, lzma )
 		if ( gamePath == true ) then gamePath = "GAME" end
 		if ( gamePath == nil or gamePath == false ) then gamePath = "DATA" end
 		local f = file.Open( fileName, "rb", gamePath )
@@ -746,7 +746,7 @@ do
 		if lzma then
 			str = util.Decompress( str ) or str
 		end
-		local b = ByteBuffer.Create(str)
+		local b = NikNaks.ByteBuffer(str)
 		f:Close()
 		return b
 	end

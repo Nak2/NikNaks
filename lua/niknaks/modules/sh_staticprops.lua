@@ -1,6 +1,6 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
+local band = bit.band
 ---@class StaticProps
 local meta = {}
 meta.__index = meta
@@ -73,7 +73,7 @@ end
 ---@param flag number
 ---@return boolean
 function meta:HasFlag( flag )
-	return bit.band(self:GetFlags(), flag) == flag
+	return band(self:GetFlags(), flag) == flag
 end
 
 ---Returns true if the static prop is disabled on X360.
@@ -87,7 +87,7 @@ end
 ---@return Vector
 ---@return Vector
 function meta:GetModelBounds()
-	local a, b = ModelSize( self:GetModel() )
+	local a, b = NikNaks.ModelSize( self:GetModel() )
 	return a * self:GetScale(), b * self:GetScale()
 end
 meta.GetModelRenderBounds = meta.GetModelBounds

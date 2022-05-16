@@ -2,8 +2,9 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 
 local max, min, abs = math.max, math.min, math.abs
-local band = bit.band
+local band, bor, bnot = bit.band, bit.bor, bit.bnot
 local ColorToLuminance, ComputeLighting = ColorToLuminance, render and render.ComputeLighting
+local Vector = Vector
 
 local function clamp( _in, low, high )
 	return min( max(_in, low), high )
@@ -175,7 +176,7 @@ do
 	---@param flag number
 	---@return boolean
 	function meta_area:HasAttributes( flag )
-		return bit.band(self.m_attributeFlags, flag) ~= 0
+		return band(self.m_attributeFlags, flag) ~= 0
 	end
 
 	---Sets the attributes to the given flag
@@ -188,9 +189,9 @@ do
 	---@param flag number
 	function meta_area:SetAttribute( flag, set )
 		if set then
-			self.m_attributeFlags = bit.bor(self.m_attributeFlags, flag)
+			self.m_attributeFlags = bor(self.m_attributeFlags, flag)
 		else
-			self.m_attributeFlags = bit.band(self.m_attributeFlags, bit.bnot(flag) )
+			self.m_attributeFlags = band(self.m_attributeFlags, bnot(flag) )
 		end
 	end
 
@@ -379,7 +380,7 @@ do
 				_typeB = C_BIGGER
 				_typeA = C_SMALLER
 			else	-- One of the sides are outside the other area
-				y1, y2 = math.max( A.y, B.y ), math.min( AA.y, BB.y )
+				y1, y2 = max( A.y, B.y ), min( AA.y, BB.y )
 				_typeA = C_MIX
 				_typeB = C_MIX
 			end
@@ -401,7 +402,7 @@ do
 				_typeB = C_BIGGER
 				_typeA = C_SMALLER
 			else	-- One of the sides are outside the other area
-				x1, x2 = math.max( A.x, B.x ), math.min( AA.x, BB.x )
+				x1, x2 = max( A.x, B.x ), min( AA.x, BB.x )
 				_typeA = C_MIX
 				_typeB = C_MIX
 			end
@@ -423,7 +424,7 @@ do
 				_typeB = C_BIGGER
 				_typeA = C_SMALLER
 			else	-- One of the sides are outside the other area
-				x1, x2 = math.max( A.x, B.x ), math.min( AA.x, BB.x )
+				x1, x2 = max( A.x, B.x ), min( AA.x, BB.x )
 				_typeA = C_MIX
 				_typeB = C_MIX
 			end
@@ -503,7 +504,7 @@ do
 		A.m_other = B
 		B.m_other = A
 		-- Calculate Z the areas touches
-		A.m_zheight = math.min( self.m_maxz, niknav_areas.m_maxz ) - math.max( A.m_from.z, A.m_to.z )
+		A.m_zheight = min( self.m_maxz, niknav_areas.m_maxz ) - max( A.m_from.z, A.m_to.z )
 		B.m_zheight	= A.m_zheight
 		-- LineMath
 		calcLM(A)
@@ -524,45 +525,12 @@ do
 		end
 	end
 
-	-- Commpiles and modifies all connections to the area. This is to help pathfinding.
-	function meta_area:CompileAllConnectionSize()
-		if true then return end
-		-- List of all sides
-		local side = {}
-		for id, connection in pairs( self.m_connections ) do
-			if not side[ connection.m_dir ] then side[ connection.m_dir ] = {} end
-			table.insert( side[ connection.m_dir ], connection )
-		end
-
-		for NavDir = 0, 3 do
-			if not side[NavDir] then continue end
-			if #side[NavDir] == 1 then -- Only one connection on this side
-				local connection = side[NavDir][1]
-				if connection._TYPE == C_SMALLER then -- This is a connection from smaller to bigger connection
-					-- We can update the connection-size
-					local area_to = connection.m_area
-					local nw, se = area_to.m_corner[NORTH_WEST], area_to.m_corner[SOUTH_EAST]
-					local size
-					if NavDir == NORTH or NavDir == SOUTH then
-						size = min( -(nw.y - connection.m_from.y), se.y - connection.m_from.y )
-					else
-						size = min( connection.m_from.x - nw.x, connection.m_from.x - se.x )
-						
-					end
-					connection.m_size = size
-				end
-			else
-
-			end
-		end
-	end
-
 	--Returns a list of all connections (A bit slow as it has to iterate and all all connections to a new table)
 	---@return table
 	function meta_area:GetAllConnections()
 		local t = {}
 		for id, connection in pairs(self.m_connections) do
-			table.insert(t, connection)
+			t[#t + 1] = connection
 		end
 		return t
 	end
@@ -579,7 +547,9 @@ do
 	function meta_area:GetConnectionsDir( NavDir )
 		local t = {}
 		for id, connection in pairs( self.m_connections ) do
-			if connection.m_dir == NavDir then table.insert(t, v) end
+			if connection.m_dir == NavDir then 
+				t[#t + 1] = v
+			end
 		end
 		return t
 	end
@@ -590,7 +560,9 @@ do
 	function meta_area:GetConnectionsWithZ( minimum_height )
 		local t = {}
 		for id, connection in pairs( self.m_connections ) do
-			if connection.m_height >= minimum_height then table.insert(t, v) end
+			if connection.m_height >= minimum_height then 
+				t[#t + 1] = v
+			end
 		end
 		return t
 	end

@@ -1,7 +1,8 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
-local CurTime = CurTime
+local NikNaks = NikNaks
+local CurTime, setmetatable, IsValid = CurTime, setmetatable, IsValid
+local min, max, cos = math.min, math.max, math.cos
 
 ---@class LPathFollower
 local meta = {}
@@ -65,7 +66,7 @@ function meta:AddSegment(from, to, curvature, move_type)
 		--seg.area
 		--seg.nna
 	self._length = self._length + seg.length
-	table.insert( self._segments, seg )
+	self._segments[#self._segments + 1] = seg
 	return seg
 end
 
@@ -128,7 +129,7 @@ local findClosestSeg
 do
 	local function findCursor( self, distance )
 		local q = self._segments
-		distance = math.min(self._length, distance)
+		distance = min(self._length, distance)
 		for i = 1, #q do
 			if distance <= q[i].s_lengh + q[i].length then
 				return i, distance - (q[i].s_lengh + q[i].length )
@@ -151,7 +152,7 @@ do
 	local function findClosestBetween( A, dir, position, maxLength )
 		local v = position - A
 		local d = v:Dot( dir )
-		return A + dir * math.max(0, math.min(d, maxLength))
+		return A + dir * max(0, min(d, maxLength))
 	end
 	---Returns the position on the path by given distance
 	---@param distance number
@@ -322,7 +323,7 @@ do
 	local col_fly = Color(55,55,255)
 	local col_jump = Color(125, 55, 255)
 
-	local mov = bit.bor(CAP_MOVE_GROUND, CAP_MOVE_CLIMB, CAP_MOVE_JUMP)
+	local mov = bit.bor(NikNaks.CAP_MOVE_GROUND, NikNaks.CAP_MOVE_CLIMB, NikNaks.CAP_MOVE_JUMP)
 	local point_b = Material("hud/cart_point_blue")
 	local point_c = Material("hud/expanding_vert_middle_blue_bg")
 
@@ -333,11 +334,11 @@ do
 			render.DrawSprite( seg.pos, 16, 16 )
 			if l then
 				local col = color_white
-				if seg.move_type == CAP_MOVE_CLIMB then
+				if seg.move_type == NikNaks.CAP_MOVE_CLIMB then
 					col = col_climb
-				elseif seg.move_type == CAP_MOVE_FLY then
+				elseif seg.move_type == NikNaks.CAP_MOVE_FLY then
 					col = col_fly
-				elseif seg.move_type == CAP_MOVE_JUMP then
+				elseif seg.move_type == NikNaks.CAP_MOVE_JUMP then
 					col = col_jump
 				end
 				local d = seg.pos:Distance(l)
@@ -351,11 +352,11 @@ do
 			l = seg.pos
 		end
 
-		local num = math.max(1, self:GetLength() / 300)
+		local num = max(1, self:GetLength() / 300)
 		for i = 1, num do
 			local dis = (CurTime() * 100 + i * 300) % self:GetLength()
 			local pos = self:GetPositionOnPath( dis )
-			local q = 1 + math.cos(SysTime() * 10 + i) * 0.1
+			local q = 1 + cos(SysTime() * 10 + i) * 0.1
 			render.SetMaterial(mat_arrow)
 			render.DrawBeam( pos + Vector(0,0,16), pos, 16, q - 1, q, color_white )
 			render.SetMaterial(mat_solider)

@@ -1,27 +1,27 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
+local NikNaks = NikNaks
 local COLOR = FindMetaTable("Color")
 
 local clamp = math.Clamp
-local Color = Color
+local Color, round = Color, math.Round
 local min, max, abs = math.min, math.max, math.abs
 local string_format, string_sub = string.format, string.sub
 
 -- Color enums
-	SERVER_COLOR= Color(156, 241, 255, 200)
-	CLIENT_COLOR= Color(255, 241, 122, 200)
-	MENU_COLOR 	= Color(100, 220, 100, 200)
-	REALM_COLOR = SERVER and SERVER_COLOR or CLIENT and CLIENT_COLOR or MENU_DLL and MENU_COLOR
-	color_error_server	= Color(136, 221, 255)
-	color_error_client	= Color(255, 221, 102)
-	color_error_menu 	= Color(120, 220, 100)
+	NikNaks.SERVER_COLOR= Color(156, 241, 255, 200)
+	NikNaks.CLIENT_COLOR= Color(255, 241, 122, 200)
+	NikNaks.MENU_COLOR 	= Color(100, 220, 100, 200)
+	NikNaks.REALM_COLOR = SERVER and SERVER_COLOR or CLIENT and CLIENT_COLOR or MENU_DLL and MENU_COLOR
+	NikNaks.color_error_server	= Color(136, 221, 255)
+	NikNaks.color_error_client	= Color(255, 221, 102)
+	NikNaks.color_error_menu 	= Color(120, 220, 100)
 	
 
 	---Returns the luminance amount. How "bright" a color is between 0 and 255.
 	---@param color Color
 	---@return number
-	function ColorToLuminance(color)
+	function NikNaks.ColorToLuminance(color)
 		return 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b
 	end
 
@@ -36,7 +36,7 @@ local string_format, string_sub = string.format, string.sub
 	---Converts a color into a hex-string.
 	---@param color Color
 	---@return string
-	function ColorToHex(color)
+	function NikNaks.ColorToHex(color)
 		return "#" .. string_format("%X", color.r) .. string_format("%X", color.g) .. string_format("%X", color.b)
 	end
 
@@ -49,11 +49,11 @@ local string_format, string_sub = string.format, string.sub
 	---Converts a hex-stirng into a color.
 	---@param str string
 	---@return Color
-	function HexToColor(str)
+	function NikNaks.HexToColor(str)
 		str = string.gsub(str,"#","")
-		local r = math.Round( tonumber("0x" .. string_sub(str,1,2)) )
-		local g = math.Round( tonumber("0x" .. string_sub(str,3,4)) )
-		local b = math.Round( tonumber("0x" .. string_sub(str,5,6)) )
+		local r = round( tonumber( string_sub(str,1,2), 16) )
+		local g = round( tonumber( string_sub(str,3,4), 16) )
+		local b = round( tonumber( string_sub(str,5,6), 16) )
 		return Color(r, g, b)
 	end
 
@@ -78,7 +78,7 @@ local string_format, string_sub = string.format, string.sub
 	---@return number m
 	---@return number y
 	---@return number j
-	function ColorToCMYK( color )
+	function NikNaks.ColorToCMYK( color )
 		return color:ToCMYK()
 	end
 
@@ -88,7 +88,7 @@ local string_format, string_sub = string.format, string.sub
 	---@param y any
 	---@param k any
 	---@return Color
-	function CMYKToColor( c, m, y, k )
+	function NikNaks.CMYKToColor( c, m, y, k )
 		local r = math.Round( 255 * ( 1 - c ) * ( 1 - k ) )
 		local g = math.Round( 255 * ( 1 - m ) * ( 1 - k ) )
 		local b = math.Round( 255 * ( 1 - y ) * ( 1 - k ) )

@@ -1,7 +1,8 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
-local band = bit.band
+local NikNaks = NikNaks
+local band, bor = bit.band, bit.bor
+local abs = math.abs
 local mesh = FindMetaTable("NikNav_Mesh")
 
 -- A* PathFinder
@@ -88,20 +89,20 @@ do
 		area_start:UpdateOnOpenList()
 
 		local maxDistance 		= options.MaxDistance or 100000
-		local BitCapability 	= options.BitCapability or CAP_MOVE_GROUND
+		local BitCapability 	= options.BitCapability or NikNaks.CAP_MOVE_GROUND
 		local JumpMultiplier 	= options.JumpMultiplier or 0.8
 		local IgnoreWater 		= options.IgnoreWater or false
-		local StepHeight 		= math.abs( options.StepHeight or 18 )
+		local StepHeight 		= abs( options.StepHeight or 18 )
 		local ClimbMultiplier	= options.ClimbMultiplier or 0.6
 
 		if options.ClimbMultiplier then
-			BitCapability = bit.bor( BitCapability, CAP_MOVE_CLIMB )
+			BitCapability = bor( BitCapability, NikNaks.CAP_MOVE_CLIMB )
 		end
 
 		--local canWalk 	= band( BitCapability, CAP_MOVE_GROUND )	~= 0
-		local canFly 	= band( BitCapability, CAP_MOVE_FLY )		~= 0
-		local canClimb 	= band( BitCapability, CAP_MOVE_CLIMB )		~= 0
-		local canJump 	= band( BitCapability, CAP_MOVE_JUMP )		~= 0
+		local canFly 	= band( BitCapability, NikNaks.CAP_MOVE_FLY )		~= 0
+		local canClimb 	= band( BitCapability, NikNaks.CAP_MOVE_CLIMB )		~= 0
+		local canJump 	= band( BitCapability, NikNaks.CAP_MOVE_JUMP )		~= 0
 		local JumpHeight = canJump and abs( options.JumpHeight or 0 )
 		local JumpDown = options.JumpDown and -abs(options.JumpDown) or -100
 		local SF = SB
@@ -109,7 +110,7 @@ do
 		while not area_start:IsOpenListEmpty()  do
 			local current = area_start:PopOpenList()
 			if ( current == area_end ) then
-				return reconstruct_path(cameFrom, current, start_position, end_position, width, canFly and CAP_MOVE_FLY or CAP_MOVE_GROUND)
+				return reconstruct_path(cameFrom, current, start_position, end_position, width, canFly and NikNaks.CAP_MOVE_FLY or NikNaks.CAP_MOVE_GROUND)
 			end
 			current:AddToClosedList()
 			-- Check areas
@@ -131,23 +132,23 @@ do
 				if connection.m_zheight < height then continue end
 				local mul, move_type = 1
 				if canFly then
-					move_type = CAP_MOVE_FLY
+					move_type = NikNaks.CAP_MOVE_FLY
 				else
 					-- JumpDown check
 					if connection.m_height < -StepHeight then 
 						if not canJump or connection.m_height < JumpDown then
 							continue
 						end
-						move_type = CAP_MOVE_JUMP
+						move_type = NikNaks.CAP_MOVE_JUMP
 						mul = JumpMultiplier
 					elseif connection.m_height > StepHeight then
 						if not canJump or connection.m_height > JumpHeight then
 							continue
 						end
-						move_type = CAP_MOVE_JUMP
+						move_type = NikNaks.CAP_MOVE_JUMP
 						mul = JumpMultiplier
 					else
-						move_type = CAP_MOVE_GROUND
+						move_type = NikNaks.CAP_MOVE_GROUND
 					end
 				end
 				local dir = connection.m_dir
@@ -206,15 +207,15 @@ do
 				end
 				-- Find move type
 				local mul,move_type = 1
-				if canFly and band( move_point.m_type, CAP_MOVE_FLY ) ~= 0 then
-					move_type = CAP_MOVE_FLY
-				elseif band( move_point.m_type, CAP_MOVE_GROUND ) ~= 0 then
-					move_type = CAP_MOVE_GROUND
-				elseif canJump and band( move_point.m_type, CAP_MOVE_JUMP) then
-					move_type = CAP_MOVE_JUMP
+				if canFly and band( move_point.m_type, NikNaks.CAP_MOVE_FLY ) ~= 0 then
+					move_type = NikNaks.CAP_MOVE_FLY
+				elseif band( move_point.m_type, NikNaks.CAP_MOVE_GROUND ) ~= 0 then
+					move_type = NikNaks.CAP_MOVE_GROUND
+				elseif canJump and band( move_point.m_type, NikNaks.CAP_MOVE_JUMP) then
+					move_type = NikNaks.CAP_MOVE_JUMP
 					mul = JumpMultiplier
 				elseif canClimb then
-					move_type = CAP_MOVE_CLIMB
+					move_type = NikNaks.CAP_MOVE_CLIMB
 					mul = ClimbMultiplier
 				else		-- Unable to use this??
 					continue
@@ -276,13 +277,13 @@ do
 		if not end_area then return false end
 
 		options = options or {}
-		options.BitCapability = options.BitCapability or CAP_MOVE_GROUND
+		options.BitCapability = options.BitCapability or NikNaks.CAP_MOVE_GROUND
 		local result = AStart(start_area, end_area, width, height, options, generator, start_position, end_position, SB, EB )
 		if result == false then return false end
 		if result == true then
-			local fly = bit.band( options.BitCapability, CAP_MOVE_FLY ) ~= 0
+			local fly = bit.band( options.BitCapability, NikNaks.CAP_MOVE_FLY ) ~= 0
 			local p = LPFMeta.CreatePathFollower( start_position )
-			local s = p:AddSegment(start_position, end_position, 0, fly and CAP_MOVE_FLY or CAP_MOVE_GROUND)
+			local s = p:AddSegment(start_position, end_position, 0, fly and NikNaks.CAP_MOVE_FLY or NikNaks.CAP_MOVE_GROUND)
 			p._generator = generator
 			p._MaxDistance = options.MaxDistance
 			return p

@@ -1,14 +1,14 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
-local max, min, clamp, abs = math.max, math.min, math.Clamp, math.abs
+local NikNaks = NikNaks
+local max, min, clamp, abs, ceil = math.max, math.min, math.Clamp, math.abs, math.ceil
 local band, bor = bit.band, bit.bor
-local TraceLine = util.TraceLine
-
+local TraceLine, Vector, util_PointContents, table_remove = util.TraceLine, Vector, util.PointContents, table.remove
+local setmetatable = setmetatable
 local ColorToLuminance, ComputeLighting = ColorToLuminance, render and render.ComputeLighting
 -- Nik Naks Navigation
-NikNav = {}
-NikNav.Version = 0.1
+NikNaks.NikNav = {}
+NikNaks.NikNav.Version = 0.1
 
 local GRID_SIZE = 800
 
@@ -53,10 +53,10 @@ local function CalcNormal(a, b, c, d)
 	return (n + n2):GetNormalized()
 end
 
-function NikNav.CreateNew()
+function NikNaks.NikNav.CreateNew()
 	local t = {}
 	setmetatable(t, mesh)
-	t.m_version = NikNav.Version
+	t.m_version = NikNaks.NikNav.Version
 	t.m_map = file.Size("maps/" .. game.GetMap() .. ".bsp", "GAME")
 	t.m_wasonmap = false		-- A flag to tell if the NikNav have been loaded on the map. If this is false, then we need to trace-to-ground the points.
 	t.m_areas 	= {}
@@ -73,6 +73,7 @@ end
 ]]
 -- Lower Mesh Functions
 do
+	local ceil = ceil
 	---Returns an empty Area ID
 	---@return number
 	function mesh:NextAreaID()
@@ -82,7 +83,7 @@ do
 
 	-- Grid functions
 	local function chop(vec)
-		return math.ceil(vec.x / GRID_SIZE), math.ceil(vec.y / GRID_SIZE)
+		return ceil(vec.x / GRID_SIZE), ceil(vec.y / GRID_SIZE)
 	end
 	---Locates the nearest area to the given position
 	---@param position Vector
@@ -170,7 +171,6 @@ do
 	function mesh:GetAreaCount()
 		return self.m_higestID
 	end
-
 
 	-- Checks to see if the line is blocked
 	local traceCheck = function( a, b )
@@ -282,7 +282,7 @@ do
 		t.m_lightIntensity = {}
 		t.m_sizex = se.x - nw.x
 		t.m_sizey = se.y - nw.y
-		t.m_haswater	= band( util.PointContents( t.m_center + t.m_normal ), CONTENTS_WATER ) == CONTENTS_WATER
+		t.m_haswater	= band( util_PointContents( t.m_center + t.m_normal ), CONTENTS_WATER ) == CONTENTS_WATER
 		if CLIENT then
 			for i = 0, 3 do
 				t.m_lightIntensity[i] = ComputeLighting( t.m_corner[i] + t.m_normal, t.m_normal )
@@ -307,12 +307,12 @@ do
 		-- Make a list of all points near/on this area
 		local points = {}
 		for _, point in pairs( area.m_hintpoints ) do
-			table.insert( points, point )
+			points[#points + 1] = point
 		end
 		-- Move points got two points, and can be one-way. We need to make sure second-pos gets updated
 		for _, point in pairs( self.m_movepoints ) do
 			if point.m_area == area or point.m_area_to == area then
-				table.insert( points, point )
+				points[#points + 1] = point
 			end
 		end
 		-- Delete the area
@@ -362,7 +362,7 @@ do
 		-- Delete connection to the area and find the direction.
 		for k, connection in pairs( from_area.m_connections ) do
 			if connection.m_area == to_area then
-				table.remove(from_area.m_connections, k)
+				table_remove(from_area.m_connections, k)
 				return
 			end
 		end
@@ -407,11 +407,11 @@ do
 		area.m_center	= ( nw + se ) / 2
 		area.m_normal 	= -CalcNormal(nw, ne, se, sw) 	-- Calc the avage up-normal.
 		area.m_flatness	= area.m_normal:Dot( vector_up )	-- How flat is the area is. ( 1 to -1 )
-		area.m_maxz		= math.min(area.m_maxz, area2.m_maxz)
+		area.m_maxz		= min(area.m_maxz, area2.m_maxz)
 		area.m_sizex = se.x - nw.x
 		area.m_sizey = se.y - nw.y
-		area.m_haswater	= band( util.PointContents( area.m_center + area.m_normal ), CONTENTS_WATER ) == CONTENTS_WATER
-		area.m_attributeFlags = bit.bor(area.m_attributeFlags, area2.m_attributeFlags)
+		area.m_haswater	= band( util_PointContents( area.m_center + area.m_normal ), CONTENTS_WATER ) == CONTENTS_WATER
+		area.m_attributeFlags = bor(area.m_attributeFlags, area2.m_attributeFlags)
 
 		-- Connections holds a lot of data, we need to recreate them all
 		local pool = {}
@@ -444,6 +444,7 @@ end
 
 -- Place Functions
 do
+	local isstring = isstring
 	-- Locates the place-id
 	local function findID( self, place_name )
 		for id, str in pairs( self.m_directory ) do
@@ -541,7 +542,7 @@ do
 		end
 		local isLast = #self.m_directory == place
 		-- Delete it from directory
-		table.remove(self.m_directory, place)
+		table_remove(self.m_directory, place)
 		-- Check if the placename was inbetween others in the list. If so, we need to do some shuffling.
 		if isLast then
 			for _, area in pairs( self.m_areas ) do 
@@ -621,12 +622,12 @@ do
 	---Loads the NikNav
 	---@param filename? string
 	---@return NikNav_Mesh|nil
-	function NikNav.Load( filename )
+	function NikNaks.NikNav.Load( filename )
 		filename = filename or "niknav/" .. game.GetMap() .. ".dat"
-		local niknav = ByteBuffer.OpenFile(filename, "DATA", true)
+		local niknav = NikNaks.ByteBuffer.OpenFile(filename, "DATA", true)
 		if not niknav then print("FILE NOT FOUND!") return end -- Unable to open file
 		if niknav:ReadULong() ~= 0xCAFEC0DE then return end -- Invalid file
-		local mesh = NikNav.CreateNew()
+		local mesh = NikNaks.NikNav.CreateNew()
 		mesh.m_version = niknav:ReadUShort()
 		mesh.m_map = niknav:ReadULong()
 		if mesh.m_map ~= file.Size("maps/" .. game.GetMap() .. ".bsp", "GAME") then
@@ -662,9 +663,9 @@ do
 	---@param filename? string
 	function mesh:Save( filename )
 		filename = filename or "niknav/" .. game.GetMap() .. ".dat"
-		local niknav = ByteBuffer.Create()
+		local niknav = NikNaks.ByteBuffer()
 		niknav:WriteULong( 0xCAFEC0DE )
-		niknav:WriteUShort( NikNav.Version )
+		niknav:WriteUShort( NikNaks.NikNav.Version )
 		niknav:WriteULong( file.Size("maps/" .. game.GetMap() .. ".bsp", "GAME") )
 		niknav:WriteBool( self.m_wasonmap )
 		-- Write directory
@@ -842,7 +843,7 @@ do
 			if CLIENT and lInt == 1 then
 				-- NAV is somewhat broken regarding the lightintensity and always 1.
 				local lcolor = ComputeLighting( area.m_corner[i] + area.m_normal, area.m_normal )
-				lInt = ColorToLuminance( Color( lcolor.x * 255, lcolor.y * 255, lcolor.z * 255 ) )
+				lInt = NikNaks.ColorToLuminance( Color( lcolor.x * 255, lcolor.y * 255, lcolor.z * 255 ) )
 			end
 			area.m_lightIntensity[i] = lInt
 		end
@@ -901,18 +902,18 @@ do
 	---@param NAVFile? string The nav file to generate from
 	---@param BSPFile? string The map file to generate from
 	---@return NikNav_Mesh|nil
-	function NikNav.GenerateFromNav( NAVFile, BSPFile )
+	function NikNaks.NikNav.GenerateFromNav( NAVFile, BSPFile )
 		local NAV, BSP, navVersion
 		-- Handle / locate input data
 		do
 			NAVFile = NAVFile or  "maps/" .. game.GetMap() .. ".nav"
-			NAV = ByteBuffer.OpenFile( NAVFile , "GAME")
+			NAV = NikNaks.ByteBuffer.OpenFile( NAVFile , "GAME")
 			if not NAV then return end	-- Unable to locate NAV
 			if NAV:ReadULong() ~= 0xFEEDFACE then return end -- Magic number doesn't match
 			navVersion = NAV:ReadULong()
 			if navVersion < 5 then return end -- NAV is too old
 
-			BSP = Map.ReadBSP( BSPFile )
+			BSP = NikNaks.Map.ReadBSP( BSPFile )
 			if not BSP then return end -- Unable to get BSP
 		end
 		local self
@@ -933,7 +934,7 @@ do
 			-- Start generation
 			NikNaks.Msg("Generating NikNav from NAV and BSP ..")
 			local m_isAnalyzed = navVersion >= 14 and NAV:ReadByte() ~= 0 or false
-			self = NikNav.CreateNew()
+			self = NikNaks.NikNav.CreateNew()
 		
 			-- Parse directory
 			for id, placeName in ipairs( loadPlaceData( NAV, navVersion ) ) do
@@ -997,7 +998,7 @@ do
 		end
 		-- Merge crawlpoints into one line
 		for i = 1, #crawlpoints do
-			local a = table.remove(crawlpoints, i)
+			local a = table_remove(crawlpoints, i)
 			if not a then continue end
 			local l = {a}
 			local pos1 = a.origin - Angle(0,a.angles.y,0):Forward() * 13
@@ -1007,7 +1008,7 @@ do
 				local pos2 = b.origin - Angle(0,b.angles.y,0):Forward() * 13
 				if not canSee(pos1, pos2) then continue end
 				l[#l + 1] = b
-				table.remove(crawlpoints, ii)
+				table_remove(crawlpoints, ii)
 			end
 			if #l < 2 then -- This list only got 1 point.
 				continue
@@ -1021,7 +1022,7 @@ do
 					o = l[i]
 				end
 			end
-			self:CreateMovePoint( o.origin, h.origin, CAP_MOVE_CLIMB, 5, false )
+			self:CreateMovePoint( o.origin, h.origin, NikNaks.CAP_MOVE_CLIMB, 5, false )
 		end
 		-- Compress
 		NikNaks.Msg("Compressing NAV-areas ..")
@@ -1039,6 +1040,7 @@ end
 
 -- Generator
 do
+	local Color = Color
 	--[[ NAV Version Cheat Sheet
 		5 = Added Place info
 		---- Conversion to Src ------
@@ -1063,7 +1065,7 @@ do
 		if count > 256 then NikNaks.Msg("[NNav] Nav file got too many named areas?") end
 		for i=1, count do
 			local len = NAV:ReadUShort()
-			table.insert(place, NAV:Read(math.min(len, 256)))
+			place[ i ] = NAV:Read(math.min(len, 256))
 		end
 		if NAVVersion > 11 then
 			place.m_hasUnnamedAreas = NAV:ReadByte() ~= 0

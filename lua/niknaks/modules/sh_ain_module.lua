@@ -1,11 +1,11 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
-local util_TraceLine = util.TraceLine
-local max, floor, round = math.max, math.floor, math.Round
+local NikNaks = NikNaks
+local util_TraceLine, Vector, table_insert, table_Count, table_SortByKey = util.TraceLine, Vector, table.insert, table.Count, table.SortByKey
+local max, floor, round, band = math.max, math.floor, math.Round, bit.band
 local FindHull, FindEntityHull = util.FindHull, util.FindEntityHull
 
-NodeGraph = NodeGraph or {}
+NikNaks.NodeGraph = {}
 
 ---@class NodeGraph
 local n_meta = {}
@@ -40,18 +40,18 @@ do
 			t.pos = b:ReadVector()
 			t.yaw = b:ReadFloat()
 			t.flOffsets = {}
-			for i = 0, (NUM_HULLS or 10) - 1 do
+			for i = 0, (NikNaks.NUM_HULLS or 10) - 1 do
 				t.flOffsets[i] = b:ReadFloat()	-- Float
 			end
 			t.nodeType = b:ReadByte() 			-- Byte
 			t.nodeInfo = b:ReadUShort()			-- UShort
 			t.zone = b:ReadShort()		
 		-- Clamp Invalid
-		if t.nodeType < NODE_TYPE_INVALID or t.nodeType > (NODE_TYPE_WATER or 5) then
-			t.nodeType = NODE_TYPE_INVALID
+		if t.nodeType < NikNaks.NODE_TYPE_INVALID or t.nodeType > (NikNaks.NODE_TYPE_WATER or 5) then
+			t.nodeType = NikNaks.NODE_TYPE_INVALID
 		end
 		-- Trade down ( Cause Source-nodes fly in the air )
-		if t.nodeType == NODE_TYPE_GROUND then
+		if t.nodeType == NikNaks.NODE_TYPE_GROUND then
 			local trace = util_TraceLine({
 				start = t.pos + Vector( 0,0,50 ),
 				endpos = t.pos - Vector( 0,0,128 ),
@@ -73,7 +73,7 @@ do
 		l.srcId = b:ReadShort() + 1 		-- Short
 		l.destId= b:ReadShort() + 1		-- Short
 		l.moves = {}
-		for i = 0, (NUM_HULLS or 10) - 1 do
+		for i = 0, (NikNaks.NUM_HULLS or 10) - 1 do
 			l.moves[i] = b:ReadByte() 	-- Byte
 		end
 		setmetatable(l, ain_link)
@@ -90,14 +90,14 @@ do
 			error_detected[to] = true
 			error_detected[from] = true
 		end 
-		for i = 0, (NUM_HULLS or 10) - 1 do
+		for i = 0, (NikNaks.NUM_HULLS or 10) - 1 do
 			local _type = link.moves[i]
 			if _type == 0 then continue end -- Unable to walk here
 			if not from._connect_hull[i] 	then from._connect_hull[i] = {} end
 			if not to._connect_hull[i] 		then to._connect_hull[i] = {} 	end
 
-			table.insert(from._connect_hull[i], { to, _type })
-			table.insert(to._connect_hull[i], 	{ from, _type })
+			table_insert(from._connect_hull[i], { to, _type })
+			table_insert(to._connect_hull[i], 	{ from, _type })
 		end
 	end
 
@@ -156,13 +156,13 @@ do
 	end
 	local function patchZones(self)
 		local fixes = 0
-		for i = 1, table.Count( error_detected ) do
+		for i = 1, table_Count( error_detected ) do
 			local node = next(error_detected)
 			if not node then break end
 			local tab,zone = {},{}
 			scan(node, tab, zone)
 			-- Take the most commen zone
-			local zone = table.SortByKey( zone )[1]
+			local zone = table_SortByKey( zone )[1]
 			for _,n in pairs( tab ) do
 				if n.zone ~= zone then
 					fixes = fixes + 1
@@ -177,12 +177,12 @@ do
 	-- Load map data and add it to the nodegraph.
 	local l = {
 	--	["info_hint"] = true,
-		["info_node_hint"] = NODE_TYPE_GROUND,
-		["info_node_air_hint"] = NODE_TYPE_AIR,
-		["info_node_climb"] = NODE_TYPE_CLIMB		
+		["info_node_hint"] = NikNaks.NODE_TYPE_GROUND,
+		["info_node_air_hint"] = NikNaks.NODE_TYPE_AIR,
+		["info_node_climb"] = NikNaks.NODE_TYPE_CLIMB		
 	}
 	local function parseMap( self )
-		for _, v in pairs( Map.ReadBSP():GetEntities() ) do
+		for _, v in pairs( NikNaks.Map.ReadBSP():GetEntities() ) do
 			if not v.classname then continue end
 			local _type = l[v.classname]
 			if not _type then continue end
@@ -213,7 +213,7 @@ do
 		--if thisMapObject and fileName == thisMap then return thisMapObject end
 		
 		if not file.Exists( fileName, "GAME" ) then return end
-		local b = ByteBuffer.OpenFile( fileName, "GAME" )
+		local b = NikNaks.ByteBuffer.OpenFile( fileName, "GAME" )
 		-- Create new NG object
 		local n = {}
 		n._version = b:ReadLong()
@@ -221,7 +221,7 @@ do
 		if n._version ~= 37 then -- This is an old / newer AIN file.
 			local s = n._version > 37 and "newer" or "older"
 			print( "[NodeGraph]: This .AIN version is " .. s .. ", not the supported 37!" )
-			return nil, AIN_ERROR_VERSIONNUM
+			return nil, NikNaks.AIN_ERROR_VERSIONNUM
 		end
 		n._file = fileName
 		n._nodes = {}
@@ -266,15 +266,15 @@ do
 		end
 		--local leftOver = b:Read()
 		--print("LEFTOVER: ", string.byte(leftOver), #leftOver)
-		return n, err > 0 and AIN_ERROR_PATCHEDDATA
+		return n, err > 0 and NikNaks.AIN_ERROR_PATCHEDDATA
 	end
-	NodeGraph.LoadAin = loadAin
+	NikNaks.NodeGraph.LoadAin = loadAin
 
 	local varNG
 	---Returns the nodegraph for the current map and caches it
 	---@return NodeGraph|nil
 	---@return number AIN_ERROR_*
-	function NodeGraph.GetMap()
+	function NikNaks.NodeGraph.GetMap()
 		assert(int_post_ent, "Can't use AIN before InitPostEntity!")
 		if varNG ~= nil then return varNG end
 		local a, err = loadAin()
@@ -296,7 +296,7 @@ do
 	---Returns true if the node is valid.
 	---@return any
 	function ain_node:IsValid()
-		return self._id >= 0 and self:GetType() > NODE_TYPE_DELETED
+		return self._id >= 0 and self:GetType() > NikNaks.NODE_TYPE_DELETED
 	end
 	---Returns the node position
 	---@return Vector
@@ -347,7 +347,7 @@ do
 	---@param flag number
 	---@return boolean
 	function ain_link:HasMoveFlag( HULL, flag )
-		return bit.band( self.moves[ HULL or 0 ], flag ) ~= 0
+		return band( self.moves[ HULL or 0 ], flag ) ~= 0
 	end
 	---Returns the node ID of the source node.
 	---@return any
@@ -379,7 +379,7 @@ do
 	---@param NODE_TYPE number
 	---@return boolean
 	function ain_node:IsNodeType( NODE_TYPE )
-		if NODE_TYPE == NODE_TYPE_ANY then return true
+		if NODE_TYPE == NikNaks.NODE_TYPE_ANY then return true
 		elseif self.nodeType == NODE_TYPE then return true
 		end
 		return false
@@ -389,10 +389,10 @@ end
 ---Debug Render.
 if CLIENT then
 	local c = {
-		[NODE_TYPE_AIR 		]= Color(155,155,255),
-		[NODE_TYPE_GROUND 	]= Color(155,255,155),
+		[NikNaks.NODE_TYPE_AIR 		]= Color(155,155,255),
+		[NikNaks.NODE_TYPE_GROUND 	]= Color(155,255,155),
 		--[NODE_TYPE_WATER 	]= Color(0,0,255),
-		[NODE_TYPE_CLIMB 	]= Color(155,155,155)
+		[NikNaks.NODE_TYPE_CLIMB 	]= Color(155,155,155)
 	}
 	local l = {}
 	for i = 0, 9 do
@@ -474,7 +474,7 @@ if CLIENT then
 		end
 		local h = 0
 		for k, v in pairs( self._connect ) do
-			if v[2]:HasMoveFlag( h, CAP_MOVE_GROUND ) then -- or v[2]:HasMoveFlag( h, CAP_MOVE_FLY ) then
+			if v[2]:HasMoveFlag( h, NikNaks.CAP_MOVE_GROUND ) then -- or v[2]:HasMoveFlag( h, CAP_MOVE_FLY ) then
 				render.DrawLine(self:GetPos(),v[1]:GetPos(), c[self:GetType()] )
 			end
 		end
@@ -543,7 +543,7 @@ do
 	---@param Zone? number
 	---@return ain_node
 	function n_meta:FindNode( position, NODE_TYPE, Zone, HULL )
-		NODE_TYPE = NODE_TYPE or NODE_TYPE_GROUND
+		NODE_TYPE = NODE_TYPE or NikNaks.NODE_TYPE_GROUND
 		local x, y = floor(position.x / 1000), floor(position.y / 1000)
 		local c, v
 		-- Use the nodegraph to search, if none at position, scan all nodes ( slow )
@@ -586,7 +586,7 @@ do
 	---@param Zone? number
 	---@return ain_node
 	function n_meta:FindNodeWithHull( position, NODE_TYPE, Zone, HULL )
-		NODE_TYPE = NODE_TYPE or NODE_TYPE_GROUND
+		NODE_TYPE = NODE_TYPE or NikNaks.NODE_TYPE_GROUND
 		local x, y = floor(position.x / 1000), floor(position.y / 1000)
 		local c, v
 		-- Use the nodegraph to search, if none at position, scan all nodes ( slow )
@@ -626,7 +626,7 @@ do
 	---@param Zone? number
 	---@return ain_node
 	function n_meta:FindHintNode( position, NODE_TYPE, HintType, HintGroup, Zone, HULL)
-		NODE_TYPE = NODE_TYPE or NODE_TYPE_GROUND
+		NODE_TYPE = NODE_TYPE or NikNaks.NODE_TYPE_GROUND
 		local x, y = floor(position.x / 1000), floor(position.y / 1000)
 		local c, v
 		-- Use the nodegraph to search, if none at position, scan all nodes ( slow )
@@ -664,7 +664,7 @@ do
 	---Returns the nodegraph as a bytebuffer.
 	---@return ByteBuffer
 	function n_meta:SaveToBuf()
-		local b = ByteBuffer.Create()
+		local b = NikNaks.ByteBuffer()
 			b:WriteLong( self:GetVersion() ) -- Should be 37
 			b:WriteLong( self._map_version )
 		-- Write node num
@@ -677,7 +677,7 @@ do
 			local node = self._nodes[i]
 			b:WriteVector( node.pos )
 			b:WriteFloat( node.yaw )
-			for i = 0, (NUM_HULLS or 10) - 1 do
+			for i = 0, (NikNaks.NUM_HULLS or 10) - 1 do
 				b:WriteFloat(node.flOffsets[i])
 			end
 			b:WriteByte( node.nodeType )
@@ -691,7 +691,7 @@ do
 			local l = self._links[i]
 			b:WriteShort( l.srcId - 1 )
 			b:WriteShort( l.destId - 1 )
-			for ii = 0, (NUM_HULLS or 10) - 1 do
+			for ii = 0, (NikNaks.NUM_HULLS or 10) - 1 do
 				b:WriteByte( l.moves[ii] )
 			end 
 		end
@@ -836,19 +836,19 @@ do
 	end
 	-- Finds the best move option
 	local function getMultiplier(moveoptions, canWalk, canJump, canClimb, canFly, JumpMultiplier, ClimbMultiplier )
-		if canFly and bit.band(moveoptions, CAP_MOVE_FLY) ~= 0 then -- Flying seems to always be the best option
-			return CAP_MOVE_FLY, 1
+		if canFly and band(moveoptions, NikNaks.CAP_MOVE_FLY) ~= 0 then -- Flying seems to always be the best option
+			return NikNaks.CAP_MOVE_FLY, 1
 		else
 			-- We like to jump more than walking
-			if canJump and JumpMultiplier < 1 and bit.band(moveoptions, CAP_MOVE_JUMP)~=0 then
-				return CAP_MOVE_JUMP, JumpMultiplier
+			if canJump and JumpMultiplier < 1 and band(moveoptions, NikNaks.CAP_MOVE_JUMP)~=0 then
+				return NikNaks.CAP_MOVE_JUMP, JumpMultiplier
 			end
-			if canWalk and bit.band(moveoptions, CAP_MOVE_GROUND)~=0 then
-				return CAP_MOVE_GROUND, 1
-			elseif canClimb and bit.band(moveoptions, CAP_MOVE_CLIMB)~=0 then -- %20 climb cost
-				return CAP_MOVE_CLIMB, ClimbMultiplier
-			elseif canJump and bit.band(moveoptions, CAP_MOVE_JUMP)~=0 then
-				return CAP_MOVE_JUMP, JumpMultiplier
+			if canWalk and band(moveoptions, NikNaks.CAP_MOVE_GROUND)~=0 then
+				return NikNaks.CAP_MOVE_GROUND, 1
+			elseif canClimb and band(moveoptions, NikNaks.CAP_MOVE_CLIMB)~=0 then -- %20 climb cost
+				return NikNaks.CAP_MOVE_CLIMB, ClimbMultiplier
+			elseif canJump and band(moveoptions, NikNaks.CAP_MOVE_JUMP)~=0 then
+				return NikNaks.CAP_MOVE_JUMP, JumpMultiplier
 			end
 		end
 	end
@@ -862,6 +862,7 @@ do
 	local function AStart(node_start, node_goal, HULL, BitCapability, JumpMultiplier, ClimbMultiplier, generator, MaxDistance )
 		if not node_start or not node_goal then return false end
 		if node_start == node_goal then return true end
+		local band = band
 		node_start:ClearSearchLists()
 		node_start:AddToOpenList()
 		local cameFrom = {}
@@ -869,10 +870,10 @@ do
 		node_start:SetTotalCost( heuristic_cost_estimate( node_start, node_goal, HULL ) )
 		node_start:UpdateOnOpenList()
 
-		local canWalk 	= bit.band( BitCapability, CAP_MOVE_GROUND )	~= 0
-		local canFly 	= bit.band( BitCapability, CAP_MOVE_FLY )		~= 0
-		local canClimb 	= bit.band( BitCapability, CAP_MOVE_CLIMB )		~= 0
-		local canJump 	= bit.band( BitCapability, CAP_MOVE_JUMP )		~= 0
+		local canWalk 	= band( BitCapability, NikNaks.CAP_MOVE_GROUND )	~= 0
+		local canFly 	= band( BitCapability, NikNaks.CAP_MOVE_FLY )		~= 0
+		local canClimb 	= band( BitCapability, NikNaks.CAP_MOVE_CLIMB )		~= 0
+		local canJump 	= band( BitCapability, NikNaks.CAP_MOVE_JUMP )		~= 0
 
 		while not node_start:IsOpenListEmpty()  do
 			local current = node_start:PopOpenList()
@@ -883,7 +884,7 @@ do
 			for k, tab in pairs( current:GetConnectionsByHull( HULL ) ) do
 				local neighbor = tab[1]
 				if not neighbor then continue end
-				local moveoptions =  bit.band( BitCapability, tab[2] or 0 )
+				local moveoptions =  band( BitCapability, tab[2] or 0 )
 				if moveoptions == 0 then continue end -- Unable to use this link. No options
 				local CAP_MOVE, Multi = getMultiplier(moveoptions, canWalk, canJump, canClimb, canFly, JumpMultiplier, ClimbMultiplier  )
 				if not CAP_MOVE then continue end
@@ -938,14 +939,14 @@ do
 		if not options then options = {} end
 		
 		local MaxDistance 		= options.MaxDistance or 100000
-		local BitCapability 	= options.BitCapability or ( NODE_TYPE == NODE_TYPE_AIR and CAP_MOVE_FLY or CAP_MOVE_GROUND ) -- Make default walk, unless NODE_TYPE is fly )
+		local BitCapability 	= options.BitCapability or ( NODE_TYPE == NikNaks.NODE_TYPE_AIR and NikNaks.CAP_MOVE_FLY or NikNaks.CAP_MOVE_GROUND ) -- Make default walk, unless NODE_TYPE is fly )
 		local JumpMultiplier 	= options.JumpMultiplier or 1.4
 		local ClimbMultiplier 	= options.ClimbMultiplier or 1.2
 
 		if not JumpMultiplier then JumpMultiplier = 1.4 			-- Default, make it kinda hate jumping around
 		elseif JumpMultiplier < 0.3 then JumpMultiplier = 0.3 end	-- Make sure it can't go below 0.3. Can inf loop if so.
 				
-		if not NODE_TYPE then NODE_TYPE = NODE_TYPE_GROUND end			-- Default node: Ground.
+		if not NODE_TYPE then NODE_TYPE = NikNaks.NODE_TYPE_GROUND end			-- Default node: Ground.
 		-- Entity checks
 		local ent	= start_pos.OBBMins and start_pos 
 		local ent_e	= end_pos.OBBMins and end_pos
@@ -972,7 +973,7 @@ do
 		if not end_node then return false end
 		-- Path find to location
 		local t = AStart(start_node, end_node, HULL_SIZE, BitCapability, JumpMultiplier, ClimbMultiplier, generator, MaxDistance)
-		local def_cap = NODE_TYPE == NODE_TYPE_AIR and CAP_MOVE_FLY or CAP_MOVE_GROUND
+		local def_cap = NODE_TYPE == NikNaks.NODE_TYPE_AIR and NikNaks.CAP_MOVE_FLY or NikNaks.CAP_MOVE_GROUND
 		if t == false then -- Unable to pathfind to location
 			return false
 		elseif t == true then -- Same location, return an "empty" path object.
@@ -1010,7 +1011,7 @@ do
 	---@return boolean
 	function n_meta:CanMaybeReach( start_pos, end_pos, NODE_TYPE, HULL_SIZE, max_dis )
 		if not HULL_SIZE then HULL_SIZE = 0 end
-		if not NODE_TYPE then NODE_TYPE = NODE_TYPE_GROUND end
+		if not NODE_TYPE then NODE_TYPE = NikNaks.NODE_TYPE_GROUND end
 		local a = self:FindNode( start_pos,	NODE_TYPE )
 		if not a then
 			return false

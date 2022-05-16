@@ -3,27 +3,29 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.07
+local version = 0.08
 if NikNaks and NikNaks.Version > version then return end
 
-local format = string.format
+local file_Find, MsgC, unpack, rawget = file.Find, MsgC, unpack, rawget
 
 NikNaks = {}
+setmetatable(NikNaks,{
+	__index = function(k, v) return rawget(NikNaks, v) or _G[v]	end
+})
 NikNaks.Version = version
-NikNaks.Authors = {"Nak"}
+NikNaks.Authors = "Nak"
 MsgN("Loading NikNaks: " .. NikNaks.Version)
 
 do
-	local c = SERVER and Color(156, 241, 255, 200) or Color(255, 241, 122, 200)
 	function NikNaks.Msg( ... )
 		local a = {...}
 		if #a < 1 then return end
-		MsgC(c,"[NN] ", unpack(a), "\n")
+		MsgC(NikNaks.REALM_COLOR,"[NN] ", unpack(a), "\n")
 	end
 end
 
 -- Handles files and adds them by using thethe file-name.
-function AutoInclude( str )
+function NikNaks.AutoInclude( str )
 	local path = str
 	if string.find(str,"/") then
 		path = string.GetFileFromFilename(str)
@@ -42,30 +44,56 @@ function AutoInclude( str )
 end
 
 -- Handles a folder
-function AutoIncludeFolder( str )
-	for _,fil in ipairs(file.Find(str .. "/*.lua","LUA")) do
-		AutoInclude(str .. "/" .. fil)
+function NikNaks.AutoIncludeFolder( str )
+	for _,fil in ipairs(file_Find(str .. "/*.lua","LUA")) do
+		NikNaks.AutoInclude(str .. "/" .. fil)
+	end
+end
+
+-- A simple scope-script
+do
+	local g = _G
+	local envs = {}
+	local env = {}
+	local getfenv, setfenv = getfenv, setfenv
+	setmetatable(env, { __index = function(k, v)
+		for i = 1, #envs do
+			local val = rawget(envs[i], v)
+			if val then return val end
+		end
+		return g[v]
+	end })
+	function NikNaks.using( ... )
+		local tab = { ... }
+		if getfenv( 2 ) == env then
+			for i = 1, #tab do envs[#envs + 1] = tab[i] end
+		elseif #tab > 0 then
+			envs = tab
+		else
+			envs = { NikNaks }
+		end
+		setfenv(2, env)
 	end
 end
 
 -- For safty reasons, we're not using auto include folder. These are hardcoded.
-AutoInclude("niknaks/modules/sh_enums.lua")
-AutoInclude("niknaks/modules/sh_util_extended.lua")
-AutoInclude("niknaks/modules/sh_file_extended.lua")
-AutoInclude("niknaks/modules/sh_color_extended.lua")
-AutoInclude("niknaks/modules/sh_model_extended.lua")
-AutoInclude("niknaks/modules/sh_bytebuffer.lua")
-AutoInclude("niknaks/modules/sh_staticprops.lua")
-AutoInclude("niknaks/modules/sh_bsp_module.lua")
-AutoInclude("niknaks/modules/sh_pathfind_module.lua")
-AutoInclude("niknaks/modules/sh_ain_module.lua")
-AutoInclude("niknaks/modules/sh_niknav_areas.lua")
-AutoInclude("niknaks/modules/sh_niknav_points.lua")
-AutoInclude("niknaks/modules/sh_niknav_module.lua")
-AutoInclude("niknaks/modules/sh_niknav_pathfinder.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_file_extended.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_color_extended.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_model_extended.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_bytebuffer.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_staticprops.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_bsp_module.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_pathfind_module.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_ain_module.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_niknav_areas.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_niknav_points.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_niknav_module.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_niknav_pathfinder.lua")
 
-AutoInclude("niknaks/framework/sh_localbsp.lua")
-AutoInclude("niknaks/framework/sh_epath.lua")
+NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
+NikNaks.AutoInclude("niknaks/framework/sh_epath.lua")
 
 --AutoIncludeFolder("niknaks/modules")
 --AutoIncludeFolder("niknaks/framework")

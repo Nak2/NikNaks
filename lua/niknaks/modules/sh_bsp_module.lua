@@ -1,7 +1,7 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
-Map = {}
+local NikNaks = NikNaks
+NikNaks.Map = {}
 ---@class BSPObject
 local meta = {}
 meta.__index = meta
@@ -56,7 +56,7 @@ local nulls = string.char( 0, 0, 0, 0 )
 local function LZMADecompress( str )
 	if str:sub(0, 4) ~= "LZMA" then return str end
 	local actualSize= str:sub(5, 8)
-	local lzmaSize 	= ByteBuffer.StringToInt( str:sub(9, 12) )
+	local lzmaSize 	= NikNaks.ByteBuffer.StringToInt( str:sub(9, 12) )
 	if lzmaSize <= 0 then return "" end -- Invalid length
 	local t = str:sub( 13, 17)
 	local data = str:sub(18, 18 + lzmaSize) -- Why not just read all of it? What data is after this? Tell me your secrets Valve.
@@ -71,7 +71,7 @@ local thisMap, thisMapObject = "maps/" .. game.GetMap() .. ".bsp"
 ---@param keep_file_open? boolean
 ---@return BSPObject
 ---@return BSP_ERROR_CODE
-function Map.ReadBSP( fileName )
+function NikNaks.Map.ReadBSP( fileName )
 	-- Handle filename
 	if not fileName then
 		if thisMapObject then return thisMapObject end -- Return this map
@@ -88,14 +88,14 @@ function Map.ReadBSP( fileName )
 		return thisMapObject
 	end
 
-	if not file.Exists(fileName,"GAME") then return nil, BSP_ERROR_FILENOTFOUND end -- File not found
+	if not file.Exists(fileName,"GAME") then return nil, NikNaks.BSP_ERROR_FILENOTFOUND end -- File not found
 	local f = file.Open(fileName,"rb","GAME")
-	if not f then return nil, BSP_ERROR_FILECANTOPEN end -- Unable to open file
+	if not f then return nil, NikNaks.BSP_ERROR_FILECANTOPEN end -- Unable to open file
 
 	-- Read the header
 	if f:Read(4) ~= "VBSP" then
 		f:Close()
-		return nil, BSP_ERROR_NOT_BSP
+		return nil, NikNaks.BSP_ERROR_NOT_BSP
 	end
 
 	-- Create BSP object
@@ -109,7 +109,7 @@ function Map.ReadBSP( fileName )
 	BSP._fileobj = f
 	if BSP._version > 21 then
 		f:Close()
-		return nil, BSP_ERROR_TOO_NEW
+		return nil, NikNaks.BSP_ERROR_TOO_NEW
 	end
 
 	-- Read Lump Header
@@ -182,7 +182,7 @@ do
 			data = LZMADecompress( data )
 		end
 		-- Create bytebuffer object with the data and return it
-		self._lumpstream[lump_id] = ByteBuffer.Create( data or "" )
+		self._lumpstream[lump_id] = NikNaks.ByteBuffer.Create( data or "" )
 		return self._lumpstream[lump_id]
 	end
 
@@ -259,12 +259,12 @@ do
 		local t = self:FindGameLump( gameLumpID )
 		-- If no gamelump can be found, set and return an empty bytebuffer.
 		if not t then
-			self._gamelumps[gameLumpID] = ByteBuffer.Create()
+			self._gamelumps[gameLumpID] = NikNaks.ByteBuffer.Create()
 			return self._gamelumps[gameLumpID]
 		end
 		local f = openFile( self )
 		f:Seek( t.fileofs )
-		self._gamelumps[gameLumpID] = ByteBuffer.Create( LZMADecompress( f:Read( t.filelen ) ) )
+		self._gamelumps[gameLumpID] = NikNaks.ByteBuffer.Create( LZMADecompress( f:Read( t.filelen ) ) )
 		return self._gamelumps[gameLumpID], t.version, t.flags
 	end
 end
@@ -594,10 +594,10 @@ do
 		if self._wmin then return self._wmin end
 		local wEnt = self:GetEntity(0)
 		if not wEnt then
-			self._wmin = Vector(0,0,0)
+			self._wmin = NikNaks.vector_zero
 			return self._wmin
 		end
-		self._wmin = util.StringToType(wEnt.world_mins or "0 0 0","Vector") or Vector(0,0,0)
+		self._wmin = util.StringToType(wEnt.world_mins or "0 0 0","Vector") or NikNaks.vector_zero
 		return self._wmin
 	end
 
@@ -605,10 +605,10 @@ do
 		if self._wmax then return self._wmax end
 		local wEnt = self:GetEntity(0)
 		if not wEnt then
-			self._wmax = Vector(0,0,0)
+			self._wmax = NikNaks.vector_zero
 			return self._wmax
 		end
-		self._wmax = util.StringToType(wEnt.world_maxs or "0 0 0","Vector") or Vector(0,0,0)
+		self._wmax = util.StringToType(wEnt.world_maxs or "0 0 0","Vector") or NikNaks.vector_zero
 		return self._wmax
 	end
 
@@ -620,7 +620,7 @@ do
 		if self._skyCamPos then return self._skyCamPos end
 		local t = self:FindByClass("sky_camera")
 		if #t < 1 then
-			self._skyCamPos = vector_zero
+			self._skyCamPos = NikNaks.vector_zero
 		else
 			self._skyCamPos = t[1].origin
 		end

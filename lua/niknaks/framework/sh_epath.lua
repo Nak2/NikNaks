@@ -1,13 +1,13 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
-
+local NikNaks = NikNaks
 -- NodeGrapth Alias and logic
 do
 	local hasFile = file.Exists("maps/graphs/" .. game.GetMap() .. ".ain", "GAME")
-	local NGarph = NodeGraph.LoadAin()
+	local NGarph = NikNaks.NodeGraph.LoadAin()
 
 	hook.Add("NN_PRE_INIT_AIN", "Load_NodeGraph", function() -- AIN will call this hook, when it is safe to load.
-		NGarph = NodeGraph.LoadAin()
+		NGarph = NikNaks.NodeGraph.LoadAin()
 		if NGarph then
 			hook.Run("NodeGraph_Init")
 		end
@@ -15,20 +15,20 @@ do
 
 	---Returns the AIN version. Should be 37.
 	---@return number
-	function NodeGraph.GetVersion( )
+	function NikNaks.NodeGraph.GetVersion( )
 		return NGarph and NGarph:GetVersion( )
 	end
 
 	---Returns the AIN map-version.
 	---@return number
-	function NodeGraph.GetMapVersion( )
+	function NikNaks.NodeGraph.GetMapVersion( )
 		return NGarph and NGarph:GetMapVersion( )
 	end
 
 	---Returns the given ain_node at said ID. 
 	---@param id number
 	---@return ain_node
-	function NodeGraph.GetNode( id )
+	function NikNaks.NodeGraph.GetNode( id )
 		return NGarph and NGarph:GetNode( id )
 	end
 
@@ -37,7 +37,7 @@ do
 	---@param NODE_TYPE? number
 	---@param Zone? number
 	---@return ain_node
-	function NodeGraph.FindNode( position, NODE_TYPE, Zone, HULL )
+	function NikNaks.NodeGraph.FindNode( position, NODE_TYPE, Zone, HULL )
 		return NGarph and NGarph:FindNode( position, NODE_TYPE, Zone, HULL )
 	end
 
@@ -47,7 +47,7 @@ do
 	---@param HULL number
 	---@param Zone? number
 	---@return ain_node
-	function NodeGraph.FindNodeWithHull( position, NODE_TYPE, Zone, HULL )
+	function NikNaks.NodeGraph.FindNodeWithHull( position, NODE_TYPE, Zone, HULL )
 		return NGarph and NGarph:FindNodeWithHull( position, NODE_TYPE, Zone, HULL )
 	end
 
@@ -58,7 +58,7 @@ do
 	---@param HintGroup? number
 	---@param Zone? number
 	---@return ain_node
-	function NodeGraph.FindHintNode( position, NODE_TYPE, HintType, HintGroup, Zone, HULL)
+	function NikNaks.NodeGraph.FindHintNode( position, NODE_TYPE, HintType, HintGroup, Zone, HULL)
 		return NGarph and NGarph:FindHintNode( position, NODE_TYPE, HintType, HintGroup, Zone, HULL)
 	end
 
@@ -70,7 +70,7 @@ do
 	---@param options? table
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
 	---@return LPathFollower|boolean
-	function NodeGraph.PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
+	function NikNaks.NodeGraph.PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
 		return NGarph and NGarph:PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
 	end
 
@@ -82,7 +82,7 @@ do
 	---@param HULL_SIZE? number
 	---@param max_dis? number -- Distance to nearest node
 	---@return boolean
-	function NodeGraph.CanMaybeReach( start_pos, end_pos, NODE_TYPE, HULL_SIZE, max_dis ) 
+	function NikNaks.NodeGraph.CanMaybeReach( start_pos, end_pos, NODE_TYPE, HULL_SIZE, max_dis ) 
 		return NGarph and NGarph:CanMaybeReach( start_pos, end_pos, NODE_TYPE, HULL_SIZE, max_dis ) 
 	end
 
@@ -94,18 +94,18 @@ do
 	---@param options? table
 	---@param HULL_SIZE? number
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
-	function NodeGraph.PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
+	function NikNaks.NodeGraph.PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
 		return NGarph and NGarph:PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
 	end
 
 	---Returns true if the nodegraph for the current map has loaded
 	---@return boolean
-	function NodeGraph.HasLoaded()
+	function NikNaks.NodeGraph.HasLoaded()
 		return NGarph and true or false
 	end
 
 	---Tries to reload the NodeGraph
-	function NodeGraph.Reload()
+	function NikNaks.NodeGraph.Reload()
 		NGarph = NodeGraph.LoadAin()
 	end
 end
@@ -115,9 +115,9 @@ do
 	local NikNav_Mesh
 	hook.Add("InitPostEntity", "NN_Load_NikNav", function()
 		if file.Exists("niknav/" .. game.GetMap() .. ".dat", "GAME") then
-			NikNav_Mesh = NikNav.Load()
+			NikNav_Mesh = NikNaks.NikNav.Load()
 		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NikNav
-			NikNav_Mesh = NikNav.GenerateFromNav()
+			NikNav_Mesh = NikNaks.NikNav.GenerateFromNav()
 			if not NikNav_Mesh then return end
 			NikNav_Mesh:Save()
 			NikNaks.Msg("Generated NikNav!")
@@ -126,16 +126,16 @@ do
 
 	---Returns true if the NikNav has loaded
 	---@return boolean
-	function NikNav.HasLoaded()
+	function NikNaks.NikNav.HasLoaded()
 		return NikNav_Mesh and true or false
 	end
 
 	---Tries to load or generate the NikNav
-	function NikNav.Reload()
-		if file.Exists("niknav/" .. game.GetMap() .. ".dat", "GAME") then
-			NikNav_Mesh = NikNav.Load()
+	function NikNaks.NikNav.Reload()
+		if file.Exists("niknav/" .. game.GetMap() .. ".dat", "DATA") then
+			NikNav_Mesh = NikNaks.NikNav.Load()
 		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NikNav
-			NikNav_Mesh = NikNav.GenerateFromNav()
+			NikNav_Mesh = NikNaks.NikNav.GenerateFromNav()
 			if not NikNav_Mesh then return end
 			NikNav_Mesh:Save()
 			NikNaks.Msg("Generated NikNav!")
@@ -148,12 +148,12 @@ do
 	---@param height? number
 	---@param options? table				A table of options: 
 	---@param generator? function 			A function to modify the cost: func( FromArea, ToArea, connection, BitCapability, CurrentCost )
-	function NikNav.PathFind( start_position, end_position, width, height, options, generator )
+	function NikNaks.NikNav.PathFind( start_position, end_position, width, height, options, generator )
 		if not NikNav_Mesh then return end
 		return NikNav_Mesh:PathFind( start_position, end_position, width, height, options, generator )
 	end
 	-- Debug
-	if false and CLIENT then
+	if  CLIENT then
 		local t = ents.FindByClass("prop_physics")
 		local A = t[1]
 		local B = t[2]
@@ -164,7 +164,7 @@ do
 		options.StepHeight = 30
 		options.ClimbMultiplier = 0.8
 		hook.Add("PostDrawOpaqueRenderables", "T", function(a, b)
-			if NikNav_Mesh and NikNav then
+			if NikNav_Mesh and NikNaks.NikNav then
 				NikNav_Mesh:DebugRender()
 			else 
 				return

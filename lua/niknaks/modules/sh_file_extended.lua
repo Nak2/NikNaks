@@ -24,12 +24,12 @@ local FILE = FindMetaTable("File")
 	function FILE:ReadVector()
 		return Vector( self:ReadFloat(), self:ReadFloat(), self:ReadFloat() )
 	end
-
+	NikNaks.file = {}
 	---Same as file.Write, but will automatically create folders and return true if successful.
 	---@param fileName string
 	---@param contents string
 	---@return boolean
-	function file.WriteEx( fileName, contents )
+	function NikNaks.file.WriteEx( fileName, contents )
 		local a = string.Explode("/", fileName)
 		assert(#a <= 10,"Unable to create an unreasonable array of folders!")
 		if #a > 1 then
