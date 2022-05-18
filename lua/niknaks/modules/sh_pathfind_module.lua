@@ -45,6 +45,7 @@ function meta:AddSegment(from, to, curvature, move_type)
 		seg.distanceFromStart = from:Distance(to)
 		local n = (to - from):GetNormalized()
 		seg.forward = n
+		seg.yaw = (-n):Angle().y
 		if n.z > 0.7 or n.z < -0.7 then
 			self.how = 9
 		else
@@ -303,6 +304,33 @@ do
 
 end
 
+-- NET
+do
+	function NikNaks.net.WritePath( path )
+		local n = #path._segments
+		net.WriteUInt( n, 16 )
+		net.WriteFloat( path._age )
+		net.WriteVector( path._start )
+		for i = 1, n do
+			local seg = path._segments[i]
+			net.WriteVector( seg.pos - seg.length * seg.forward )
+			net.WriteVector( seg.pos )
+			net.WriteFloat( seg.curvature )
+			net.WriteUInt( seg.move_type, 8 )
+		end
+	end
+	function NikNaks.net.ReadPath()
+		local n = net.ReadUInt( 16)
+		local age = net.ReadFloat()
+		local path = meta.CreatePathFollower( net.ReadVector() )
+		path._age = age
+		for i = 1, n do
+			path:AddSegment( net.ReadVector(), net.ReadVector(), net.ReadFloat(), net.ReadUInt( 8 ) )
+		end
+		return path
+	end
+end
+
 -- Debug
 do
 	local mat_goal = Material("editor/assault_rally")
@@ -352,9 +380,9 @@ do
 			l = seg.pos
 		end
 
-		local num = max(1, self:GetLength() / 300)
+		local num = max(1, self:GetLength() / 800)
 		for i = 1, num do
-			local dis = (CurTime() * 100 + i * 300) % self:GetLength()
+			local dis = (CurTime() * 100 + i * 800) % self:GetLength()
 			local pos = self:GetPositionOnPath( dis )
 			local q = 1 + cos(SysTime() * 10 + i) * 0.1
 			render.SetMaterial(mat_arrow)
@@ -364,3 +392,4 @@ do
 		end
 	end
 end
+
