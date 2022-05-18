@@ -13,15 +13,6 @@ n_meta.__index = n_meta
 n_meta.__tostring = function(self) return "NodeGraph: " .. (self._file or "New") end
 debug.getregistry().NodeGraph = n_meta
 
--- Make sure you can't create a nodegraph if entities hasn't been initialised 
-local int_post_ent = true
-hook.Add("InitPostEntity","AIN_PROTECT_CRASH", function()
-	int_post_ent = true
-	hook.Remove("InitPostEntity","AIN_PROTECT_CRASH")
-	if not file.Exists("maps/graphs/" .. game.GetMap() .. ".ain", "GAME") then return end
-	hook.Run("NN_PRE_INIT_AIN")
-end)
-
 ---@class ain_node
 local ain_node = {}
 ain_node.__tostring = function(self) return "Ain Node: " .. self:GetID() end
@@ -205,7 +196,8 @@ do
 	---@return NodeGraph|nil
 	---@return number AIN_ERROR_*
 	local function loadAin( fileName )
-		assert(int_post_ent, "Can't use AIN before InitPostEntity!")
+		-- Make sure you can't create a nodegraph if entities hasn't been initialised 
+		assert(NikNaks.PostInit, "Can't use AIN before InitPostEntity!")
 		if not fileName and _nodeG then return _nodeG end
 		if not fileName then fileName = "maps/graphs/" .. game.GetMap() .. ".ain" end
 		if not string.match(fileName,"%.ain$") and not string.match(fileName,"%.dat$") then fileName = fileName .. ".ain" end -- Add file type
@@ -275,7 +267,7 @@ do
 	---@return NodeGraph|nil
 	---@return number AIN_ERROR_*
 	function NikNaks.NodeGraph.GetMap()
-		assert(int_post_ent, "Can't use AIN before InitPostEntity!")
+		assert(NikNaks.PostInit, "Can't use AIN before InitPostEntity!")
 		if varNG ~= nil then return varNG end
 		local a, err = loadAin()
 		varNG = a or false
