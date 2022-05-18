@@ -54,7 +54,7 @@ NikNaks.NikNav_ERROR_FILECANTOPEN	= 8
 NikNaks.PATHTYPE_NONE=-1	-- In case there are no path-options on the map
 NikNaks.PATHTYPE_AIN = 0
 NikNaks.PATHTYPE_NAV = 1
-NikNaks.PATHTYPE_NNV = 2
+NikNaks.PATHTYPE_NIKNAV = 2
 
 -- How the NPC should move
 NikNaks.PATHMOVETYPE_GROUND = 0
