@@ -1,35 +1,54 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
 local NikNaks = NikNaks
+local _NodeGraph, _NikNav
+
+function NikNaks._LoadPathOptions()
+	-- NodeGraph
+	local data = "data/graphs/" .. game.GetMap() .. ".dat"
+	local ain = "maps/graphs/" .. game.GetMap() .. ".ain"
+	if file.Exists(data, "GAME") then
+		_NodeGraph = NikNaks.NodeGraph.LoadAin(data)
+	elseif file.Exists(ain, "GAME") then
+		_NodeGraph = NikNaks.NodeGraph.LoadAin(ain)
+	end
+
+	-- NikNav
+	local data = "data/niknav/" .. game.GetMap() .. ".dat"
+	if file.Exists(data, "GAME") then
+		_NikNav = NikNaks.NikNav.Load( data )
+	elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then
+		_NikNav = NikNaks.NikNav.GenerateFromNav()
+		if _NikNav then
+			_NikNav:Save()
+			NikNaks.Msg("Generated NikNav!")
+		else
+			NikNaks.Msg("Failed to generate NikNav!")
+		end
+	end
+
+	hook.Run("NikNak.Navigation.Loaded")
+end
+
 -- NodeGrapth Alias and logic
 do
-	local hasFile = file.Exists("maps/graphs/" .. game.GetMap() .. ".ain", "GAME")
-	local NGarph = NikNaks.NodeGraph.LoadAin()
-
-	hook.Add("NN_PRE_INIT_AIN", "Load_NodeGraph", function() -- AIN will call this hook, when it is safe to load.
-		NGarph = NikNaks.NodeGraph.LoadAin()
-		if NGarph then
-			hook.Run("NodeGraph_Init")
-		end
-	end)
-
 	---Returns the AIN version. Should be 37.
 	---@return number
 	function NikNaks.NodeGraph.GetVersion( )
-		return NGarph and NGarph:GetVersion( )
+		return _NodeGraph and _NodeGraph:GetVersion( )
 	end
 
 	---Returns the AIN map-version.
 	---@return number
 	function NikNaks.NodeGraph.GetMapVersion( )
-		return NGarph and NGarph:GetMapVersion( )
+		return _NodeGraph and _NodeGraph:GetMapVersion( )
 	end
 
 	---Returns the given ain_node at said ID. 
 	---@param id number
 	---@return ain_node
 	function NikNaks.NodeGraph.GetNode( id )
-		return NGarph and NGarph:GetNode( id )
+		return _NodeGraph and _NodeGraph:GetNode( id )
 	end
 
 	---Returns the nearest node
@@ -38,7 +57,7 @@ do
 	---@param Zone? number
 	---@return ain_node
 	function NikNaks.NodeGraph.FindNode( position, NODE_TYPE, Zone, HULL )
-		return NGarph and NGarph:FindNode( position, NODE_TYPE, Zone, HULL )
+		return _NodeGraph and _NodeGraph:FindNode( position, NODE_TYPE, Zone, HULL )
 	end
 
 	---Returns the nearest node with a connection matching the hull.
@@ -48,7 +67,7 @@ do
 	---@param Zone? number
 	---@return ain_node
 	function NikNaks.NodeGraph.FindNodeWithHull( position, NODE_TYPE, Zone, HULL )
-		return NGarph and NGarph:FindNodeWithHull( position, NODE_TYPE, Zone, HULL )
+		return _NodeGraph and _NodeGraph:FindNodeWithHull( position, NODE_TYPE, Zone, HULL )
 	end
 
 	---Returns the nearest node with said HintType.
@@ -59,7 +78,7 @@ do
 	---@param Zone? number
 	---@return ain_node
 	function NikNaks.NodeGraph.FindHintNode( position, NODE_TYPE, HintType, HintGroup, Zone, HULL)
-		return NGarph and NGarph:FindHintNode( position, NODE_TYPE, HintType, HintGroup, Zone, HULL)
+		return _NodeGraph and _NodeGraph:FindHintNode( position, NODE_TYPE, HintType, HintGroup, Zone, HULL)
 	end
 
 	---A* pathfinding using the NodeGraph.
@@ -71,7 +90,7 @@ do
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
 	---@return LPathFollower|boolean
 	function NikNaks.NodeGraph.PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
-		return NGarph and NGarph:PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
+		return _NodeGraph and _NodeGraph:PathFind( start_pos, end_pos, NODE_TYPE, options, HULL_SIZE, generator )
 	end
 
 	---A cheap lookup function. Checks to see if we can reach the position using nearby nodes.
@@ -83,7 +102,7 @@ do
 	---@param max_dis? number -- Distance to nearest node
 	---@return boolean
 	function NikNaks.NodeGraph.CanMaybeReach( start_pos, end_pos, NODE_TYPE, HULL_SIZE, max_dis ) 
-		return NGarph and NGarph:CanMaybeReach( start_pos, end_pos, NODE_TYPE, HULL_SIZE, max_dis ) 
+		return _NodeGraph and _NodeGraph:CanMaybeReach( start_pos, end_pos, NODE_TYPE, HULL_SIZE, max_dis ) 
 	end
 
 	---A* pathfinding using the NodeGraph. Returns the result in the callback. Calculates 20 paths pr tick.
@@ -95,51 +114,48 @@ do
 	---@param HULL_SIZE? number
 	---@param generator? function		-- A funtion that allows you to calculate your own cost: func( node, fromNode, CAP_MOVE, elevator, length )
 	function NikNaks.NodeGraph.PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
-		return NGarph and NGarph:PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
+		return _NodeGraph and _NodeGraph:PathFindASync( start_pos, end_pos, callback, NODE_TYPE, options, HULL_SIZE, generator )
 	end
 
 	---Returns true if the nodegraph for the current map has loaded
 	---@return boolean
 	function NikNaks.NodeGraph.HasLoaded()
-		return NGarph and true or false
+		return _NodeGraph and true or false
 	end
 
 	---Tries to reload the NodeGraph
 	function NikNaks.NodeGraph.Reload()
-		NGarph = NodeGraph.LoadAin()
+		_NodeGraph = NikNaks.NodeGraph.LoadAin()
 	end
 end
 
 -- NikNaks Alis and logic
 do
-	local NikNav_Mesh
-	hook.Add("InitPostEntity", "NN_Load_NikNav", function()
-		if file.Exists("niknav/" .. game.GetMap() .. ".dat", "GAME") then
-			NikNav_Mesh = NikNaks.NikNav.Load()
-		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NikNav
-			NikNav_Mesh = NikNaks.NikNav.GenerateFromNav()
-			if not NikNav_Mesh then return end
-			NikNav_Mesh:Save()
-			NikNaks.Msg("Generated NikNav!")
-		end
-	end)
-
+	---Returns the AIN version. Should be 37.
+	---@return number
+	function NikNaks.NikNav.GetVersion( )
+		return _NikNav and _NikNav:GetVersion( )
+	end
 	---Returns true if the NikNav has loaded
 	---@return boolean
 	function NikNaks.NikNav.HasLoaded()
-		return NikNav_Mesh and true or false
+		return _NikNav and true or false
 	end
 
 	---Tries to load or generate the NikNav
 	function NikNaks.NikNav.Reload()
 		if file.Exists("niknav/" .. game.GetMap() .. ".dat", "DATA") then
-			NikNav_Mesh = NikNaks.NikNav.Load()
+			_NikNav = NikNaks.NikNav.Load()
 		elseif file.Exists("maps/" .. game.GetMap() .. ".nav", "GAME") then -- Generate NikNav
-			NikNav_Mesh = NikNaks.NikNav.GenerateFromNav()
-			if not NikNav_Mesh then return end
-			NikNav_Mesh:Save()
+			_NikNav = NikNaks.NikNav.GenerateFromNav()
+			if not _NikNav then return end
+			_NikNav:Save()
 			NikNaks.Msg("Generated NikNav!")
 		end
+	end
+
+	function NikNaks.NikNav.Unload()
+		_NikNav = nil
 	end
 
 	---@param start_position Vector
@@ -149,13 +165,73 @@ do
 	---@param options? table				A table of options: 
 	---@param generator? function 			A function to modify the cost: func( FromArea, ToArea, connection, BitCapability, CurrentCost )
 	function NikNaks.NikNav.PathFind( start_position, end_position, width, height, options, generator )
-		if not NikNav_Mesh then return end
-		return NikNav_Mesh:PathFind( start_position, end_position, width, height, options, generator )
+		if not _NikNav then return end
+		return _NikNav:PathFind( start_position, end_position, width, height, options, generator )
 	end
 
-	function NikNaks.NikNav._mesh()
-		return NikNav_Mesh
+	---@param start_position Vector
+	---@param end_position Vector
+	---@param width? number
+	---@param height? number
+	---@param options? table				A table of options: 
+	---@param generator? function 			A function to modify the cost: func( FromArea, ToArea, connection, BitCapability, CurrentCost )
+	function NikNaks.NikNav.PathFindASync( start_position, end_position, callback, width, height, options, generator )
+		if not _NikNav then return end
+		return _NikNav:PathFindASync( start_position, end_position,callback, width, height, options, generator )
 	end
+
+	
+
+	---Returns an empty Area ID
+	---@return number
+	function NikNaks.NikNav.NextAreaID()
+		if not _NikNav then return end
+		return _NikNav:NextAreaID()
+	end
+
+	---Locates the nearest area to the given position
+	---@param position Vector
+	---@param beneathLimit? number
+	---@return NikNav_Area
+	function NikNaks.NikNav.GetArea( position, beneathLimit )
+		if not _NikNav then return end
+		return _NikNav:GetArea( position, beneathLimit )
+	end
+
+	---Returns a list of all areas
+	---@param table
+	function NikNaks.NikNav.GetAllAreas()
+		if not _NikNav then return end
+		return _NikNav:GetAllAreas( )
+	end
+
+	---Returns the area by the given ID
+	---@param id number
+	---@return NikNav_AREA|nil
+	function NikNaks.NikNav.GetAreaByID( id )
+		if not _NikNav then return end
+		return _NikNav:GetAreaByID( id )
+	end
+
+	---Returns the higest ID on the mesh
+	---@return number
+	function NikNaks.NikNav.GetAreaCount()
+		if not _NikNav then return end
+		return _NikNav.m_higestID
+	end
+
+	---Returns the nearest area
+	---@param position Vector
+	---@param maxDist? number
+	---@param checkLOS? boolean
+	---@param hasAttrobutes? number
+	---@param matchZone? number
+	---@return NikNav_AREA|nil
+	function NikNaks.NikNav.GetNearestArea( position, maxDist, checkLOS, hasAttributes, matchZone)
+		if not _NikNav then return end
+		return _NikNav:GetNearestArea( position, maxDist, checkLOS, hasAttributes, matchZone )
+	end
+
 
 	-- Debug
 	if false and CLIENT then

@@ -293,21 +293,4 @@ do
 			return result
 		end
 	end
-
-	---Same as PathFind, but sets some parameters
-	---@param start_position Vector
-	---@param end_position Vector
-	---@param width? number
-	---@param height? number
-	---@param options? table				A table of options: 
-	---@param generator? function 			A function to modify the cost: func( FromArea, ToArea, connection, BitCapability, CurrentCost )
-	function mesh:PathFindSmart( start_position, end_position, width, height, options, generator )
-		options = options or {}
-		if options.MaxDistance then
-			options.MaxDistance = min( options.MaxDistance, start_position:Distance(end_position) * 2  )
-		else
-			options.MaxDistance = start_position:Distance(end_position) * 2
-		end
-		return self:PathFind( start_position, end_position, width, height, options, generator )
-	end
 end

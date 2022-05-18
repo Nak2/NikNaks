@@ -54,6 +54,8 @@ local function CalcNormal(a, b, c, d)
 end
 
 function NikNaks.NikNav.CreateNew()
+	-- Make sure you can't create a nodegraph if entities hasn't been initialised 
+	assert(NikNaks.PostInit, "Can't use NikNav before InitPostEntity!")
 	local t = {}
 	setmetatable(t, mesh)
 	t.m_version = NikNaks.NikNav.Version
@@ -73,6 +75,10 @@ end
 ]]
 -- Lower Mesh Functions
 do
+	function mesh:GetVersion()
+		return self.m_version
+	end
+
 	local ceil = ceil
 	---Returns an empty Area ID
 	---@return number
@@ -662,9 +668,11 @@ do
 	---@param filename? string
 	---@return NikNav_Mesh|nil
 	function NikNaks.NikNav.Load( filename )
+		-- Make sure you can't create a nodegraph if entities hasn't been initialised 
+		assert(NikNaks.PostInit, "Can't use NikNav before InitPostEntity!")
 		filename = filename or "niknav/" .. game.GetMap() .. ".dat"
 		local niknav = NikNaks.ByteBuffer.OpenFile(filename, "DATA", true)
-		if not niknav then print("FILE NOT FOUND!") return end -- Unable to open file
+		if not niknav then return end -- Unable to open file
 		if niknav:ReadULong() ~= 0xCAFEC0DE then return end -- Invalid file
 		local mesh = NikNaks.NikNav.CreateNew()
 		mesh.m_version = niknav:ReadUShort()
@@ -943,6 +951,8 @@ do
 	---@param BSPFile? string The map file to generate from
 	---@return NikNav_Mesh|nil
 	function NikNaks.NikNav.GenerateFromNav( NAVFile, BSPFile )
+		-- Make sure you can't create a nodegraph if entities hasn't been initialised 
+		assert(NikNaks.PostInit, "Can't use NikNav before InitPostEntity!")
 		local NAV, BSP, navVersion
 		-- Handle / locate input data
 		do
@@ -1070,9 +1080,9 @@ do
 		-- Calculate grid
 		self:CalculateGrid()
 		-- Calculate size
-		for k, area in pairs( self.m_areas ) do
-			area:CompileAllConnectionSize()
-		end
+		--for k, area in pairs( self.m_areas ) do
+		--	area:CompileAllConnectionSize()
+		--end
 		self:GenerateZones()
 		NikNaks.Msg((string.format("NAV + BSP -> NikNav parser took: %fms", SysTime() - starttime)))
 		return self
