@@ -9,8 +9,10 @@ if NikNaks and NikNaks.Version > version then return end
 local file_Find, MsgC, unpack, rawget = file.Find, MsgC, unpack, rawget
 
 NikNaks = {}
+NikNaks.net = {}
 setmetatable(NikNaks,{
-	__index = function(k, v) return rawget(NikNaks, v) or _G[v]	end
+	__index = function(k, v) return rawget(NikNaks, v) or _G[v]	end,
+	__call = function( _, ...) return NikNaks.using( ... ) end
 })
 NikNaks.Version = version
 NikNaks.Authors = "Nak"
@@ -51,6 +53,7 @@ function NikNaks.AutoIncludeFolder( str )
 end
 
 -- A simple scope-script
+local env_gpatch
 do
 	local g = _G
 	local envs = {}
@@ -62,11 +65,25 @@ do
 			if val then return val end
 		end
 		return g[v]
-	end })
+	end
+	})
+	-- Patches any tables with nakes that share _G
+	function env_gpatch( tab )
+		for key, val in pairs( tab ) do
+			if type(val) ~= "table" then continue end
+			if not _G[key] then continue end
+			setmetatable(val, { __index = function(k, v)
+				return rawget(k, v) or _G[key][v]
+			end})
+		end
+	end
 	function NikNaks.using( ... )
 		local tab = { ... }
 		if getfenv( 2 ) == env then
-			for i = 1, #tab do envs[#envs + 1] = tab[i] end
+			for i = 1, #tab do 
+				env_gpatch(tab[i])
+				envs[#envs + 1] = tab[i]
+			end
 		elseif #tab > 0 then
 			envs = tab
 		else
@@ -97,3 +114,18 @@ NikNaks.AutoInclude("niknaks/framework/sh_epath.lua")
 
 --AutoIncludeFolder("niknaks/modules")
 --AutoIncludeFolder("niknaks/framework")
+
+env_gpatch(NikNaks)
+
+-- Post Init
+NikNaks.PostInit = _NIKNAKS_POSTENTITY or false
+if not NikNaks.PostInit then
+	hook.Add("InitPostEntity","NikNaks_InitPostEntity", function()
+		NikNaks.PostInit = true
+		_NIKNAKS_POSTENTITY = true
+		hook.Remove("InitPostEntity","NikNaks_InitPostEntity")
+		timer.Simple(1, NikNaks._LoadPathOptions )
+	end)
+else
+	timer.Simple(1, NikNaks._LoadPathOptions )
+end
