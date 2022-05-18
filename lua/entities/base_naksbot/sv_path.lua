@@ -95,30 +95,40 @@ do
 		return false
 	end
 
-	local SysTime = SysTime
-	local ASyncI = 0
 	local tab = {}
 	-- Calculates a path, and returns the cost or 0
 	local function Tick()
-		if #tab < 1 then return 0 end
 		local a = table.remove( tab, 1 )
 		local ent = a[1]
-		local s = SysTime()
 		ent._pathA = ent:PathFindTo( a[2], a[3], a[4], a[5] ) or false
-		return SysTime() - s
 	end
 
-	local max_cost_pr_tick = 0.1
-	local wallet = 0
-	hook.Add("Think", "NikNav_ASyncThink", function()
-		wallet = math.min(max_cost_pr_tick, wallet + 0.002)
-		if #tab == 0 then return end
-		if wallet <= 0 then return end
-		for i = 1, #tab do
-			if wallet <= 0 then break end
-			wallet = wallet - Tick()
+	local max_pathsPrTick = 180
+	local box = coroutine.create( function()
+		while true do
+			if #tab == 0 then 
+				coroutine.yield()
+			else
+				Tick()
+			end
 		end
 	end)
+	
+	hook.Add("Think", "NikNav_ASyncThink", function()
+		if box then
+			coroutine.resume( box )
+		end
+	end)
+	local g = 0
+	local costGen = function( ... )
+		if g > max_pathsPrTick then
+			coroutine.yield()
+			g = 0
+		else
+			g = g + 1
+		end
+		return select(5, ...)
+	end
 
 	---Creates a LPathFollower using the bots data. Returns true if we started generating it. Result will be returned in the callback.
 	---@param pos Vector
@@ -128,7 +138,7 @@ do
 	---@return boolean
 	function ENT:PathFindToASync( pos, options, generator, MaxDistance )
 		self._pathA = nil
-		tab[#tab + 1] = { self, pos, options, generator, MaxDistance }
+		tab[#tab + 1] = { self, pos, options, costGen or generator, MaxDistance }
 		while self._pathA == nil do -- Wait until we recive our path
 			coroutine.yield()
 		end
