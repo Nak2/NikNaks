@@ -32,7 +32,12 @@ function NikNaks.AutoInclude( str )
 	if string.find(str,"/") then
 		path = string.GetFileFromFilename(str)
 	end
-	local _type = string.sub(path,0,3)
+	local _type
+	if path ~= "shared.lua" then
+		_type = string.sub(path,0,3)
+	else
+		_type = "sh_"
+	end
 	if SERVER then
 		if _type == "cl_" or _type == "sh_" then
 			AddCSLuaFile(str)
