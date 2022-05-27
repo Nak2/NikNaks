@@ -4,6 +4,73 @@ local NikNaks = NikNaks
 local tostring, tonumber, tobool, Angle, Vector, string_ToColor = tostring, tonumber, tobool, Angle, Vector, string.ToColor
 
 
+-- Lua based type fix
+do	
+	NikNaks.oldType = type
+	function NikNaks.isnumber( var )
+		local mt = getmetatable( var )
+		if not mt or mt.MetaName ~= "number" then return false end
+		return true
+	end
+	function NikNaks.isstring( var )
+		local mt = getmetatable( var )
+		if not mt or mt.MetaName ~= "string" then return false end
+		return true
+	end
+	function NikNaks.istable( var )
+		if not getmetatable( var ) then return true end
+		return false
+	end
+	function NikNaks.isfunction( var )
+		local mt = getmetatable( var )
+		if not mt or mt.MetaName ~= "function" then return false end
+		return true
+	end
+	function NikNaks.isvector( var )
+		local mt = getmetatable( var )
+		if not mt or mt.MetaName ~= "Vector" then return false end
+		return true
+	end
+	function NikNaks.isangle( var )
+		local mt = getmetatable( var )
+		if not mt or mt.MetaName ~= "Angle" then return false end
+		return true
+	end
+	function NikNaks.isbool( var )
+		return var == true or var == false or false
+	end
+	function NikNaks.isplayer( var )
+		local mt = getmetatable( var )
+		if not mt or mt.MetaName ~= "Player" then return false end
+		return true
+	end
+	function NikNaks.isentity( var )
+		local mt = getmetatable( var )
+		if not mt or (mt.MetaName ~= "Player" and mt.MetaName ~= "Entity" ) then return false end
+		return true
+	end
+	local function PatchMetaName( var, str )
+		-- If it has a metatable.
+		local mt =  getmetatable(var)
+		if mt then -- Make sure the metatable has the metaname
+			mt.MetaName = str
+		else
+			local tab = {["MetaName"] = str}
+			debug.setmetatable(var, tab)
+		end
+	end
+	PatchMetaName("", "string")
+	PatchMetaName(1, "number")
+	PatchMetaName(function() end, "function")
+	PatchMetaName(coroutine.create(function() end), "thread")
+
+	function NikNaks.type( var )
+		local mt = getmetatable( var )
+		if mt and mt.MetaName then return mt.MetaName end
+		return "table"
+	end
+end
+
 ---Same as AccessorFunc, but will make 'Set' functions return self. Allowing you to chain-call.
 ---@param tab table
 ---@param varname string
@@ -11,33 +78,26 @@ local tostring, tonumber, tobool, Angle, Vector, string_ToColor = tostring, tonu
 ---@param iForce? number
 function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
 	if ( !tab ) then debug.Trace() end
-
 	tab[ "Get" .. name ] = function( self ) return self[ varname ] end
-
 	if ( iForce == FORCE_STRING ) then
 		tab[ "Set" .. name ] = function( self, v ) self[ varname ] = tostring( v ) return self end
 	return end
-
 	if ( iForce == FORCE_NUMBER ) then
 		tab[ "Set" .. name ] = function( self, v ) self[ varname ] = tonumber( v ) return self end
 	return end
-
 	if ( iForce == FORCE_BOOL ) then
 		tab[ "Set" .. name ] = function( self, v ) self[ varname ] = tobool( v ) return self end
 	return end
-
 	if ( iForce == FORCE_ANGLE ) then
 		tab[ "Set" .. name ] = function( self, v ) self[ varname ] = Angle( v ) return self end
 	return end
-
 	if ( iForce == FORCE_COLOR ) then
 		tab[ "Set" .. name ] = function( self, v )
-			if ( type( v ) == "Vector" ) then self[ varname ] = v:ToColor()
+			if ( NikNaks.type( v ) == "Vector" ) then self[ varname ] = v:ToColor()
 			else self[ varname ] = string_ToColor( tostring( v ) ) end
 			return self
 		end
 	return end
-
 	if ( iForce == FORCE_VECTOR ) then
 		tab[ "Set" .. name ] = function( self, v )
 			if ( IsColor( v ) ) then self[ varname ] = v:ToVector()
@@ -45,7 +105,6 @@ function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
 			return self
 		end
 	return end
-
 	tab[ "Set" .. name ] = function( self, v ) self[ varname ] = v return self end
 end
 NikNaks.util = {}
@@ -147,7 +206,7 @@ do
 		local keys = table.GetKeys( t )
 	
 		table.sort( keys, function( a, b )
-			if ( isnumber( a ) && isnumber( b ) ) then return a < b end
+			if ( NikNaks.isnumber( a ) && NikNaks.isnumber( b ) ) then return a < b end
 			return tostring( a ) < tostring( b )
 		end )
 	
@@ -160,13 +219,13 @@ do
 		
 		for i = 1, #keys do
 			local key =  keys[ i ]
-			if shorten and isnumber(key) and key > 15 then
+			if shorten and NikNaks.isnumber(key) and key > 15 then
 				-- Check to see if we can shorten the numbers
 				if not _shorten then
 					local a = false
 					for c = 1, 8 do
 						local _next = keys[ i + c ]
-						if not _next or not isnumber( _next ) or _next - c ~= key then
+						if not _next or not NikNaks.isnumber( _next ) or _next - c ~= key then
 							a = true
 							break
 						end
@@ -175,14 +234,14 @@ do
 				end
 				if _shorten then
 					local _next = keys[ i + 1 ]
-					if isnumber( _next ) and _next == key + 1 then
+					if NikNaks.isnumber( _next ) and _next == key + 1 then
 						continue
 					else
 						Msg( string.rep( "\t", indent ), "...\n" )
 						_shorten = false
 					end
 				end
-			elseif hide and isstring(key) then
+			elseif hide and NikNaks.isstring(key) then
 				if key:sub(0,1) == "_" then continue end
 			end
 			
@@ -214,4 +273,3 @@ do
 		end
 	end
 end
-

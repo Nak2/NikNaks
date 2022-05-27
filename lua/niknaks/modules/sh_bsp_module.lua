@@ -279,7 +279,7 @@ do
 		for i = 1, #d do
 			local k = d[i].Key
 			if t[k] then -- Multiple keys for this one
-				if type(t[k]) ~= "table" then --Convert to a table
+				if NikNaks.type(t[k]) ~= "table" then --Convert to a table
 					t[k] = {t[k]}
 				end
 				table.insert(t[k], d[i].Value)
