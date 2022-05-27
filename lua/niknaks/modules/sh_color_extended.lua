@@ -12,12 +12,11 @@ local string_format, string_sub = string.format, string.sub
 	NikNaks.SERVER_COLOR= Color(156, 241, 255, 200)
 	NikNaks.CLIENT_COLOR= Color(255, 241, 122, 200)
 	NikNaks.MENU_COLOR 	= Color(100, 220, 100, 200)
-	NikNaks.REALM_COLOR = SERVER and SERVER_COLOR or CLIENT and CLIENT_COLOR or MENU_DLL and MENU_COLOR
+	NikNaks.REALM_COLOR = SERVER and NikNaks.SERVER_COLOR or CLIENT and NikNaks.CLIENT_COLOR or MENU_DLL and NikNaks.MENU_COLOR
 	NikNaks.color_error_server	= Color(136, 221, 255)
 	NikNaks.color_error_client	= Color(255, 221, 102)
 	NikNaks.color_error_menu 	= Color(120, 220, 100)
 	
-
 	---Returns the luminance amount. How "bright" a color is between 0 and 255.
 	---@param color Color
 	---@return number
