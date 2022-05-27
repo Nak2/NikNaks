@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.08
+local version = 0.12
 if NikNaks and NikNaks.Version > version then return end
 
 local file_Find, MsgC, unpack, rawget = file.Find, MsgC, unpack, rawget
@@ -11,7 +11,6 @@ local file_Find, MsgC, unpack, rawget = file.Find, MsgC, unpack, rawget
 NikNaks = {}
 NikNaks.net = {}
 setmetatable(NikNaks,{
-	__index = function(k, v) return rawget(NikNaks, v) or _G[v]	end,
 	__call = function( _, ...) return NikNaks.using( ... ) end
 })
 NikNaks.Version = version
@@ -57,48 +56,9 @@ function NikNaks.AutoIncludeFolder( str )
 	end
 end
 
--- A simple scope-script
-local env_gpatch
-do
-	local g = _G
-	local envs = {}
-	local env = {}
-	local getfenv, setfenv = getfenv, setfenv
-	setmetatable(env, { __index = function(k, v)
-		for i = 1, #envs do
-			local val = rawget(envs[i], v)
-			if val then return val end
-		end
-		return g[v]
-	end
-	})
-	-- Patches any tables with nakes that share _G
-	function env_gpatch( tab )
-		for key, val in pairs( tab ) do
-			if type(val) ~= "table" then continue end
-			if not _G[key] then continue end
-			setmetatable(val, { __index = function(k, v)
-				return rawget(k, v) or _G[key][v]
-			end})
-		end
-	end
-	function NikNaks.using( ... )
-		local tab = { ... }
-		if getfenv( 2 ) == env then
-			for i = 1, #tab do 
-				env_gpatch(tab[i])
-				envs[#envs + 1] = tab[i]
-			end
-		elseif #tab > 0 then
-			envs = tab
-		else
-			envs = { NikNaks }
-		end
-		setfenv(2, env)
-	end
-end
-
--- For safty reasons, we're not using auto include folder. These are hardcoded.
+--[[
+	TODO: For safty reasons, we're won't use AutoInclude in the final version. These should be hardcoded.
+]]
 NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_file_extended.lua")
@@ -117,12 +77,53 @@ NikNaks.AutoInclude("niknaks/modules/sh_niknav_pathfinder.lua")
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
 NikNaks.AutoInclude("niknaks/framework/sh_epath.lua")
 
---AutoIncludeFolder("niknaks/modules")
---AutoIncludeFolder("niknaks/framework")
+-- A simple scope-script
+do
+	local g = _G
+	local envs = {}
+	local env = {}
+	local getfenv, setfenv = getfenv, setfenv
+	local NikNaks = NikNaks
+	local function createEnv( tab )
+		local t = {}
+		setmetatable(t, { __index = function(k, v)
+			return rawget(NikNaks, v) or tab[v]
+		end,
+		__newindex = function( t, k, v)
+			rawset( _G, k ,v )
+		end})
+		envs[ tab ] = t
+		return t
+	end
+	local _GEnv = createEnv( _G )
+	-- Patches any tables with names that share _G
+	function NikNaks.using()
+		local _env = getfenv( 2 )
+		if _env == g then
+			setfenv(2, _GEnv)
+		elseif _env ~= _GEnv then -- Make sure it isn't our env
+			-- Create new env and apply it
+			setfenv(2, envs[_env] or createEnv( _env ))
+		else
+			-- Ignore for now.
+			-- error("Can't apply enviroment to self")
+		end
+	end
+end
 
-env_gpatch(NikNaks)
+-- Patch table to ref _G
+do
+	local g = _G
+	for key, val in pairs( NikNaks ) do
+		if not istable( val ) then continue end
+		if not _G[key] then continue end
+		setmetatable(val, { __index = function(k, v)
+			return rawget(k, v) or g[key][v]
+		end})
+	end
+end
 
--- Post Init
+-- Post Init. This is a safety option, as using traces and other functions before can cause crash.
 NikNaks.PostInit = _NIKNAKS_POSTENTITY or false
 if not NikNaks.PostInit then
 	hook.Add("InitPostEntity","NikNaks_InitPostEntity", function()
