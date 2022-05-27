@@ -9,7 +9,7 @@ do
 	---@return Vector MinVec
 	---@return Vector MaxVec
 	function NikNaks.ModelSize(name)
-		if cache[name] then return cache[name][1],cache[name][2] end
+		if cache[name] then return Vector(cache[name][1]),Vector(cache[name][2]) end
 		if not file_Exists(name,"GAME") then
 			cache[name] = {NikNaks.vector_zero,NikNaks.vector_zero}
 			return cache[name]
@@ -20,7 +20,7 @@ do
 		local hullMax = Vector( f:ReadFloat(),f:ReadFloat(),f:ReadFloat())
 		f:Close()
 		cache[name] = {hullMin,hullMax}
-		return hullMin,hullMax
+		return Vector(hullMin),Vector(hullMax)
 	end
 end
 
