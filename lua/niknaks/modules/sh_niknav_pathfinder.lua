@@ -279,7 +279,6 @@ do
 			return false
 		end
 
-		
 		local result = AStart(start_area, end_area, width, height, options, generator, start_position, end_position, SB, EB )
 		if result == false then return false end
 		if result == true then
@@ -293,4 +292,67 @@ do
 			return result
 		end
 	end
+end
+-- ASync
+do
+	local async, run = {}, false
+	local function remove_hook()
+		if not run then return end
+		run = false
+		hook.Remove("Think","niknav_apath")
+	end
+	local function add_hook()
+		if run then return end
+		run = true
+		hook.Add("Think","niknav_apath",function()
+			local n = #async
+			if n < 1 then
+				return remove_hook() -- None left to calculate
+			end
+			for i = n, 1, -1 do
+				local thread, callback = async[1][1], async[1][2]
+				-- Somehow it died
+				if coroutine.status( thread ) == "dead" then
+					callback( false )
+					table.remove( async, 1 )
+					continue
+				end
+				-- Call the thread
+				local ok, message = coroutine.resume( thread )
+				if ( ok == false ) then -- Error?
+					ErrorNoHalt( " Error: ", message, "\n" )
+					callback( false )
+					table.remove( async, 1 )
+				elseif message then -- Success
+					table.remove( async, 1 )
+				end
+			end
+		end)
+	end
+	---A* pathfinding using the NodeGraph. Returns the result in the callback. Calculates 20 paths pr tick.
+	---@param start_position Vector
+	---@param end_position Vector
+	---@param callback function 		-- Returns the result. LPathFollower or false
+	---@param width? number
+	---@param height? number
+	---@param options? table				A table of options: 
+	---@param generator? function 			A function to modify the cost: func( FromArea, ToArea, connection, BitCapability, CurrentCost )
+	function mesh:PathFindASync( start_position, end_position, callback, width, height, options, generator )
+		local count = 0
+		local function awaitGen( current, neighbor, connection, BitCapability, h_cost )
+			count = count + 1
+			if count > 20 then
+				count = 0
+				coroutine.yield()
+			end
+			if generator then return generator( current, neighbor, connection, BitCapability, h_cost ) end
+			return h_cost
+		end
+		table.insert(async, {coroutine.create(function()
+			callback( self:PathFind( start_position, end_position, width, height, options, generator ) )
+			coroutine.yield( true )
+		end, callback)})
+		add_hook() -- Make sure the async runs
+	end
+
 end
