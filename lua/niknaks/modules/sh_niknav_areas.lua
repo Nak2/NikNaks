@@ -664,11 +664,9 @@ end
 -- Debug Render
 if CLIENT then
 	local w_col = Color(155,155,255,55)
-	local a_col = Color(155,155,255,105)
-	local mat = Material("vgui/hud/scalablepanel_bgblack_outlinered")
+	local mat = Material("debug/debugwireframevertexcolor")
 	local mat2 = Material("gui/workshop_rocket.png")
 	local mat3 = Material("gui/noicon.png", "noclamp")
-	local c_col = Color(55,255,55)
 	function meta_area:DebugRender( col )
 		
 		local PY = (EyeAngles().y - 45) % 360
@@ -681,12 +679,13 @@ if CLIENT then
 			DIR = WEST
 		end
 		render.SetMaterial(mat)
-		if col then
-			render.DrawQuad( self.m_corner[0], self.m_corner[1], self.m_corner[2], self.m_corner[3], col )
-		elseif self.m_haswater then
+		local n = self:GetFlatness()
+		if self.m_haswater then
 			render.DrawQuad( self.m_corner[0], self.m_corner[1], self.m_corner[2], self.m_corner[3], w_col )
+		elseif n >= 0.9 then
+			render.DrawQuad( self.m_corner[0], self.m_corner[1], self.m_corner[2], self.m_corner[3], self.col or color_white )
 		else
-			render.DrawQuad( self.m_corner[0], self.m_corner[1], self.m_corner[2], self.m_corner[3], self.col and color_black or a_col )
+			render.DrawQuad( self.m_corner[0], self.m_corner[1], self.m_corner[2], self.m_corner[3], Color(0, 255 ,0) )
 		end
 		if true then return end
 		--if self.m_id ~= 20 then return end
