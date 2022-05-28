@@ -378,101 +378,6 @@ do
 	end
 end
 
----Debug Render.
-if CLIENT then
-	local c = {
-		[NikNaks.NODE_TYPE_AIR 		]= Color(155,155,255),
-		[NikNaks.NODE_TYPE_GROUND 	]= Color(155,255,155),
-		--[NODE_TYPE_WATER 	]= Color(0,0,255),
-		[NikNaks.NODE_TYPE_CLIMB 	]= Color(155,155,155)
-	}
-	local l = {}
-	for i = 0, 9 do
-		l[i] = Material( "sprites/key_" .. i )
-	end
-	local hType = {
-		[0] = "None",
-		[2] = "Window",
-		[12] = "Act Busy",
-		[13] = "Visually Interesting",
-		[14] = "Visually Interesting(Dont aim)",
-		[15] = "Inhibit Combine Mines",
-		[16] = "Visually Interesting (Stealth mode)",
-		[100] = "Crouch Cover Medium",	-- Angles + FOV is important
-		[101] = "Crouch Cover Low",		-- Angles + FOV is important
-		[102] = "Waste Scanner Spawn",
-		[103] = "Entrance / Exit Pinch (Cut content from Antlion guard)",
-		[104] = "Guard Point",
-		[105] = "Enemy Disadvantage Point",
-		[106] = "Health Kit (Cut content from npc_assassin)",
-		[400] = "Antlion: Burrow Point",
-		[401] = "Antlion: Thumper Flee Point",
-		[450] = "Headcrab: Burrow Point",
-		[451] = "Headcrab: Exit Pod Point",
-		[500] = "Roller: Patrol Point",
-		[501] = "Roller: Cleanup Spot",
-		[700] = "Crow: Fly to point",
-		[701] = "Crow: Perch point",
-		[900] = "Follower: Wait point",
-		[901] = "Override jump permission",
-		[902] = "Player squad transition point",
-		[903] = "NPC exit point",
-		[904] = "Strider mnode",
-		[950] = "Player Ally: Push away destination",
-		[951] = "Player Ally: Fear withdrawal destination",
-		[1000]= "HL1 World: Machinery",
-		[1001]= "HL1 World: Blinking Light",
-		[1002]= "HL1 World: Human Blood",
-		[1003]= "HL1 World: Alien Blood",
-	}
-	local function getH(num)
-		if not num then return "?" end
-		if hType[num] then
-			return hType[num] .. "[" .. num .. "]"
-		end
-		return num
-	end
-	function ain_node:DebugRender( size )
-		--if self.zone ~= 4 then return end
-		size = size or 32
-		if self.hint then
-			render.SetMaterial(l[self.zone % 10])
-			render.DrawSprite( self:GetPos(), size, size, HSVToColor((CurTime() * 420)%360, 0.5, 0.5))
-			if LocalPlayer():GetPos():DistToSqr(self:GetPos()) < 40000 then
-				local angle = EyeAngles()
-				angle:RotateAroundAxis( angle:Up(), -90 )
-				angle:RotateAroundAxis( angle:Forward(), 90 )
-				cam.Start3D2D( self:GetPos() + Vector(0,0,30), angle, 0.1 )
-					draw.DrawText( "HintType: " .. getH(self.hint.hinttype), "DermaLarge", 0, 0, color_white, TEXT_ALIGN_CENTER )
-					if self.hint.targetnode and self.hint.targetnode > -1 then
-						draw.DrawText( "Target node: " .. self.hint.targetnode, "DermaLarge", 0, 30, color_white, TEXT_ALIGN_CENTER )
-					elseif (self.hint.hinttype or 0) > 0 or not self.hint.group then
-						draw.DrawText( "ID node: " .. self.hint.nodeid, "DermaLarge", 0, 30, color_white, TEXT_ALIGN_CENTER )
-					else
-						draw.DrawText( "Group node: " .. self.hint.group, "DermaLarge", 0, 30, color_white, TEXT_ALIGN_CENTER )
-					end
-				cam.End3D2D()
-			end
-		elseif self.zone <= 9 then
-			render.SetMaterial(l[self.zone % 10])
-			render.DrawSprite( self:GetPos() + Vector(0,0,15), size, size, c[self:GetType()])
-		else
-			local angle = EyeAngles()
-				angle:RotateAroundAxis( angle:Up(), -90 )
-				angle:RotateAroundAxis( angle:Forward(), 90 )
-			cam.Start3D2D( self:GetPos() + Vector(0,0,30), angle, 0.5 )
-				draw.DrawText( ""..self.zone, "DermaLarge", 0, 0, color_white, TEXT_ALIGN_CENTER )
-			cam.End3D2D()
-		end
-		local h = 0
-		for k, v in pairs( self._connect ) do
-			if v[2]:HasMoveFlag( h, NikNaks.CAP_MOVE_GROUND ) then -- or v[2]:HasMoveFlag( h, CAP_MOVE_FLY ) then
-				render.DrawLine(self:GetPos(),v[1]:GetPos(), c[self:GetType()] )
-			end
-		end
-	end
-end
-
 -- Get Grid Nodes
 do
 	local function scan( node, tab )
@@ -1074,5 +979,112 @@ do
 			callback( self:PathFind( start_pos, end_pos, NODE_TYPE, HULL_SIZE, BitCapability, JumpMultiplier, awaitGen, MaxDistance, UseZone ) )
 			return true
 		end))
+	end
+end
+
+if SERVER then return end
+do
+	local c = {
+		[NikNaks.NODE_TYPE_AIR 		]= Color(155,155,255),
+		[NikNaks.NODE_TYPE_GROUND 	]= Color(155,255,155),
+		--[NODE_TYPE_WATER 	]= Color(0,0,255),
+		[NikNaks.NODE_TYPE_CLIMB 	]= Color(155,155,155)
+	}
+	local l = {}
+	for i = 0, 9 do
+		l[i] = Material( "sprites/key_" .. i )
+	end
+	local hType = {
+		[0] = "None",
+		[2] = "Window",
+		[12] = "Act Busy",
+		[13] = "Visually Interesting",
+		[14] = "Visually Interesting(Dont aim)",
+		[15] = "Inhibit Combine Mines",
+		[16] = "Visually Interesting (Stealth mode)",
+		[100] = "Crouch Cover Medium",	-- Angles + FOV is important
+		[101] = "Crouch Cover Low",		-- Angles + FOV is important
+		[102] = "Waste Scanner Spawn",
+		[103] = "Entrance / Exit Pinch (Cut content from Antlion guard)",
+		[104] = "Guard Point",
+		[105] = "Enemy Disadvantage Point",
+		[106] = "Health Kit (Cut content from npc_assassin)",
+		[400] = "Antlion: Burrow Point",
+		[401] = "Antlion: Thumper Flee Point",
+		[450] = "Headcrab: Burrow Point",
+		[451] = "Headcrab: Exit Pod Point",
+		[500] = "Roller: Patrol Point",
+		[501] = "Roller: Cleanup Spot",
+		[700] = "Crow: Fly to point",
+		[701] = "Crow: Perch point",
+		[900] = "Follower: Wait point",
+		[901] = "Override jump permission",
+		[902] = "Player squad transition point",
+		[903] = "NPC exit point",
+		[904] = "Strider mnode",
+		[950] = "Player Ally: Push away destination",
+		[951] = "Player Ally: Fear withdrawal destination",
+		[1000]= "HL1 World: Machinery",
+		[1001]= "HL1 World: Blinking Light",
+		[1002]= "HL1 World: Human Blood",
+		[1003]= "HL1 World: Alien Blood",
+	}
+	local function getH(num)
+		if not num then return "?" end
+		if hType[num] then
+			return hType[num] .. "[" .. num .. "]"
+		end
+		return num
+	end
+	function ain_node:DebugRender( size )
+		--if self.zone ~= 4 then return end
+		size = size or 32
+		if self.hint then
+			render.SetMaterial(l[self.zone % 10])
+			render.DrawSprite( self:GetPos(), size, size, HSVToColor((CurTime() * 420)%360, 0.5, 0.5))
+			if LocalPlayer():GetPos():DistToSqr(self:GetPos()) < 40000 then
+				local angle = EyeAngles()
+				angle:RotateAroundAxis( angle:Up(), -90 )
+				angle:RotateAroundAxis( angle:Forward(), 90 )
+				cam.Start3D2D( self:GetPos() + Vector(0,0,30), angle, 0.1 )
+					draw.DrawText( "HintType: " .. getH(self.hint.hinttype), "DermaLarge", 0, 0, color_white, TEXT_ALIGN_CENTER )
+					if self.hint.targetnode and self.hint.targetnode > -1 then
+						draw.DrawText( "Target node: " .. self.hint.targetnode, "DermaLarge", 0, 30, color_white, TEXT_ALIGN_CENTER )
+					elseif (self.hint.hinttype or 0) > 0 or not self.hint.group then
+						draw.DrawText( "ID node: " .. self.hint.nodeid, "DermaLarge", 0, 30, color_white, TEXT_ALIGN_CENTER )
+					else
+						draw.DrawText( "Group node: " .. self.hint.group, "DermaLarge", 0, 30, color_white, TEXT_ALIGN_CENTER )
+					end
+				cam.End3D2D()
+			end
+		elseif self.zone <= 9 then
+			render.SetMaterial(l[self.zone % 10])
+			render.DrawSprite( self:GetPos() + Vector(0,0,15), size, size, c[self:GetType()])
+		else
+			local angle = EyeAngles()
+				angle:RotateAroundAxis( angle:Up(), -90 )
+				angle:RotateAroundAxis( angle:Forward(), 90 )
+			cam.Start3D2D( self:GetPos() + Vector(0,0,30), angle, 0.5 )
+				draw.DrawText( ""..self.zone, "DermaLarge", 0, 0, color_white, TEXT_ALIGN_CENTER )
+			cam.End3D2D()
+		end
+		local h = 0
+		for k, v in pairs( self._connect ) do
+			if v[2]:HasMoveFlag( h, NikNaks.CAP_MOVE_GROUND ) then -- or v[2]:HasMoveFlag( h, CAP_MOVE_FLY ) then
+				render.DrawLine(self:GetPos(),v[1]:GetPos(), c[self:GetType()] )
+			end
+		end
+	end
+end
+
+function n_meta:DebugRender()
+	local lp = LocalPlayer()
+	if not lp then return end
+	local x, y = math.floor(lp:GetPos().x / 1000), math.floor(lp:GetPos().y / 1000)
+	-- Use the nodegraph to search, if none at position, scan all nodes ( slow )
+	local ng = self._nodegraph[x] and self._nodegraph[x][y]
+	if not ng then return end
+	for k, v in pairs( ng ) do
+		v:DebugRender()
 	end
 end
