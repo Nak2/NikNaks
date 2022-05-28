@@ -6,9 +6,20 @@ local band, bor = bit.band, bit.bor
 local TraceLine, Vector, util_PointContents, table_remove = util.TraceLine, Vector, util.PointContents, table.remove
 local setmetatable = setmetatable
 local ColorToLuminance, ComputeLighting = ColorToLuminance, render and render.ComputeLighting
+
+-- Convars
+local convar_zheightt = 	CreateConVar("niknav_gen_height_offset", 25, bit.bor(FCVAR_REPLICATED, FCVAR_ARCHIVE),	"How far inside the area the height should be calculated from.")
+local convar_automerge= 	CreateConVar("niknav_gen_automerge", 3, bit.bor(FCVAR_REPLICATED, FCVAR_ARCHIVE), 		"Automerges navmesh areas when generating. Number also indecates how many times it should iterate over the mesh.")
+local convar_importhint= 	CreateConVar("niknav_gen_import_hints", 1, bit.bor(FCVAR_REPLICATED, FCVAR_ARCHIVE), 	"Imports info_node_hints from BSP when generating.")
+local convar_importclimb=	CreateConVar("niknav_gen_import_climb", 1, bit.bor(FCVAR_REPLICATED, FCVAR_ARCHIVE), 	"Imports info_node_climb from BSP when generating.")
+
+local convar_automerge_F=	CreateConVar("niknav_gen_automerge_beta", 0, bit.bor(FCVAR_REPLICATED, FCVAR_ARCHIVE), 	"Ignores connections when compressing. Takes significantly longer.")
+
+
+
 -- Nik Naks Navigation
 NikNaks.NikNav = {}
-NikNaks.NikNav.Version = 0.1
+NikNaks.NikNav.Version = 0.3
 
 local GRID_SIZE = 800
 
@@ -151,6 +162,11 @@ do
 		end
 	end
 
+	function mesh:GetGrid( position )
+		local x,y = chop(position)
+		return self._grid[x] and self._grid[x][y] or nil
+	end
+
 	---This function re-generated the grid lookup table. This speeds up locating areas and other stuff.
 	function mesh:CalculateGrid()
 		self._grid = {}
@@ -194,7 +210,7 @@ do
 	---@param hasAttrobutes? number
 	---@param matchZone? number
 	---@return NikNav_AREA|nil
-	function mesh:GetNearestArea( position, maxDist, checkLOS, hasAttributes, matchZone)
+	function mesh:GetNearestArea( position, maxDist, checkLOS, hasAttributes, matchZone, minSize)
 		maxDist = maxDist or 10000
 		local x,y = chop(position)
 		local c, d, z
@@ -203,6 +219,10 @@ do
 			-- Check to see if the area is within
 			for id, area in pairs( self._grid[x][y] ) do
 				if not area then continue end -- Unknown area?
+				if minSize then
+					if area.m_sizex < minSize then continue end
+					if area.m_sizey < minSize then continue end
+				end
 				if matchZone then
 					local n = area:GetZone()
 					if n >= 0 and n ~= matchZone then
@@ -244,12 +264,13 @@ end
 
 -- Area Creation and Destruction
 do
-	local offset = 5
-	local traceHull = function( a, b, c, d )
-		local pos = (a + b + c + d) / 4
-		pos.z = max(a.z, b.z, c.z, d.z) - 4
-		local mi = Vector(min(a.x, b.x, c.x, d.x) + offset,min(a.y, b.y, c.y, d.y) + offset,pos.z) - pos
-		local ma = Vector(max(a.x, b.x, c.x, d.x) - offset,max(a.y, b.y, c.y, d.y) - offset,pos.z + 1) - pos
+	local traceHull = function( nw, ne, se, sw )
+		local offset = convar_zheightt:GetInt()
+		local pos = (nw + ne + se + sw) / 4		-- Get the center
+		pos.z = max(nw.z, ne.z, se.z, sw.z) + 1 -- Make sure the higest point to trace here, starts at the higest point.
+		local w, h = min((sw.x - nw.x) / 2 - offset, 10), min((ne.y - nw.y) / 2 - offset, 10)
+		local mi = Vector(-w,-h, 0)
+		local ma = Vector( w, h, 1)
 		return util.TraceHull( {
 			start = pos + vector_up,
 			endpos = Vector(pos.x, pos.y, 32768),
@@ -346,8 +367,9 @@ do
 	---@param area NikNav_Area
 	---@param area2 NikNav_Area
 	---@param fuzzy? number		"Fuzzyness" of the angles.
+	---@param checkZ? boolean	Compares the Z height betweeen the two areas as well. On by default.
 	---@return boolean
-	function mesh:CanMerge(area, area2, fuzzy)
+	function mesh:CanMerge(area, area2, fuzzy, checkZ)
 		if not area or not area2 then return false end
 		if area.m_id == area2.m_id then return false end -- Can't merge itself
 		if area.m_directorys or area2.m_directorys then
@@ -357,7 +379,7 @@ do
 		local se = area.m_corner[SOUTH_EAST]
 		local nw2 = area2.m_corner[NORTH_WEST]
 		local se2 = area2.m_corner[SOUTH_EAST]
-		-- Can combine
+		-- Can combine (Check to see if points are close)
 		if abs(nw.x - nw2.x) < 1 and abs( se.x - se2.x ) < 1 then
 		elseif abs(nw.y - nw2.y) < 1 and abs(se.y - se2.y) < 1 then
 		else
@@ -367,6 +389,9 @@ do
 		-- Looks fine, but check angle. We can use "flatness" to check for this.
 		if area.m_normal:Dot(area2.m_normal) < fuzzy then return false end
 		if abs(area.m_maxz - area2.m_maxz) > 60 then return false end
+		if checkZ or checkZ == nil then -- Check the Z height between the two areas.
+			if abs( area:ComputeGroundHeightChange( area2 ) ) > 10 then return false end
+		end
 		return true
 	end
 
@@ -483,13 +508,12 @@ do
 			end
 			zone = zone + 1
 		end
-		print(string.format("%f", SysTime() - s))
 	end
 end
 
 -- Place Functions
 do
-	local isstring = isstring
+	local isstring = NikNaks.isstring
 	-- Locates the place-id
 	local function findID( self, place_name )
 		for id, str in pairs( self.m_directory ) do
@@ -748,13 +772,21 @@ do
 	do
 		-- Tries to compress the mesh-area with its surrounding
 		local function tryAndCompress( mesh, area, fuzzy )
-			for _, connection in ipairs( area:GetAllConnections() ) do
+			-- Try compress connections
+			for _, connection in pairs( area:GetAllConnections() ) do
 				if connection:GetDistance() > 1 then continue end
 				local other = connection:GetArea()
 				if not other then continue end
 				if not mesh:MergeAreas(area, other, fuzzy) then continue end
-				other.col = true
 				return true
+			end
+			-- Noi connections found. Lookup nearby areas.
+			if convar_automerge_F:GetBool() then
+				for _, area2 in pairs( mesh:GetGrid( area.m_center ) ) do
+					if area:Distance( area2 ) > 1 then continue end
+					if not mesh:MergeAreas(area, area2, fuzzy) then continue end
+					return true
+				end
 			end
 			return false
 		end
@@ -767,17 +799,18 @@ do
 		---@param fuzzy? number		Fuzzyness of angles comparison. 1= Same anges.
 		function mesh:Compress( tries, fuzzy )
 			tries = tries or 4
-			local changed = {}
+			local changed, n = {}, 1
 			for k, v in pairs( self.m_areas ) do
 				if tryAndCompress(self, v, fuzzy) then
-					table.insert( changed, v.m_id )
+					changed[n] = v.m_id
+					n = n + 1
 				end
 			end
 			if #changed < 1 then return end
 			-- Some areas got changed. double check those.
 			local b = false
-			for _, id in pairs( changed ) do
-				local area = self.m_areas[id]
+			for i = 1, n do
+				local area = self.m_areas[changed[i]]
 				if not area then continue end
 				b = b or tryAndCompress(self, area, fuzzy)
 			end
@@ -1035,48 +1068,60 @@ do
 			end
 		end
 		--Check BSP info nodes and crawl points
-		local crawlpoints = {}
-		for _, v in pairs( BSP:GetEntities() ) do
-			if not v.classname then continue end
-			if v.classname == "info_node_hint" or v.classname == "info_node_air_hint" then
-				if v.hinttype then
-					self:CreateHintPoint( v.origin, tonumber(v.hinttype), v.angles.yaw, v.nodefov or 180, v.hintactivity )
-				end
-			elseif v.classname == "info_node_climb" then
-				table.insert(crawlpoints, v)
-			end
-		end
-		-- Merge crawlpoints into one line
-		for i = 1, #crawlpoints do
-			local a = table_remove(crawlpoints, i)
-			if not a then continue end
-			local l = {a}
-			local pos1 = a.origin - Angle(0,a.angles.y,0):Forward() * 13
-			for ii = #crawlpoints, 1, -1 do
-				local b = crawlpoints[ii]
-				if _2ddis(pos1, b.origin) > 50 then continue end
-				local pos2 = b.origin - Angle(0,b.angles.y,0):Forward() * 13
-				if not canSee(pos1, pos2) then continue end
-				l[#l + 1] = b
-				table_remove(crawlpoints, ii)
-			end
-			if #l < 2 then -- This list only got 1 point.
-				continue
-			end 
-			-- Get the higest and lowest points
-			local h, o = l[1], l[1]
-			for i = 2, #l do
-				if h.origin.z < l[i].origin.z then
-					h = l[i]
-				elseif o.origin.z > l[i].origin.z then
-					o = l[i]
+		local b_hints = convar_importhint:GetBool()
+		local b_climb = convar_importclimb:GetBool()
+		if b_hint or n_climb then
+			local crawlpoints = {}
+			for _, v in pairs( BSP:GetEntities() ) do
+				if not v.classname then continue end
+				if v.classname == "info_node_hint" or v.classname == "info_node_air_hint" then
+					if b_hints and v.hinttype then
+						self:CreateHintPoint( v.origin, tonumber(v.hinttype), v.angles.yaw, v.nodefov or 180, v.hintactivity )
+					end
+				elseif b_climb and v.classname == "info_node_climb" then
+					table.insert(crawlpoints, v)
 				end
 			end
-			self:CreateMovePoint( o.origin, h.origin, NikNaks.CAP_MOVE_CLIMB, 5, false )
+			-- Merge crawlpoints into one line
+			for i = 1, #crawlpoints do
+				local a = table_remove(crawlpoints, i)
+				if not a then continue end
+				local l = {a}
+				local pos1 = a.origin - Angle(0,a.angles.y,0):Forward() * 13
+				for ii = #crawlpoints, 1, -1 do
+					local b = crawlpoints[ii]
+					if _2ddis(pos1, b.origin) > 50 then continue end
+					local pos2 = b.origin - Angle(0,b.angles.y,0):Forward() * 13
+					if not canSee(pos1, pos2) then continue end
+					l[#l + 1] = b
+					table_remove(crawlpoints, ii)
+				end
+				if #l < 2 then -- This list only got 1 point.
+					continue
+				end 
+				-- Get the higest and lowest points
+				local h, o = l[1], l[1]
+				for i = 2, #l do
+					if h.origin.z < l[i].origin.z then
+						h = l[i]
+					elseif o.origin.z > l[i].origin.z then
+						o = l[i]
+					end
+				end
+				self:CreateMovePoint( o.origin, h.origin, NikNaks.CAP_MOVE_CLIMB, 5, false )
+			end
 		end
 		-- Compress
-		NikNaks.Msg("Compressing NAV-areas ..")
-		self:Compress()
+		if convar_automerge:GetInt() > 0 then
+			NikNaks.Msg("Compressing NAV-areas ..")
+			local s = SysTime()
+			local n = table.Count( self.m_areas )
+			self:Compress( convar_automerge:GetInt() )
+			NikNaks.Msg((string.format("Compressing took: %fms", SysTime() - s)))
+			local n2 = table.Count( self.m_areas )
+			local c = 100 - ((n2 / n) * 100)
+			NikNaks.Msg("Merged " .. (n - n2) .. " together. Saved " .. c .. "%." )
+		end
 		-- Calculate grid
 		self:CalculateGrid()
 		-- Calculate size
@@ -1234,11 +1279,10 @@ end
 
 -- Client debug render
 if CLIENT then	
-	local mat = Material("gui/sm_hover.png")
 	function mesh:DebugRender()
 		local lp = LocalPlayer():GetPos()
 		local lpv = EyeVector()
-		cam.IgnoreZ( true )
+		cam.IgnoreZ( false )
 		local x,y = math.ceil(lp.x / GRID_SIZE), math.ceil(lp.y / GRID_SIZE)
 		if self._grid[x] and self._grid[x][y] then
 			for id, area in pairs( self._grid[x][y] ) do
@@ -1269,23 +1313,5 @@ if CLIENT then
 			if hintp.m_pos:DistToSqr(lp) > 3400400 then continue end
 			hintp:DebugRender()
 		end
-		if true then return end
-		local pos = LocalPlayer():GetEyeTrace().HitPos
-		if not pos then return end
-		local area = self:GetNearestArea(pos, nil, true )
-		if not area then return end
-		local min = area.m_corner[0] - area.m_center
-		local max = Vector(area.m_corner[2].x,area.m_corner[2].y,area.m_maxz) - area.m_center
-		render.SetColorMaterial()
-		render.DrawBox( area.m_center, Angle(0,0,0), max, min, Color(255,0,0,144) )
-		render.SetMaterial(mat)
-		render.DrawSprite( area:GetClosestPointOnArea( pos ), 128, 128 )
-		render.DrawLine( pos, area:GetClosestPointOnArea( pos ) )
-		cam.IgnoreZ( true )
-		for id, connection in pairs( area:GetAllConnectionsWID() ) do
-			local area = connection:GetArea()
-			area:DebugRender(Color(0,255,0))
-		end
-		cam.IgnoreZ( false )
 	end
 end
