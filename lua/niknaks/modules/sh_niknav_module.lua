@@ -771,19 +771,21 @@ do
 
 	do
 		-- Tries to compress the mesh-area with its surrounding
-		local function tryAndCompress( mesh, area, fuzzy )
+		local function tryAndCompress( mesh, area, fuzzy, advcompress )
 			-- Try compress connections
 			for _, connection in pairs( area:GetAllConnections() ) do
-				if connection:GetDistance() > 1 then continue end
 				local other = connection:GetArea()
-				if not other then continue end
+				if not other or other:DistToSqr(area) > 1 then continue end
+				if area.m_haswater ~= other.m_haswater then continue end
 				if not mesh:MergeAreas(area, other, fuzzy) then continue end
 				return true
 			end
 			-- Noi connections found. Lookup nearby areas.
-			if convar_automerge_F:GetBool() then
+			if convar_automerge_F:GetBool() and not advcompress then
 				for _, area2 in pairs( mesh:GetGrid( area.m_center ) ) do
-					if area:Distance( area2 ) > 1 then continue end
+					if area2:DistToSqr(area) > 1 then continue end
+					if area.m_haswater ~= area2.m_haswater then continue end
+					if area:DistToSqr( area2 ) > 1 then continue end
 					if not mesh:MergeAreas(area, area2, fuzzy) then continue end
 					return true
 				end
@@ -797,11 +799,11 @@ do
 		---Tries to compress areas.
 		---@param tries? number		How many times we should try and compress
 		---@param fuzzy? number		Fuzzyness of angles comparison. 1= Same anges.
-		function mesh:Compress( tries, fuzzy )
+		function mesh:Compress( tries, fuzzy, _lookup )
 			tries = tries or 4
 			local changed, n = {}, 1
 			for k, v in pairs( self.m_areas ) do
-				if tryAndCompress(self, v, fuzzy) then
+				if tryAndCompress(self, v, fuzzy, _lookup) then
 					changed[n] = v.m_id
 					n = n + 1
 				end
@@ -812,12 +814,12 @@ do
 			for i = 1, n do
 				local area = self.m_areas[changed[i]]
 				if not area then continue end
-				b = b or tryAndCompress(self, area, fuzzy)
+				b = b or tryAndCompress(self, area, fuzzy, true)
 			end
 			-- If the new areas didn't compress, or we ran out of tries; return.
 			if not b or tries <= 0 then return end
 			-- Run the compress function again.
-			self:Compress( tries - 1, fuzzy )
+			self:Compress( tries - 1, fuzzy, true )
 		end
 	end
 end
@@ -1279,7 +1281,7 @@ end
 
 -- Client debug render
 if CLIENT then	
-	function mesh:DebugRender()
+	function mesh:DebugRender( b_connections )
 		local lp = LocalPlayer():GetPos()
 		local lpv = EyeVector()
 		cam.IgnoreZ( false )
@@ -1289,7 +1291,7 @@ if CLIENT then
 				local v = (lp - area.m_center):GetNormalized()
 				local n = v:Dot(lpv)
 				if n > 0  then continue end
-				area:DebugRender()
+				area:DebugRender( b_connections )
 			end
 		else
 			for _, areas in pairs( self.m_areas ) do
@@ -1298,7 +1300,7 @@ if CLIENT then
 				local dis = areas.m_center:DistToSqr(lp)
 				if n > 0 and dis > 300000 then continue end
 				if dis > 7400400 then continue end
-				areas:DebugRender()
+				areas:DebugRender( b_connections )
 			end
 		end
 		cam.IgnoreZ( false )
