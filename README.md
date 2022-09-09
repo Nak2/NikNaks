@@ -6,9 +6,10 @@
 >***Note:** May not be reuploaded to workshop or any other Steam© services without specific prior written permission.<br>
 See: https://github.com/Nak2/NikNaks/blob/main/LICENSE for more info.
 
-###Quick Start
+### Quick Start
 
-* [How to use NikNaks with your project]()
+* [Getting started](https://github.com/Nak2/NikNaks/wiki/Getting-started)
+* [Wiki page]()
 * [FAQ]()
 
 ### Documentation
