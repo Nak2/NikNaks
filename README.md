@@ -1,4 +1,5 @@
-# NikNaks
+![alt text][banner]
+
  A library with various features for Garry's Mod I've created.
  It features an adv BitBuffer, BSP Parser, BSP Objects , PVS/PAS, and more.
  
@@ -9,7 +10,7 @@ See: https://github.com/Nak2/NikNaks/blob/main/LICENSE for more info.
 BitBuffers are simelar to file-objects as they store data in a 32-bit number-array.
 * They offer speeds up to 80x faster than the regular file-IO system. As they skip the Lua -> C -> Lua header.
 * Little/Big Endian support
-*  Allows for non-byte integers
+* Allows for non-byte integers
 * Supports Float / Dobule.
 * Have additional features, structures and allows to be loaded entirely in memory.
 * Can both Read and Write at the same time.
@@ -42,3 +43,5 @@ A fast lua-based system to mimic, load, edit and patch Valves NodeGraphs ( AIN f
 Has a list of extended and useful features.
 * Color functions ( Luminance, Hex support, Brighten/Darken .. ect )
 * ModelSize, ModelMaterial, AccessorFuncEx and more.
+
+[banner]: https://github.com/Nak2/NikNaks/blob/main/assets/banner.png "NikNaks Banner"
