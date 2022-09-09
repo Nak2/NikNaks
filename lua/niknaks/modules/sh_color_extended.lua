@@ -142,13 +142,13 @@ local string_format, string_sub = string.format, string.sub
 
 -- Color functions
 
-	---Returns true if the color is bright. Useful to check if the text infront should be white or black.
+	---Returns true if the color is bright. Useful to check if the text infront should be dark.
 	---@return boolean
 	function COLOR:IsBright()
 		return ColorToLuminance(self) >= 127.5
 	end
 
-	---Returns true if the color is bright. Useful to check if the text infront should be white or black.
+	---Returns true if the color is bright. Useful to check if the text infront should be bright.
 	---@return boolean
 	function COLOR:IsDark()
 		return ColorToLuminance(self) < 127.5

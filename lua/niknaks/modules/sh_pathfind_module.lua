@@ -8,7 +8,7 @@ local min, max, cos = math.min, math.max, math.cos
 local meta = {}
 meta.__index = meta
 meta.__tostring = function(self) return "LPathFollower Age: " .. self:GetAge() end
-debug.getregistry().LPathFollower = meta
+NikNaks.__metatables["LPathFollower"] = meta
 
 --[[
 	t._segments = {}

@@ -4,8 +4,9 @@ local NikNaks = NikNaks
 local tostring, tonumber, tobool, Angle, Vector, string_ToColor = tostring, tonumber, tobool, Angle, Vector, string.ToColor
 
 
--- Lua based type fix
-do	
+-- Lua based type fix 
+-- TODO: Note sure if it should be added
+if false then	
 	NikNaks.oldType = type
 	function NikNaks.isnumber( var )
 		local mt = getmetatable( var )
@@ -77,7 +78,7 @@ end
 ---@param name string
 ---@param iForce? number
 function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
-	if ( !tab ) then debug.Trace() end
+	if not tab then debug.Trace() end
 	tab[ "Get" .. name ] = function( self ) return self[ varname ] end
 	if ( iForce == FORCE_STRING ) then
 		tab[ "Set" .. name ] = function( self, v ) self[ varname ] = tostring( v ) return self end
@@ -107,6 +108,7 @@ function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
 	return end
 	tab[ "Set" .. name ] = function( self, v ) self[ varname ] = v return self end
 end
+
 NikNaks.util = {}
 -- Hull
 do
@@ -115,8 +117,6 @@ do
 	---@param vecMax Vector
 	---@return number HULL_ENUM
 	function NikNaks.util.FindHull( vecMin, vecMax )
-		assert(type( vecMin ) == "Vector", "bad argument #1 to FindHull (Vector expected, got " .. type(vecMin) ..")")
-		assert(type( vecMax ) == "Vector", "bad argument #2 to FindHull (Vector expected, got " .. type(vecMax) ..")")
 		local wide = max(-vecMin.x, -vecMin.y, vecMax.x, vecMax.y)
 		local high = vecMax.z - vecMin.z
 		if wide <= 16 and high <= 8 then
@@ -137,139 +137,11 @@ do
 	end
 
 	---Returns a HULL_ENUM matching the entitys hull.
-	---@param ent Entity
+	---@param entity Entity
 	---@return number HULL_ENUM
 	function NikNaks.util.FindEntityHull( entity )
 		if entity.GetHull then return entity:GetHull() end
 		local mi, ma = entity:OBBMins(), entity:OBBMaxs()
 		return FindHull(mi, ma)
-	end
-end
-
--- A safer PrintTable, with a few more features.
-do
-	local getinfo = debug.getinfo
-	local getlocal = debug.getlocal
-	local function getfuncName( info )
-		if not info.what == "C" then return end
-		if not info.short_src or not info.linedefined or not file.Exists(info.short_src,"GAME") then return end
-		local fil = file.Open( info.short_src, "r", "GAME" )
-		if not fil then return end
-		-- Goto line defined
-		for i = 1, info.linedefined - 1 do
-			fil:ReadLine()
-		end
-		local line = fil:ReadLine()
-		fil:Close()
-		local func = string.match( line, "([^s]+)%s-=%s-function%s-%(")
-		if func then
-			return string.Trim( func )
-		end
-		local func = string.match( line, "function%s(.-)%(")
-		if func then
-			return string.Trim( func )
-		end
-	end
-	local function getFuncArgs( func )
-		local args = {}
-		local arg = getlocal( func, 1 )
-		local i = 1
-		while arg ~= nil do
-			table.insert(args,arg)
-			i = i + 1
-			arg = getlocal( func, i )
-		end
-		return "(" .. table.concat( args, "," ) .. ")"
-	end
-	local function MsgColor( col )
-		MsgC(REALM_COLOR,"Color("  .. col.r .. ", " .. col.g .. ", " .. col.b  .. (col.a ~= 255 and "," .. col.a or "") .. ")",col," ▉▉▉")
-	end
-	local funcCache = {}
-	local function MSgFunc( func )
-		local funcName = funcCache[ func ]
-		local info = getinfo( func )
-		if not funcName then
-			funcName = getfuncName( info ) or tostring( func )
-			funcCache[ func ] = funcName
-		end
-		local line = info.linedefined .. ":" .. info.short_src
-		Msg( funcName .. getFuncArgs( func ) .. "\t\t" .. line )
-	end
-
-	function NikNaks.PrintTable( t, shorten, hide, indent, done )
-		local Msg = Msg
-		if shorten == nil then shorten = true end
-		if hide == nil then hide = true end
-	
-		done = done or {}
-		indent = indent or 0
-		local keys = table.GetKeys( t )
-	
-		table.sort( keys, function( a, b )
-			if ( NikNaks.isnumber( a ) && NikNaks.isnumber( b ) ) then return a < b end
-			return tostring( a ) < tostring( b )
-		end )
-	
-		done[ t ] = true
-		if t.MetaName then
-			done[ t.MetaName ] = true
-		end
-
-		local _shorten = false
-		
-		for i = 1, #keys do
-			local key =  keys[ i ]
-			if shorten and NikNaks.isnumber(key) and key > 15 then
-				-- Check to see if we can shorten the numbers
-				if not _shorten then
-					local a = false
-					for c = 1, 8 do
-						local _next = keys[ i + c ]
-						if not _next or not NikNaks.isnumber( _next ) or _next - c ~= key then
-							a = true
-							break
-						end
-					end
-					_shorten = not a
-				end
-				if _shorten then
-					local _next = keys[ i + 1 ]
-					if NikNaks.isnumber( _next ) and _next == key + 1 then
-						continue
-					else
-						Msg( string.rep( "\t", indent ), "...\n" )
-						_shorten = false
-					end
-				end
-			elseif hide and NikNaks.isstring(key) then
-				if key:sub(0,1) == "_" then continue end
-			end
-			
-			local value = t[ key ]
-			Msg( string.rep( "\t", indent ) )
-	
-			if  ( istable( value ) and !done[ value ] and !(value.MetaName and done[ value.MetaName ]) ) then
-				if value.r and value.g and value.b then
-					Msg( key, "\t=\t" )
-					MsgColor( value )
-					MsgN()
-				else
-					done[ value ] = true
-					Msg( key, ":", value.MetaName and "\t"..tostring(value) .."\t" .. "[" .. value.MetaName .. "]\n" or "\n")
-					NikNaks.PrintTable ( value, shorten, hide, indent + 2, done )
-				end
-			else
-				if isfunction( value ) then
-					Msg( key, "\t=\t" )
-					MSgFunc( value )
-					MsgN()
-				else
-					if istable(value) and value.MetaName then
-						value = tostring(value) .. "\t[" .. value.MetaName .. "]"
-					end
-					Msg( key, "\t=\t", value, "\n" )
-				end
-			end
-		end
 	end
 end

@@ -13,8 +13,8 @@ NikNaks.CAP_MOVE_GROUND								= 0x01 -- walk/run
 NikNaks.CAP_MOVE_JUMP								= 0x02 -- jump/leap
 NikNaks.CAP_MOVE_FLY								= 0x04 -- can fly, move all around
 NikNaks.CAP_MOVE_CLIMB								= 0x08 -- climb ladders
---CAP_MOVE_SWIM / bits_BUILD_GIVEWAY?	= 0x10 -- navigate in water			// UNDONE - not yet implemented
---CAP_MOVE_CRAWL						= 0x20 -- crawl						// UNDONE - not yet implemented
+--CAP_MOVE_SWIM / bits_BUILD_GIVEWAY?	= 0x10 -- navigate in water			// Removed by Valve: UNDONE - not yet implemented
+--CAP_MOVE_CRAWL						= 0x20 -- crawl						// Removed by Valve: UNDONE - not yet implemented
 
 -- Nodes
 NikNaks.NODE_TYPE_INVALID 	=-1 -- Any nodes not matching these
@@ -46,9 +46,6 @@ NikNaks.BSP_ERROR_TOO_NEW 		= 2
 NikNaks.BSP_ERROR_FILENOTFOUND 	= 3
 NikNaks.AIN_ERROR_VERSIONNUM	= 4
 NikNaks.AIN_ERROR_ZONEPATCH		= 5	-- This error is thrown when the AIN-parser repairs the data. It will still return the data successfully.
-NikNaks.NikNav_ERROR_NAVNOTFOUND	= 6
-NikNaks.NikNav_ERROR_BSPNOTFOUND	= 7
-NikNaks.NikNav_ERROR_FILECANTOPEN	= 8
 
 -- naksbot
 NikNaks.PATHTYPE_NONE=-1	-- In case there are no path-options on the map

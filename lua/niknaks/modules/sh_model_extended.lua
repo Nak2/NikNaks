@@ -26,7 +26,7 @@ end
 
 do
 	local util_GetModelMeshes, Material = util.GetModelMeshes, Material
-	---Returns the materials used for this model. This can be exspensive, so cache the result.
+	---Returns the materials used for this model. This can be expensive, so cache the result.
 	---@param name any
 	---@param lod? number
 	---@param bodygroupMask? number

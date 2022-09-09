@@ -24,6 +24,7 @@ local FILE = FindMetaTable("File")
 	function FILE:ReadVector()
 		return Vector( self:ReadFloat(), self:ReadFloat(), self:ReadFloat() )
 	end
+
 	NikNaks.file = {}
 	---Same as file.Write, but will automatically create folders and return true if successful.
 	---@param fileName string
