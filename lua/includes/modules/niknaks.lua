@@ -75,7 +75,7 @@ do
 	end
 
 	-- Patches any tables with names that share _G
-	NikNaks._source = source:lower():match("addons/(.-)/")
+	--NikNaks._source = source:lower():match("addons/(.-)/")
 	NikNaks._source = "niknak"
 	local function using()
 		local _env = getfenv( 2 )
