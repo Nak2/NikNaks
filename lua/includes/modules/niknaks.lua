@@ -76,6 +76,7 @@ do
 
 	-- Patches any tables with names that share _G
 	NikNaks._source = source:lower():match("addons/(.-)/")
+	NikNaks._source = "niknak"
 	local function using()
 		local _env = getfenv( 2 )
 		if _env ~= _GEnv then -- Make sure it isn't our env
@@ -130,7 +131,7 @@ do
 	for key, val in pairs( NikNaks ) do
 		if not istable( val ) then continue end
 		if not _G[key] then continue end
-		if not NikNaks._source:find("niknak") then continue end
+		--if not NikNaks._source:find("niknak") then continue end
 		setmetatable(val, { __index = function(k, v)
 			return rawget(k, v) or g[key][v]
 		end})
