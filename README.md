@@ -14,7 +14,7 @@ See: https://github.com/Nak2/NikNaks/blob/main/LICENSE for more info.
 
 ### Documentation
 
-* [BitBuffer](BitBuffer)
+* [BitBuffer](https://github.com/Nak2/NikNaks/wiki/BitBuffer)
 * [BSP Parser]()
 * [DateTime]()
 * [TimeDelta]()
