@@ -11,7 +11,7 @@ NikNaks.NodeGraph = {}
 local n_meta = {}
 n_meta.__index = n_meta
 n_meta.__tostring = function(self) return "NodeGraph: " .. (self._file or "New") end
-debug.getregistry().NodeGraph = n_meta
+NikNaks.__metatables["NodeGraph"] = n_meta
 
 ---@class ain_node
 local ain_node = {}
@@ -205,7 +205,7 @@ do
 		--if thisMapObject and fileName == thisMap then return thisMapObject end
 		
 		if not file.Exists( fileName, "GAME" ) then return end
-		local b = NikNaks.ByteBuffer.OpenFile( fileName, "GAME" )
+		local b = NikNaks.BitBuffer.OpenFile( fileName, "GAME" )
 		-- Create new NG object
 		local n = {}
 		n._version = b:ReadLong()
@@ -559,9 +559,9 @@ do
 
 	local MAX_NODES = MAX_NODES or 4096 	-- This is the limit for Source, not NikNaks.
 	---Returns the nodegraph as a bytebuffer.
-	---@return ByteBuffer
+	---@return BitBuffer
 	function n_meta:SaveToBuf()
-		local b = NikNaks.ByteBuffer()
+		local b = NikNaks.BitBuffer()
 			b:WriteLong( self:GetVersion() ) -- Should be 37
 			b:WriteLong( self._map_version )
 		-- Write node num
@@ -717,7 +717,7 @@ do
 end
 
 -- A* PathFinder
-local LPFMeta = FindMetaTable("LPathFollower")
+local LPFMeta = NikNaks.__metatables["LPathFollower"]
 do
 	local function heuristic_cost_estimate( start, goal, HULL )
 		// Perhaps play with some calculations on which corner is closest/farthest or whatever

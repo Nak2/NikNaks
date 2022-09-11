@@ -70,10 +70,3 @@ do
 		return calcPAS(position2):TestPosition( position )
 	end
 end
-
-
-
-if SERVER then return end
-
-
-
