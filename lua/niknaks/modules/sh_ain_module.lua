@@ -173,7 +173,7 @@ do
 		["info_node_climb"] = NikNaks.NODE_TYPE_CLIMB		
 	}
 	local function parseMap( self )
-		for _, v in pairs( NikNaks.Map.ReadBSP():GetEntities() ) do
+		for _, v in pairs( NikNaks.CurrentMap:GetEntities() ) do
 			if not v.classname then continue end
 			local _type = l[v.classname]
 			if not _type then continue end
