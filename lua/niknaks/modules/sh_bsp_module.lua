@@ -291,22 +291,25 @@ end
 
 -- Word Data
 do
-	-- Returns the detail-metail the map uses.
 	local default = [[detail\detailsprites.vmt]]
+	--- Returns the detail-metail the map uses.
+	---@return string
 	function meta:GetDetailMaterial()
 		local wEnt = self:GetEntities()[0]
 		if not wEnt then return default end
 		return wEnt.detailmaterial or default
 	end
 
-	-- Returns true if the map is a cold world. ( Flag set in the BSP )
+	--- Returns true if the map is a cold world. ( Flag set in the BSP )
+	---@return bool
 	function meta:IsColdWorld()
 		local wEnt = self:GetEntity(0)
 		if not wEnt then return false end
 		return wEnt.coldworld == 1
 	end
 
-	-- Returns the min-positions where brushes are within the map.
+	--- Returns the min-positions where brushes are within the map.
+	---@return Vector
 	function meta:WorldMin()
 		if self._wmin then return self._wmin end
 		local wEnt = self:GetEntity(0)
@@ -318,7 +321,8 @@ do
 		return self._wmin
 	end
 
-	-- Returns the max-position where brushes are within the map.
+	--- Returns the max-position where brushes are within the map.
+	---@return Vector
 	function meta:WorldMax()
 		if self._wmax then return self._wmax end
 		local wEnt = self:GetEntity(0)
@@ -330,12 +334,15 @@ do
 		return self._wmax
 	end
 
-	-- Returns the map-bounds. These are not the size of the map, but the bounds where brushes are within.
+	--- Returns the map-bounds. These are not the size of the map, but the bounds where brushes are within.
+	---@return Vector
+	---@return Vector
 	function meta:GetBrushBounds()
 		return self:WorldMin(), self:WorldMax()
 	end
 
-	-- Returns the skybox position. Returns [0,0,0] if none are found.
+	--- Returns the skybox position. Returns [0,0,0] if none are found.
+	---@return Vector
 	function meta:GetSkyBoxPos()
 		if self._skyCamPos then return self._skyCamPos end
 		local t = self:FindByClass("sky_camera")
@@ -347,7 +354,8 @@ do
 		return self._skyCamPos
 	end
 
-	-- Returns the skybox scale. Returns 1 if none are found.
+	--- Returns the skybox scale. Returns 1 if none are found.
+	---@return number
 	function meta:GetSkyBoxScale()
 		if self._skyCamScale then return self._skyCamScale end
 		local t = self:FindByClass("sky_camera")
@@ -359,19 +367,24 @@ do
 		return self._skyCamScale
 	end
 
-	-- Returns true if the map has a 3D skybox.
+	--- Returns true if the map has a 3D skybox.
+	---@return bool
 	function meta:HasSkyBox()
 		if self._skyCam ~= nil then return self._skyCam end
 		self._skyCam = #self:FindByClass("sky_camera") > 0
 		return self._skyCam
 	end
 
-	-- Returns a position in the skybox that matches the one in the world.
+	--- Returns a position in the skybox that matches the one in the world.
+	---@param vec Vector
+	---@return Vector
 	function meta:WorldToSkyBox( vec )
 		return vec / self:GetSkyBoxScale() + self:GetSkyBoxPos()
 	end
 
-	-- Returns a position in the world that matches the one in the skybox.
+	--- Returns a position in the world that matches the one in the skybox.
+	---@param vec Vector
+	---@return Vector
 	function meta:SkyBoxToWorld( vec )
 		return ( vec - self:GetSkyBoxPos() ) * self:GetSkyBoxScale()
 	end
@@ -1115,6 +1128,8 @@ end
 	end
 end*/
 
+-- Old debug code below
+if true then return end
 
 function TESTVPS()
 	
