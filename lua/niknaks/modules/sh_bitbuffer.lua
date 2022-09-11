@@ -488,6 +488,8 @@ do
 	end
 end
 
+local function isNegative(n) return 1/n == -math.huge end
+
 -- Float
 do
 	local band = band
@@ -524,7 +526,7 @@ do
 				ex = ex - 1
 			end
 			man = floor(ldexp(man, 23) + 0.5)
-		elseif tostring(num) == "-0" then -- Minus 0 support
+		elseif isNegative(num) then -- Minus 0 support
 			sign = 0x80000000
 			man = 0
 		end
@@ -564,7 +566,7 @@ do
 	function meta:WriteDouble( num )
 		-- Calculate sign, ex and man
 		local sign = 0
-		if num < 0 then
+		if num < 0 or (num == 0 and isNegative(num)) then
 			num = -num
 			sign = 0x80000000
 		end
