@@ -150,8 +150,10 @@ do
 
 	---Skips x bits ahead.
 	---@param num number
+	---@return self
 	function meta:Skip( num )
 		self._tell = self._tell + num
+		return self
 	end
 
 	---Returns true if we've reached the end of the bitbuffer.
@@ -161,10 +163,12 @@ do
 	end
 
 	---Clears all data from the bitbuffer
+	---@return self
 	function meta:Clear()
 		self._data = {}
 		self._len = 0
 		self._tell = 0
+		return self
 	end
 
 	local function toBits(num,bits,byte_space)
