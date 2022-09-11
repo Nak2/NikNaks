@@ -8,5 +8,3 @@ if not _NIKNAKS_POSTENTITY then
 		hook.Remove("InitPostEntity","NikNaks_InitPostEntity")
 	end)
 end
-
-require("niknaks")
