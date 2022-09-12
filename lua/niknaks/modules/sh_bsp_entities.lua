@@ -44,14 +44,14 @@ end
 
 -- A list of data-keys that can have multiple entries.
 local _tableTypes = {
-	["OnMapSpawn"] = true,
-	["OnTrigger"] = true,
-	["OnStartTouch"] = true,
+	["OnMapSpawn"] = 	true,
+	["OnTrigger"] = 	true,
+	["OnStartTouch"] = 	true,
 	["OnArrivedAtDestinationNode"] = true,
-	["OnPowered"] = true,
-	["OnUnpowered"] = true,
-	["OnExplode"] = true,
-	["OnAllTrue"] = true,
+	["OnPowered"] = 	true,
+	["OnUnpowered"] = 	true,
+	["OnExplode"] = 	true,
+	["OnAllTrue"] = 	true,
 }
 
 local function ParseEntity( str )
