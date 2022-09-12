@@ -77,7 +77,6 @@ end
 -- Tries to parse the entity-data
 local function parseEntityData( data )
 	local s = SysTime()
-	local KeyValuesToTablePreserveOrder = util.KeyValuesToTablePreserveOrder
 	-- Cut the data into bits
 	local charPos = 1
 	local tabData = {}
