@@ -103,6 +103,7 @@ meta.__index = meta
 meta.__tostring = function(self) return string.format( "BSP Map [ %s ]", self._mapfile ) end
 meta.MetaName = "BSP"
 NikNaks.__metatables["BSP"] = meta
+NikNaks._Source = "niknak"
 
 NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")
