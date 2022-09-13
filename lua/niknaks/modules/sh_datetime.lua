@@ -290,16 +290,6 @@ function datetime_obj.__add(a, b)
 	end
 end
 
-function datetime_obj.__mod(a, b)
-	if not getmetatable(a) then -- A is most likely a number
-		return a % b.unix
-	elseif not getmetatable(b) then -- B is most likely a number
-		return a.unix % b
-	else
-		return (a.unix or a.time) % (b.unix or b.time)
-	end
-end
-
 function datetime_obj.__concat(a, b)
 	return tostring(a) .. tostring(b)
 end
