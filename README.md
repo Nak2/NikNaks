@@ -3,8 +3,9 @@
  A pure Lua library with various features for Garry's Mod I've created.
  It features an adv BitBuffer, BSP Parser, BSP Objects , PVS/PAS, and more.
  
->***Note:** May not be reuploaded to workshop or any other Steam© services without specific prior written permission.<br>
+>***Note:** May not be reuploaded to workshop without specific prior written permission.<br>
 See: https://github.com/Nak2/NikNaks/blob/main/LICENSE for more info.
+In case you need NikNaks for your addon, add the [offical addon](https://steamcommunity.com/sharedfiles/filedetails/?id=2861839844) to the required Items on your workshop page.
 
 ### Quick Start
 
