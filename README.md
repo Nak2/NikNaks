@@ -17,7 +17,7 @@ In case you need NikNaks for your addon, add the [offical addon](https://steamco
 
 * [BitBuffer](https://github.com/Nak2/NikNaks/wiki/BitBuffer)
 * [BSP Parser](https://github.com/Nak2/NikNaks/wiki/BSP-Parser)
-* [PVS / PAS]
+* [PVS / PAS](https://github.com/Nak2/NikNaks/wiki/PVS-and-PAS)
 * [DateTime]
 * [TimeDelta]
 * [NodeGraph]
