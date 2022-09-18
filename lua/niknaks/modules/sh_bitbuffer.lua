@@ -11,6 +11,9 @@ NikNaks.BitBuffer = {}
 
 local meta = {}
 meta.__index = meta
+function meta:__tostring()
+	return "BitBuffer [" .. self:Size() .. "]"
+end
 -- Fixes bit-shift errors
 local function rshift( int, shift )
 	if shift > 31 then return 0x0 end
@@ -892,6 +895,40 @@ do
 		return true
 	end
 end
+
+-- Net functions
+function meta:ReadFromNet( bits )
+	for i = 1, bits / 32 do
+		self:WriteUInt( net.ReadUInt( 32 ), 32)
+	end
+	local leftover = bits % 32
+	if leftover > 0 then
+		self:WriteUInt( net.ReadUInt( leftover ), leftover)
+	end
+	self:Seek(0)
+	return self
+end
+function NikNaks.BitBuffer.FromNet( bits )
+	return NikNaks.BitBuffer():ReadFromNet( bits )
+end
+function meta:WriteToNet()
+	local tell = self:Tell()
+	self:Seek(0)
+	local l = self:Size()
+	for i = 1, l / 32 do
+		net.WriteUInt( self:ReadULong(), 32)
+	end
+	local leftover = l % 32
+	if leftover > 0 then
+		net.WriteUInt( self:ReadUInt(leftover), leftover)
+	end
+	self:Seek(tell)
+	return l
+end
+function NikNaks.BitBuffer.ToNet( buf )
+	return buf:WriteToNet()
+end
+
 
 -- Debug BitBuffer
 if true then return end
