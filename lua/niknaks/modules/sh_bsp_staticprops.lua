@@ -164,7 +164,6 @@ function meta:GetStaticProps()
 		sObj.Index = i
 		self._staticprops[i] = sObj
 	end
-	print(">", staticSize)
 	if staticUsed and staticUsed ~= staticSize then
 		ErrorNoHalt("Was unable to parse " .. self._mapfile .. "'s StaticProps correctly!")
 	end
