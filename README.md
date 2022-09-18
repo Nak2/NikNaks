@@ -10,8 +10,8 @@ In case you need NikNaks for your addon, add the [offical addon](https://steamco
 ### Quick Start
 
 * [Getting started](https://github.com/Nak2/NikNaks/wiki/Getting-started)
-* [Wiki page]()
-* [FAQ]()
+* [Wiki page](https://github.com/Nak2/NikNaks/wiki)
+* FAQ (Comming soon)
 
 ### Documentation
 
