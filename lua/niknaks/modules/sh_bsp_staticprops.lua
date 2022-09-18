@@ -93,7 +93,6 @@ local function CreateStaticProp(f, ver, m, staticSize)
 	local obj = {}
 	local q = f:Tell()
 	local size = version[ver]( f, obj, m )
-	print("size", size)
 	obj.version = ver
 	setmetatable(obj, meta_staticprop)
 	return obj,f:Tell() - q
