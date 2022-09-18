@@ -270,6 +270,7 @@ do
 		self._data[ i_word ] = bor( data, rshift( int, overflow ) )
 		local data = band( rshift( b_mask, overflow ) , self._data[ i_word + 1 ] or 0x0)
 		self._data[ i_word + 1 ] = bor( data, lshift( int, 32 - overflow ))
+		return self
 	end
 
 	function readraw( self, bits )
@@ -323,6 +324,7 @@ do
 		local data = band( self._data[ i_word ] or 0x0, mask )
 		-- Write the data
 		self._data[ i_word ] = bor( data, lshift( b and 1 or 0, 32 - ebitPos ) )
+		return self
 	end
 
 	---Reads a boolean
@@ -379,6 +381,7 @@ do
 	---@param byte number
 	function meta:WriteByte( byte )
 		writeraw( self, byte, 8)
+		return self
 	end
 
 	---Reads a byte ( 0 - 255 )
@@ -394,6 +397,7 @@ do
 	---@param byte number
 	function meta:WriteSignedByte( byte )
 		self:WriteInt( byte, 8 )
+		return self
 	end
 
 	---Writes a signed byte ( -128 - 127 )
@@ -409,6 +413,7 @@ do
 	---@param num number
 	function meta:WriteUShort( num )
 		self:WriteUInt( num, 16 )
+		return self
 	end
 
 	---Reads an unsigned 2 byte number ( 0 - 65535 )
@@ -424,6 +429,7 @@ do
 	---@param num number
 	function meta:WriteShort( num )
 		self:WriteInt( num, 16 )
+		return self
 	end
 
 	---Reads an 2 byte number ( -32768 - 32767 )
@@ -439,6 +445,7 @@ do
 	---@param num number
 	function meta:WriteULong( num )
 		self:WriteUInt( num, 32 )
+		return self
 	end
 
 	---Reads an unsigned 4 byte number ( 0 - 4294967295 )
@@ -454,6 +461,7 @@ do
 	---@param num number
 	function meta:WriteLong( num )
 		self:WriteInt( num, 32 )
+		return self
 	end
 
 	---Reads a 4 byte number ( -2147483648 - 2147483647 )
@@ -469,6 +477,7 @@ do
 	---@param num number
 	function meta:WriteNibble( num )
 		self:WriteUInt( num, 4 )
+		return self
 	end
 	---Reads a 4 bit unsigned number ( 0 - 15 )
 	---@return number
@@ -483,6 +492,7 @@ do
 	---@param num number
 	function meta:WriteSnort( num )
 		self:WriteUInt( num, 2 )
+		return self
 	end
 	---Reads a 2 bit unsigned number ( 0 - 3 )
 	---@return number
@@ -535,6 +545,7 @@ do
 		end
 		-- Not tested, but I guess it is faster to write 1 32bit number, than 3x others.
 		self:WriteULong( bor( sign, lshift(band(ex, 0xFF), 23), man ), 32 )
+		return self
 	end
 
 	---Reads an IEEE 754 little-endian float
@@ -603,6 +614,7 @@ do
 			self:WriteULong( bor( sign, lshift(ex, 20), band( man/_32pow, 0x001FFFFF) ) )
 			self:WriteULong( band( man, 0xFFFFFFFF ) )
 		end
+		return self
 	end
 	function meta:ReadDouble( )
 		local a, b
@@ -636,6 +648,7 @@ do
 		for i = q + 1, len do
 			WriteUInt( self, s_byte( str, i ), 8 )
 		end
+		return self
 	end
 
 	---Reads raw string-data. Default bytes are the length of the bitbuffer.
@@ -669,6 +682,7 @@ do
 		end
 		self:WriteUShort( l )
 		Write( self, str )
+		return self
 	end
 	---Reads a string. Max string length: 65535
 	---@return string
@@ -682,6 +696,7 @@ do
 	---@param str string
 	function meta:WriteStringNull( str )
 		Write( self, string.gsub( str, z, '') .. z )
+		return self
 	end
 
 	---Reads a string using a nullbyte at the end. Note: ReadStringNull is a bit slower than ReadString.
@@ -706,6 +721,7 @@ do
 		self:WriteFloat( vector.x )
 		self:WriteFloat( vector.y )
 		self:WriteFloat( vector.z )
+		return self
 	end
 
 	---Reads a vector
@@ -720,6 +736,7 @@ do
 		self:WriteFloat( angle.p )
 		self:WriteFloat( angle.y )
 		self:WriteFloat( angle.r )
+		return self
 	end
 
 	---Reads an angle
@@ -735,6 +752,7 @@ do
 		self:WriteByte( color.g )
 		self:WriteByte( color.b )
 		self:WriteByte( color.a or 255 )
+		return self
 	end
 
 	---Reads a 32bit color
@@ -784,7 +802,8 @@ do
 		elseif id == 11 then self:WriteAngle( obj )
 		elseif id == 21 then self:WriteString( obj:GetName() )
 		elseif id == 255 then self:WriteColor( obj )
-		end		
+		end
+		return self
 	end
 
 	---Reads a type using a byte as TYPE_ID.
@@ -821,6 +840,7 @@ do
 			self:WriteType( v )
 		end
 		self:WriteByte( 0 )
+		return self
 	end
 
 	---Reads a table. Default maxValues is 150
