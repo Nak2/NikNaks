@@ -10,15 +10,15 @@ In case you need NikNaks for your addon, add the [offical addon](https://steamco
 ### Quick Start
 
 * [Getting started](https://github.com/Nak2/NikNaks/wiki/Getting-started)
-* [Wiki page]()
-* [FAQ]()
+* [Wiki page](https://github.com/Nak2/NikNaks/wiki)
+* FAQ (Comming soon)
 
 ### Documentation
 
 * [BitBuffer](https://github.com/Nak2/NikNaks/wiki/BitBuffer)
 * [BSP Parser](https://github.com/Nak2/NikNaks/wiki/BSP-Parser)
 * [PVS / PAS](https://github.com/Nak2/NikNaks/wiki/PVS-and-PAS)
-* [DateTime]
-* [TimeDelta]
+* [DateTime and Date-Functions](https://github.com/Nak2/NikNaks/wiki/DateTime-and-Date-Functions)
+* [TimeDelta](https://github.com/Nak2/NikNaks/wiki/TimeDelta)
 * [NodeGraph]
 * [Misc functions]()
