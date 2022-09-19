@@ -10,7 +10,7 @@ NikNaks.TimeDelta.Minute = 60
 NikNaks.TimeDelta.Hour = 3600
 NikNaks.TimeDelta.Day = 86400
 NikNaks.TimeDelta.Week = 604800
-NikNaks.TimeDelta.Year = 31535965
+NikNaks.TimeDelta.Year = 31536000
 NikNaks.TimeDelta.Decade = 315359654
 NikNaks.TimeDelta.Century = 3153596543
 
@@ -26,13 +26,33 @@ do
 	function meta:ToTable()
 		if self._tab then return self._tab end
 		local t, num, f = {}, abs(self.time), self.time < 0 and -1 or 1
+		local ily = NikNaks.DateTime.IsLeapYear
 		for i = 1, #q do
 			local s = q[i]
 			local v = tab[s]
+			-- Leap year
 			if num < v then continue end
-			local n = floor( num / v )
-			t[s] = n * f
-			num = num - v * n
+			if i == 1 then -- Since years aren't whole numbers, we need to round the tiniest amount, or floor is going to count down.
+				local n = 0
+				local y = self.year
+				local v = ily(y) and 31622400 or 31536000
+				while num >= v do
+					local q = 1 * f
+					if num >= v then
+						n = n + 1
+						num = num - v
+						y = y + q
+						v = ily(y) and 31622400 or 31536000
+					else
+						break
+					end
+				end
+				t[s] = n * f
+			else
+				local n = floor( num / v )
+				t[s] = n * f
+				num = num - v * n
+			end
 		end
 		self._tab = t
 		return t
@@ -42,30 +62,35 @@ end
 -- Create tab[<X>], Get<X> and Set<X>
 for key, var in pairs( NikNaks.TimeDelta ) do
 	local low = key:lower()
-	meta["Get" .. key .. "s"] = function(self)
-		return self:ToTable()[low] or 0
+	local keys = key.."s"
+	if key == "Century" then
+		keys = "Centuries"
+	end
+	meta["Get" .. keys] = function(self)
+		return self.time / var
 	end
 
-	meta["Add" .. key .. "s"] = function(self, num)
+	meta["Add" .. keys] = function(self, num)
 		self.time = self.time + num * var
 		self._tab = nil
 		return self
 	end
 
-	meta["Remove" .. key .. "s"] = function(self, num)
+	meta["Remove" .. keys] = function(self, num)
 		self.time = self.time - num * var
 		self._tab = nil
 		return self
 	end
-	meta["Sub" .. key .. "s"] = meta["Remove" .. key .. "s"]
+	meta["Sub" .. keys] = meta["Remove" .. keys]
 
 	tab[low] = var
 end
 
 NikNaks.TimeDelta.__index = NikNaks.TimeDelta
-setmetatable(NikNaks.TimeDelta, {__call = function(_, num)
+setmetatable(NikNaks.TimeDelta, {__call = function(_, num, year)
 	local t = {}
 	t.time = num
+	t.year = year or NikNaks.DateTime.year
 	setmetatable(t, meta)
 	return t
 end})

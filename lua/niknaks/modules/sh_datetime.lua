@@ -118,6 +118,7 @@ do
 
 		function findDate( str )
 			-- The year number tent to mess with the rest, if found replace it if found.
+			local fy = true
 			local y = string.match(str, "(%d%d%d%d)")
 			local m, d
 			if y then
@@ -128,6 +129,7 @@ do
 				y, m, d = string.match(str, '(%d+)[/%-](%d%d?)[/%-](%d%d?)')
 				if not y then -- Year must be today
 					y = NikNaks.DateTime.year
+					fy = false
 				else
 					return tonumber(y), tonumber(m), tonumber(d)
 				end				 				
@@ -143,6 +145,11 @@ do
 			local m, d = findMonthNameAndDate( str:upper() ) -- Try parse letters
 			if m then
 				return y, m, d
+			end
+
+			-- If only a year is given, then return the first day in that year.
+			if fy then
+				return y, 1, 1
 			end
 		end
 	end
@@ -161,8 +168,10 @@ do
 
 	function string_to_var(str)
 		str = string.Trim(str)
-		local n = string.match(str, "%d+")
-		if #n == #str then return tonumber(n) end
+		if #str ~= 4 then
+			local n = string.match(str, "%d+")
+			if #n == #str then return tonumber(n) end
+		end
 		--[[
 			Sun, 03 Jan 2010 00:00:00 GMT
 			September 26, 2006 12:12 AM
@@ -176,14 +185,14 @@ do
 		-- Get Time & Date
 		local year, month, day = findDate( str )
 		-- Find offset
-		local offsetH = findOffset( str )
+		local offsetH = findOffset( str ) or 0
 		
 		-- Convert to unix
 		return os_time({
-			day = day,
+			day = day or 1,
 			hour = (h or 0),
 			min = (m or 0),
-			month = month,
+			month = month or 1,
 			sec = tonumber(s) or 0,
 			year = year
 		}) + offsetH * 3600
@@ -221,16 +230,23 @@ function NikNaks.DateTime.Get(var, t_zone)
 	return t
 end
 
+function datetime_obj:GetUnix()
+	return self.unix
+end
+
 function datetime_obj:TimeUntil( var )
 	local unix
-	if not getmetatable( var ) then
-		unix = var
-	elseif var.unix then
-		unix = var.unix
-	elseif var.time then
-		return var -- A time-object would always be reletive.
+	local _type = type(var)
+	if _type == "string" then
+		unix = string_to_var(var)
+	elseif _type == "table" then
+		if var.time then
+			return var.time -- Will always be relative
+		elseif var.unix then
+			unix = var.unix
+		end
 	end
-	return NikNaks.TimeDelta(unix - self.unix)
+	return NikNaks.TimeDelta(unix - self.unix, tonumber(os.date( "%Y", self.unix )))
 end
 
 -- Local variable functions: DateTime.<X>
