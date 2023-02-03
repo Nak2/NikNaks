@@ -62,20 +62,13 @@ local function __findEntityUsingBrush( self )
 	return self.__funcBrush
 end
 
-local __readColorRGBExp32
-do
-	local r, g, b, exponent
-	__readColorRGBExp32 = function( data )
-		r = data:ReadByte()
-		g = data:ReadByte()
-		b = data:ReadByte()
+local function __readColorRGBExp32 ( data )
+	return NikNaks.ColorRGBExp32ToColor( {
+		r = data:ReadByte(),
+		g = data:ReadByte(),
+		b = data:ReadByte(),
 		exponent = data:ReadSignedByte()
-
-		-- "Standard RGB format can be obtained from this by multiplying each colour component by 2^(exponent)."
-		-- TODO: These already look like they're in the standard RGB format, so I'm not sure what they mean
-
-		return Color( r, g, b ), exponent
-	end
+	} )
 end
 
 -- Returns the lightmap samples for the face.
