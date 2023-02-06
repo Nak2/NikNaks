@@ -119,6 +119,9 @@ function meta_face:GetLightmapSamples()
 	return samples
 end
 
+function meta_face:GenerateDisplacementInfo()
+	if not self:IsDisplacement() then return end
+end
 
 ---Returns the face-index.
 ---@return number
@@ -214,7 +217,7 @@ end
 
 ---Returns true if the face is part of Displacment
 ---@return boolean
-function meta_face:IsDisplacment()
+function meta_face:IsDisplacement()
 	return self.dispinfo > -1
 end
 
@@ -223,7 +226,7 @@ end
 ---@return table
 function meta_face:GetVertexs()
 	local t = {}
-	if not self:IsDisplacment() then
+	if not self:IsDisplacement() then
 		for i = 0, self.numedges - 1 do
 			t[i + 1] = self.__map:GetSurfEdgesIndex( self.firstedge + i )
 		end

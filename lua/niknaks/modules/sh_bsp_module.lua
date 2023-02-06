@@ -11,8 +11,6 @@ local format = string.format
 ---@class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
-local abs = math.abs
-
 local function openFile( self )
 	assert(self._mapfile, "BSP object has nil mapfile path!")
 	local f = file.Open(self._mapfile,"rb","GAME")
@@ -85,7 +83,7 @@ function NikNaks.Map( fileName )
 			fileName = "maps/" .. fileName	-- Add "maps" folder
 		end
 	end
-	
+
 	-- Check to see if it is the map we're on. This function might be called multiple times, better to cache it.
 	if thisMap == fileName and thisMapObject and FIXMEPLZ then
 		return thisMapObject
@@ -790,32 +788,70 @@ do
 		return self._dispTris
 	end
 
-	local m_CDispNeighbor = 58
+	-- local m_CDispNeighbor = 58
 	local m_AllowedVerts = 10
+
+	local MAX_DISP_NEIGHBORS = 4
 	local MAX_DISP_CORNER_NEIGHBORS = 4
-	local function CDispCornerNeighbors( data )
-		local q = {}
-		q.m_Neighbors = {}
-		for i = 0, MAX_DISP_CORNER_NEIGHBORS - 1 do
-			q.m_Neighbors[i] = data:ReadShort()
-		end
-		q.m_nNeighbors = data:ReadByte()
-		return q
+
+	local function CDispSubNeighbor( data )
+		local sub = {}
+
+		sub.neighbor = data:ReadUShort()
+		sub.neighborOrientation = data:ReadByte()
+		sub.span = data:ReadByte()
+		sub.neighborSpan = data:ReadByte()
+
+		return sub
 	end
-	
+
+	local function CDispNeighbor( data )
+		local edgeNeighbors = {}
+
+		for neighbor = 1, MAX_DISP_NEIGHBORS do
+			local subNeighbors = {}
+			subNeighbors[1] = CDispSubNeighbor( data )
+			subNeighbors[2] = CDispSubNeighbor( data )
+
+			edgeNeighbors[neighbor] = { subNeighbors = subNeighbors }
+		end
+
+		return edgeNeighbors
+	end
+
+	local function CDispCornerNeighbors( data )
+		local cornerNeighbors = {}
+		local neighbors = {}
+
+		for i = 1, MAX_DISP_CORNER_NEIGHBORS do
+			neighbors[i] = data:ReadUShort()
+		end
+
+		cornerNeighbors.neighbors = neighbors
+		cornerNeighbors.mNeighbors = data:ReadByte()
+
+		return cornerNeighbors
+	end
+
 	-- Returns nVerts and nIndices
 	local function CalcMaxNumVertsAndIndices( power )
 		local sideLengh = bit.rshift(1, power) + 1
 		return sideLengh * sideLengh, (sideLengh - 1) * (sideLengh - 1) * 2 * 3
 	end
 
+	local m_ddispinfo_t = 176
+
 	---Returns the DispInfo data.
 	---@return table
 	function meta:GetDispInfo()
 		if self._dispinfo then return self._dispinfo end
+
 		self._dispinfo = {}
+		self._dispinfo_byoffset = {}
 		local data = self:GetLump( 26 )
-		for i = 0, data:Size() / 1408 - 1 do
+		local dispInfoCount = ( data:Size() / ( m_ddispinfo_t * 8 ) ) - 1
+
+		for i = 0, dispInfoCount do
 			local q = {}
 			q.startPosition = data:ReadVector()
 			q.DispVertStart = data:ReadLong()
@@ -827,18 +863,26 @@ do
 			q.MapFace = data:ReadUShort()
 			q.LightmapAlphaStart = data:ReadLong()
 			q.LightmapSamplePositionStart = data:ReadLong()
-			-- 46 bytes used. 130 bytes left regarding corner neighbors .. ect
-			-- allowedVerts are 40 bytes (10 * 4), therefore neighbors are 90 bytes
-			data:Skip( 720 ) -- CDispCornerNeighbors + CDispNeighbor
+
+			q.edgeNeighbors = CDispNeighbor( data )
+			q.cornerNeighbors = CDispCornerNeighbors( data )
+
 			q.allowedVerts = {}
-			for i = 0, m_AllowedVerts - 1 do
-				q.allowedVerts[i] = data:ReadULong()
+			for v = 0, m_AllowedVerts - 1 do
+				q.allowedVerts[v] = data:ReadULong()
 			end
+
+			local offset = i * m_ddispinfo_t * 8
+			q.offset = offset
+
 			self._dispinfo[i] = q
+			self._dispinfo_byoffset[offset] = q
 		end
+
 		self:ClearLump( 26 )
 		return self._dispinfo
 	end
+
 
 	---!! DEBUG FUNCTIONS !!
 	function meta:GetMaterialMeshs()

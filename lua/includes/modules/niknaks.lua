@@ -1,5 +1,6 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
+--
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
