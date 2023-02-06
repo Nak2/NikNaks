@@ -796,8 +796,14 @@ do
 
 	local function CDispSubNeighbor( data )
 		local sub = {}
+		local neighborIdx = data:ReadShort()
 
-		sub.neighbor = data:ReadUShort()
+		-- 0xFFFF if there is no neighbor here.
+		if sub.neighbor == 0xFFFF then
+			return sub
+		end
+
+		sub.neighbor = neighborIdx
 		sub.neighborOrientation = data:ReadByte()
 		sub.span = data:ReadByte()
 		sub.neighborSpan = data:ReadByte()
@@ -849,9 +855,9 @@ do
 		self._dispinfo = {}
 		self._dispinfo_byoffset = {}
 		local data = self:GetLump( 26 )
-		local dispInfoCount = ( data:Size() / ( m_ddispinfo_t * 8 ) ) - 1
+		local dispInfoCount = data:Size() / ( m_ddispinfo_t * 8 )
 
-		for i = 0, dispInfoCount do
+		for i = 0, dispInfoCount - 1 do
 			local q = {}
 			q.startPosition = data:ReadVector()
 			q.DispVertStart = data:ReadLong()
