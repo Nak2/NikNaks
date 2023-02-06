@@ -104,7 +104,7 @@ function meta_face:GetLightmapSamples()
 	--  there are single samples containing the average lighting on the face, one for each lightstyle,
 	--  in reverse order from that given in the styles[] array."
 	local color, exponent
-	data:Skip( lightofs - ( 32 * lightstyle_count ) )
+	data:Seek( ( lightofs * 8 ) - ( 32 * lightstyle_count ) )
 	for _ = 1, lightstyle_count do
 		color, exponent = __readColorRGBExp32( data )
 		table.insert( samples.average, 1, { color = color, exponent = exponent } )

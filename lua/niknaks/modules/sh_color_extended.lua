@@ -183,11 +183,11 @@ local string_format, string_sub = string.format, string.sub
 			math.min( LinearToVertexLight( linearColor[3] ), 1 )
 		}
 
-		return {
-			r = math.Round( vertexColor[1] * 255 ),
-			g = math.Round( vertexColor[2] * 255 ),
-			b = math.Round( vertexColor[3] * 255 ),
-			a = 255
-		}
+		return Color(
+			math.Round( vertexColor[1] * 255 ),
+			math.Round( vertexColor[2] * 255 ),
+			math.Round( vertexColor[3] * 255 ),
+			255
+		)
 	end
 
