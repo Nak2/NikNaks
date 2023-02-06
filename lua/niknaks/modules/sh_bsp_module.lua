@@ -788,7 +788,6 @@ do
 		return self._dispTris
 	end
 
-	-- local m_CDispNeighbor = 58
 	local m_AllowedVerts = 10
 
 	local MAX_DISP_NEIGHBORS = 4
@@ -796,17 +795,31 @@ do
 
 	local function CDispSubNeighbor( data )
 		local sub = {}
-		local neighborIdx = data:ReadShort()
+
+		local neighborIdx = data:ReadUShort()
+		sub.neighbor = neighborIdx
+
+		-- sub.unknown = data:ReadByte()
 
 		-- 0xFFFF if there is no neighbor here.
-		if sub.neighbor == 0xFFFF then
-			return sub
+		if neighborIdx == 0xFFFF then
+			-- When there are no neighbors, the rest of the data may be junk (and is irrelevant anyway)
+			data:Skip( 3 * 8 )
+		else
+			sub.neighborOrientation = data:ReadByte()
+			assert( sub.neighborOrientation >= 0, sub.neighborOrientation )
+			assert( sub.neighborOrientation <= 3, sub.neighborOrientation )
+
+			sub.span = data:ReadByte()
+			assert( sub.span >= 0, sub.span )
+			assert( sub.span <= 2, sub.span )
+
+			sub.neighborSpan = data:ReadByte()
+			assert( sub.neighborSpan >= 0, sub.span )
+			assert( sub.neighborSpan <= 2, sub.span )
 		end
 
-		sub.neighbor = neighborIdx
-		sub.neighborOrientation = data:ReadByte()
-		sub.span = data:ReadByte()
-		sub.neighborSpan = data:ReadByte()
+		data:Skip( 8 )
 
 		return sub
 	end
@@ -816,8 +829,15 @@ do
 
 		for neighbor = 1, MAX_DISP_NEIGHBORS do
 			local subNeighbors = {}
+			local preSub
+
+			preSub = data:Tell()
 			subNeighbors[1] = CDispSubNeighbor( data )
+			assert( data:Tell() - preSub == 6 * 8, data:Tell() - preSub )
+
+			preSub = data:Tell()
 			subNeighbors[2] = CDispSubNeighbor( data )
+			assert( data:Tell() - preSub == 6 * 8, data:Tell() - preSub )
 
 			edgeNeighbors[neighbor] = { subNeighbors = subNeighbors }
 		end
@@ -836,6 +856,8 @@ do
 		cornerNeighbors.neighbors = neighbors
 		cornerNeighbors.mNeighbors = data:ReadByte()
 
+		data:Skip( 8 )
+
 		return cornerNeighbors
 	end
 
@@ -845,7 +867,7 @@ do
 		return sideLengh * sideLengh, (sideLengh - 1) * (sideLengh - 1) * 2 * 3
 	end
 
-	local m_ddispinfo_t = 176
+	local m_ddispinfo_t = 176 * 8
 
 	---Returns the DispInfo data.
 	---@return table
@@ -855,30 +877,44 @@ do
 		self._dispinfo = {}
 		self._dispinfo_byoffset = {}
 		local data = self:GetLump( 26 )
-		local dispInfoCount = data:Size() / ( m_ddispinfo_t * 8 )
+		local dispInfoCount = data:Size() / m_ddispinfo_t
 
+		local target
 		for i = 0, dispInfoCount - 1 do
+			target = i * m_ddispinfo_t
+			if data:Tell() ~= target then
+				print( "ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell() )
+			end
+			data:Seek( i * m_ddispinfo_t )
+
 			local q = {}
 			q.startPosition = data:ReadVector()
 			q.DispVertStart = data:ReadLong()
 			q.DispTriStart = data:ReadLong()
 			q.power = data:ReadLong()
+			assert( q.power >= 2, power )
+			assert( q.power <= 4, power )
+
 			q.minTess = data:ReadLong()
 			q.smoothingAngle = data:ReadFloat()
 			q.contents = data:ReadLong()
 			q.MapFace = data:ReadUShort()
+
+			data:Skip( 2 * 8 )
+
 			q.LightmapAlphaStart = data:ReadLong()
 			q.LightmapSamplePositionStart = data:ReadLong()
 
-			q.edgeNeighbors = CDispNeighbor( data )
-			q.cornerNeighbors = CDispCornerNeighbors( data )
+			q.EdgeNeighbors = CDispNeighbor( data )
+			q.CornerNeighbors = CDispCornerNeighbors( data )
 
 			q.allowedVerts = {}
 			for v = 0, m_AllowedVerts - 1 do
 				q.allowedVerts[v] = data:ReadULong()
 			end
+			assert( table.Count( q.allowedVerts ) == 10, table.Count( q.allowedVerts ) )
 
-			local offset = i * m_ddispinfo_t * 8
+			local offset = i * m_ddispinfo_t
 			q.offset = offset
 
 			self._dispinfo[i] = q
