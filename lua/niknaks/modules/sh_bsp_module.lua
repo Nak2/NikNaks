@@ -853,8 +853,10 @@ do
 			neighbors[i] = data:ReadUShort()
 		end
 
+		assert( #neighbors == 4, #neighbors )
+
 		cornerNeighbors.neighbors = neighbors
-		cornerNeighbors.mNeighbors = data:ReadByte()
+		cornerNeighbors.nNeighbors = data:ReadByte()
 
 		data:Skip( 8 )
 
@@ -907,6 +909,8 @@ do
 
 			q.EdgeNeighbors = CDispNeighbor( data )
 			q.CornerNeighbors = CDispCornerNeighbors( data )
+
+			data:Skip( 6 * 8 )
 
 			q.allowedVerts = {}
 			for v = 0, m_AllowedVerts - 1 do
