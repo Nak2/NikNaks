@@ -197,6 +197,9 @@ function meta_face:GenerateVertexData()
 		end
 	end
 
+	local luxelW = self.LightmapTextureSizeInLuxels[1] + 1
+	local luxelH = self.LightmapTextureSizeInLuxels[2] + 1
+
 	for i = 0, self.numedges - 1 do
 		local vert = {}
 		local a = self.__map:GetSurfEdgesIndex( self.firstedge + i )
@@ -210,8 +213,8 @@ function meta_face:GenerateVertexData()
 		vert.u = ( tv[0][0] * a.x + tv[0][1] * a.y + tv[0][2] * a.z + tv[0][3] ) / mat_w
 		vert.v = ( tv[1][0] * a.x + tv[1][1] * a.y + tv[1][2] * a.z + tv[1][3] ) / mat_h
 
-		vert.lu = self.LightmapTextureMinsInLuxels[1] - ( lv[0][0] * a.x + lv[0][1] * a.y + lv[0][2] * a.z + lv[0][3] )
-		vert.lv = self.LightmapTextureMinsInLuxels[2] - ( lv[1][0] * a.x + lv[1][1] * a.y + lv[1][2] * a.z + lv[1][3] )
+		vert.lu = ( ( lv[0][0] * a.x + lv[0][1] * a.y + lv[0][2] * a.z + lv[0][3] ) - self.LightmapTextureMinsInLuxels[1] ) / luxelW
+		vert.lv = ( ( lv[1][0] * a.x + lv[1][1] * a.y + lv[1][2] * a.z + lv[1][3] ) - self.LightmapTextureMinsInLuxels[2] ) / luxelH
 
 		vert.userdata = { 0, 0, 0, 0 } -- Todo: Calculate this?
 
