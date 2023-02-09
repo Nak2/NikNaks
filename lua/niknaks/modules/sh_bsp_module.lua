@@ -799,27 +799,27 @@ do
 		local neighborIdx = data:ReadUShort()
 		sub.neighbor = neighborIdx
 
-		-- sub.unknown = data:ReadByte()
-
 		-- 0xFFFF if there is no neighbor here.
 		if neighborIdx == 0xFFFF then
 			-- When there are no neighbors, the rest of the data may be junk (and is irrelevant anyway)
 			data:Skip( 3 * 8 )
+			print( "Skipping empty neighbor" )
 		else
+			-- 1 byte
 			sub.neighborOrientation = data:ReadByte()
 			assert( sub.neighborOrientation >= 0, sub.neighborOrientation )
 			assert( sub.neighborOrientation <= 3, sub.neighborOrientation )
 
+			-- 1 byte
 			sub.span = data:ReadByte()
 			assert( sub.span >= 0, sub.span )
 			assert( sub.span <= 2, sub.span )
 
+			-- 1 byte
 			sub.neighborSpan = data:ReadByte()
 			assert( sub.neighborSpan >= 0, sub.span )
 			assert( sub.neighborSpan <= 2, sub.span )
 		end
-
-		data:Skip( 8 )
 
 		return sub
 	end
@@ -829,15 +829,18 @@ do
 
 		for neighbor = 1, MAX_DISP_NEIGHBORS do
 			local subNeighbors = {}
-			local preSub
 
-			preSub = data:Tell()
+			-- 5 bytes
 			subNeighbors[1] = CDispSubNeighbor( data )
-			assert( data:Tell() - preSub == 6 * 8, data:Tell() - preSub )
 
-			preSub = data:Tell()
+			-- 1 byte
+			data:Skip( 8 )
+
+			-- 5 bytes
 			subNeighbors[2] = CDispSubNeighbor( data )
-			assert( data:Tell() - preSub == 6 * 8, data:Tell() - preSub )
+
+			-- 1 byte
+			data:Skip( 8 )
 
 			edgeNeighbors[neighbor] = { subNeighbors = subNeighbors }
 		end
@@ -849,16 +852,19 @@ do
 		local cornerNeighbors = {}
 		local neighbors = {}
 
+		-- 8 bytes
 		for i = 1, MAX_DISP_CORNER_NEIGHBORS do
+			-- 2 bytes
 			neighbors[i] = data:ReadUShort()
 		end
 
 		assert( #neighbors == 4, #neighbors )
 
 		cornerNeighbors.neighbors = neighbors
-		cornerNeighbors.nNeighbors = data:ReadByte()
 
-		data:Skip( 8 )
+		-- 1 byte
+		-- Total: 9 bytes
+		cornerNeighbors.nNeighbors = data:ReadByte()
 
 		return cornerNeighbors
 	end
@@ -881,42 +887,102 @@ do
 		local data = self:GetLump( 26 )
 		local dispInfoCount = data:Size() / m_ddispinfo_t
 
+
 		local target
 		for i = 0, dispInfoCount - 1 do
 			target = i * m_ddispinfo_t
 			if data:Tell() ~= target then
 				print( "ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell() )
 			end
-			data:Seek( i * m_ddispinfo_t )
+			data:Seek( target )
+
+			local function verify( expectedBytes )
+				local here = data:Tell()
+				assert( here == target + ( expectedBytes * 8 ), ( here - target ) / 8 )
+			end
 
 			local q = {}
+
+			-- 12 bytes
+			-- Total: 12 bytes
 			q.startPosition = data:ReadVector()
+			verify( 12 )
+
+			-- 4 bytes
+			-- Total: 16 bytes
 			q.DispVertStart = data:ReadLong()
+			verify( 16 )
+
+			-- 4 bytes
+			-- Total: 20 bytes
 			q.DispTriStart = data:ReadLong()
+			verify( 20 )
+
+			-- 4 bytes
+			-- Total: 24 bytes
 			q.power = data:ReadLong()
 			assert( q.power >= 2, power )
 			assert( q.power <= 4, power )
+			verify( 24 )
 
+			-- 4 bytes
+			-- Total: 28 bytes
 			q.minTess = data:ReadLong()
+			verify( 28 )
+
+			-- 4 bytes
+			-- Total: 32 bytes
 			q.smoothingAngle = data:ReadFloat()
+			verify( 32 )
+
+			-- 4 bytes
+			-- Total: 36 bytes
 			q.contents = data:ReadLong()
+			verify( 36 )
+
+			-- 2 bytes
+			-- Total: 38 bytes
 			q.MapFace = data:ReadUShort()
+			verify( 38 )
 
+			-- 2 bytes
+			-- Total: 40 bytes
 			data:Skip( 2 * 8 )
+			verify( 40 )
 
+			-- 4 bytes
+			-- Total: 44 bytes
 			q.LightmapAlphaStart = data:ReadLong()
+			verify( 44 )
+
+			-- 4 bytes
+			-- Total: 48 bytes
 			q.LightmapSamplePositionStart = data:ReadLong()
+			verify( 48 )
 
+			-- 12 bytes * 4 = 48
+			-- Total: 96 bytes
 			q.EdgeNeighbors = CDispNeighbor( data )
+			verify( 96 )
+
+			-- 9 bytes
+			-- Total: 105 bytes
 			q.CornerNeighbors = CDispCornerNeighbors( data )
+			verify( 105 )
 
-			data:Skip( 6 * 8 )
+			-- 1 byte (padding or something after CornerNeighbors)
+			-- Total: 106 bytes
+			data:Skip( 8 )
+			verify( 106 )
 
+			-- 4 bytes * 10 = 40 bytes
+			-- Total: 146 bytes
 			q.allowedVerts = {}
 			for v = 0, m_AllowedVerts - 1 do
 				q.allowedVerts[v] = data:ReadULong()
 			end
 			assert( table.Count( q.allowedVerts ) == 10, table.Count( q.allowedVerts ) )
+			verify( 146 )
 
 			local offset = i * m_ddispinfo_t
 			q.offset = offset
