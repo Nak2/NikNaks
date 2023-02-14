@@ -131,7 +131,7 @@ end
 -- Smaller functions
 do
 	---Returns the mapname.
-	---@return striing
+	---@return string
 	function meta:GetMapName()
 		return self._mapname or "Unknown"
 	end
@@ -796,30 +796,35 @@ do
 	local function CDispSubNeighbor( data )
 		local sub = {}
 
+		-- 2 bytes
 		local neighborIdx = data:ReadUShort()
 		sub.neighbor = neighborIdx
 
 		-- 0xFFFF if there is no neighbor here.
 		if neighborIdx == 0xFFFF then
 			-- When there are no neighbors, the rest of the data may be junk (and is irrelevant anyway)
+			print( data:Tell() )
 			data:Skip( 3 * 8 )
-			print( "Skipping empty neighbor" )
+			print( data:Tell() )
+			print()
 		else
 			-- 1 byte
-			sub.neighborOrientation = data:ReadByte()
-			assert( sub.neighborOrientation >= 0, sub.neighborOrientation )
-			assert( sub.neighborOrientation <= 3, sub.neighborOrientation )
+			sub.neighborOrientation = data:ReadUInt( 8 )
+			assert( sub.neighborOrientation <= 3, tostring( sub.neighborOrientation ) .. " - " .. tostring( neighborIdx ) )
 
 			-- 1 byte
-			sub.span = data:ReadByte()
+			sub.span = data:ReadUInt( 8 )
 			assert( sub.span >= 0, sub.span )
-			assert( sub.span <= 2, sub.span )
+			assert( sub.span <= 2, tostring( sub.span ) .. " - " .. tostring( neighborIdx ) )
 
 			-- 1 byte
-			sub.neighborSpan = data:ReadByte()
-			assert( sub.neighborSpan >= 0, sub.span )
-			assert( sub.neighborSpan <= 2, sub.span )
+			sub.neighborSpan = data:ReadUInt( 8 )
+			assert( sub.neighborSpan >= 0, sub.neighborSpan )
+			assert( sub.neighborSpan <= 2, tostring( sub.neighborSpan ) .. " - " .. tostring( neighborIdx ) )
 		end
+
+		-- 1 byte
+		data:ReadUInt( 8 )
 
 		return sub
 	end
@@ -827,20 +832,16 @@ do
 	local function CDispNeighbor( data )
 		local edgeNeighbors = {}
 
+		-- 4 * 12 = 48 bytes
 		for neighbor = 1, MAX_DISP_NEIGHBORS do
 			local subNeighbors = {}
+			print( "Neighbor:", neighbor )
 
-			-- 5 bytes
+			-- 6 bytes
 			subNeighbors[1] = CDispSubNeighbor( data )
 
-			-- 1 byte
-			data:Skip( 8 )
-
-			-- 5 bytes
+			-- 6 bytes
 			subNeighbors[2] = CDispSubNeighbor( data )
-
-			-- 1 byte
-			data:Skip( 8 )
 
 			edgeNeighbors[neighbor] = { subNeighbors = subNeighbors }
 		end
@@ -850,21 +851,30 @@ do
 
 	local function CDispCornerNeighbors( data )
 		local cornerNeighbors = {}
-		local neighbors = {}
 
-		-- 8 bytes
-		for i = 1, MAX_DISP_CORNER_NEIGHBORS do
-			-- 2 bytes
-			neighbors[i] = data:ReadUShort()
+		-- 10 bytes * 4 = 40 bytes
+		for c = 1, 4 do
+			local neighbor = {}
+			local neighbors = {}
+
+			-- 2 bytes * 4 = 8 bytes
+			for i = 1, MAX_DISP_CORNER_NEIGHBORS do
+				neighbors[i] = data:ReadUShort()
+			end
+
+			assert( #neighbors == 4, #neighbors )
+			neighbor.neighbors = neighbors
+
+			-- 1 byte
+			-- Total: 9 bytes
+			neighbor.nNeighbors = data:ReadUInt( 8 )
+
+			-- 1 byte
+			-- Total: 10 bytes
+			data:ReadUInt( 8 )
+
+			cornerNeighbors[c] = neighbor
 		end
-
-		assert( #neighbors == 4, #neighbors )
-
-		cornerNeighbors.neighbors = neighbors
-
-		-- 1 byte
-		-- Total: 9 bytes
-		cornerNeighbors.nNeighbors = data:ReadByte()
 
 		return cornerNeighbors
 	end
@@ -875,7 +885,7 @@ do
 		return sideLengh * sideLengh, (sideLengh - 1) * (sideLengh - 1) * 2 * 3
 	end
 
-	local m_ddispinfo_t = 176 * 8
+	local m_ddispinfo_t = 172 * 8
 
 	---Returns the DispInfo data.
 	---@return table
@@ -885,16 +895,21 @@ do
 		self._dispinfo = {}
 		self._dispinfo_byoffset = {}
 		local data = self:GetLump( 26 )
-		local dispInfoCount = data:Size() / m_ddispinfo_t
 
+		for i = 0, 10 do
+			local n = 168 + i
+		    print( tostring( n ), data:Size() % n )
+		end
+		local dispInfoCount = data:Size() / m_ddispinfo_t
 
 		local target
 		for i = 0, dispInfoCount - 1 do
 			target = i * m_ddispinfo_t
+			print( i, target )
+
 			if data:Tell() ~= target then
 				print( "ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell() )
 			end
-			data:Seek( target )
 
 			local function verify( expectedBytes )
 				local here = data:Tell()
@@ -903,86 +918,64 @@ do
 
 			local q = {}
 
-			-- 12 bytes
-			-- Total: 12 bytes
+			-- 4 bytes * 3 = 12 bytes
 			q.startPosition = data:ReadVector()
 			verify( 12 )
 
 			-- 4 bytes
-			-- Total: 16 bytes
 			q.DispVertStart = data:ReadLong()
 			verify( 16 )
 
 			-- 4 bytes
-			-- Total: 20 bytes
 			q.DispTriStart = data:ReadLong()
 			verify( 20 )
 
 			-- 4 bytes
-			-- Total: 24 bytes
 			q.power = data:ReadLong()
-			assert( q.power >= 2, power )
-			assert( q.power <= 4, power )
+			assert( q.power >= 2, q.power )
+			assert( q.power <= 4, q.power )
 			verify( 24 )
 
-			-- 4 bytes
-			-- Total: 28 bytes
-			q.minTess = data:ReadLong()
-			verify( 28 )
+			-- 2 bytes
+			q.minTess = data:ReadShort()
+			verify( 26 )
 
 			-- 4 bytes
-			-- Total: 32 bytes
 			q.smoothingAngle = data:ReadFloat()
-			verify( 32 )
+			verify( 30 )
 
 			-- 4 bytes
-			-- Total: 36 bytes
 			q.contents = data:ReadLong()
+			verify( 34 )
+
+			-- 2 bytes
+			q.MapFace = data:ReadUShort()
 			verify( 36 )
 
-			-- 2 bytes
-			-- Total: 38 bytes
-			q.MapFace = data:ReadUShort()
-			verify( 38 )
-
-			-- 2 bytes
-			-- Total: 40 bytes
-			data:Skip( 2 * 8 )
+			-- 4 bytes 
+			q.LightmapAlphaStart = data:ReadLong()
 			verify( 40 )
 
 			-- 4 bytes
-			-- Total: 44 bytes
-			q.LightmapAlphaStart = data:ReadLong()
+			q.LightmapSamplePositionStart = data:ReadLong()
 			verify( 44 )
 
-			-- 4 bytes
-			-- Total: 48 bytes
-			q.LightmapSamplePositionStart = data:ReadLong()
-			verify( 48 )
-
-			-- 12 bytes * 4 = 48
-			-- Total: 96 bytes
+			-- 48 bytes
 			q.EdgeNeighbors = CDispNeighbor( data )
-			verify( 96 )
+			verify( 92 )
 
-			-- 9 bytes
-			-- Total: 105 bytes
+			-- 40 bytes
 			q.CornerNeighbors = CDispCornerNeighbors( data )
-			verify( 105 )
+			verify( 132 )
 
-			-- 1 byte (padding or something after CornerNeighbors)
-			-- Total: 106 bytes
-			data:Skip( 8 )
-			verify( 106 )
 
 			-- 4 bytes * 10 = 40 bytes
-			-- Total: 146 bytes
 			q.allowedVerts = {}
 			for v = 0, m_AllowedVerts - 1 do
-				q.allowedVerts[v] = data:ReadULong()
+				q.allowedVerts[v] = data:ReadLong()
 			end
 			assert( table.Count( q.allowedVerts ) == 10, table.Count( q.allowedVerts ) )
-			verify( 146 )
+			verify( 172 )
 
 			local offset = i * m_ddispinfo_t
 			q.offset = offset
