@@ -119,10 +119,6 @@ function meta_face:GetLightmapSamples()
 	return samples
 end
 
-function meta_face:GenerateDisplacementInfo()
-	if not self:IsDisplacement() then return end
-end
-
 ---Returns the face-index.
 ---@return number
 function meta_face:GetIndex()
@@ -221,6 +217,127 @@ function meta_face:IsDisplacement()
 	return self.dispinfo > -1
 end
 
+
+---Returns the displacement info for the face
+--@return table
+function meta_face:GetDisplacementInfo()
+	local _, lookup = self.__map:GetDispInfo()
+	return lookup[self.__id]
+end
+
+allDisplacementVerts = {}
+---Returns the vertex positions for the displacement face. [Not Cached]
+---@param faceVertexData table -- The output of :GenerateVertexData
+function meta_face:GetDisplacementVertexs( faceVertexData )
+	local dispInfo = self:GetDisplacementInfo()
+	local start = dispInfo.startPosition
+
+	local baseVerts = faceVertexData
+	assert( #baseVerts == 4 )
+
+	---Extracts the u and v params from each point in vData and returns them as Vectors (u->x, v->y, z->0)
+	local function extractUVVecs( vData, u, v )
+		u = u or "u"
+		v = v or "v"
+		local uvs = {}
+
+		local point
+		for i = 1, #vData do
+			point = vData[i]
+			table.insert( uvs, Vector( point[u], point[v], 0 ) )
+		end
+
+		return unpack( uvs )
+	end
+
+	local baseQuad = {}
+	local startIdx = 1
+	do
+		local minDist = math.huge
+
+		local pos, idx, dist
+		for i = 1, 4 do
+			pos = baseVerts[i].pos
+			idx = table.insert( baseQuad, pos )
+
+			dist = pos:Distance( start )
+			if dist < minDist then
+				minDist = dist
+				startIdx = idx
+			end
+		end
+	end
+
+	local function rotated( q )
+		local part = {}
+		for i = startIdx, #q do
+			table.insert( part, q[i] )
+		end
+		for i = 1, startIdx - 1 do
+			table.insert( part, q[i] )
+		end
+
+		return part
+	end
+
+	local A, B, C, D = unpack( rotated( baseQuad ) )
+	local AD = D - A
+	local BC = C - B
+
+	local quad = rotated( baseVerts )
+
+	local uvA, uvB, uvC, uvD = extractUVVecs( quad )
+	local uvAD = uvD - uvA
+	local uvBC = uvC - uvB
+
+	local uv2A, uv2B, uv2C, uv2D = extractUVVecs( quad, "lu", "lv" )
+	local uv2AD = uv2D - uv2A
+	local uv2BC = uv2C - uv2B
+
+	local power = dispInfo.power
+	local power2 = 2 ^ power
+	local vertCount = ( ( 2 ^ power ) + 1 ) ^ 2
+	local vertStart = dispInfo.DispVertStart
+	local vertEnd = vertStart + vertCount
+
+	local vertices = {}
+	do
+		local dispVertices = self.__map:GetDispVerts()
+		local vertex, t1, t2, baryVert, dispVert, trueVert, textureUV, lightmapUV
+		local normal = baseVerts[1].normal
+
+		local index = 0
+		for v = vertStart, vertEnd do
+			vertex = dispVertices[v]
+
+			t1 = index % ( power2 + 1 ) / power2
+			t2 = math.floor( index / ( power2 + 1 ) ) / power2
+
+			baryVert = LerpVector( t2, A + ( AD * t1 ), B + ( BC * t1 ) )
+			dispVert = vertex.vec * vertex.dist
+			trueVert = baryVert + dispVert
+			textureUV = LerpVector( t2, uvA + ( uvAD * t1 ), uvB + ( uvBC * t1 ) )
+			lightmapUV = LerpVector( t2, uv2A + ( uv2AD * t1 ), uv2B + ( uv2BC * t1 ) )
+
+			table.insert( vertices, {
+				pos = trueVert,
+				normal = normal,
+				u = textureUV.x,
+				v = textureUV.y,
+				lu = lightmapUV.x,
+				lv = lightmapUV.y,
+				userdata = { 0, 0, 0, 0 }
+			} )
+
+			index = index + 1
+		end
+	end
+
+	allDisplacementVerts[self.__id] = vertices
+
+	return vertices
+end
+
 ---Returns the vertex positions for the face. [Not Cached]
 ---Note this will ignore BModel-positions!
 ---@return table
@@ -282,13 +399,21 @@ function meta_face:GenerateVertexData()
 
 		t[i + 1] = vert
 	end
+
+	-- Displacement Verts require the base verts to be parsed first
+	-- Then, they're interchangeable
+	if self:IsDisplacement() then
+		return self:GetDisplacementVertexs( t )
+	end
+
 	return t
 end
 
 local function PolyChop( o_vert )
 	local vert = {}
 	if #o_vert < 3 then return end
-	local n, triCount = 1, #o_vert - 2
+	local n = 1
+	local triCount = #o_vert - 2
 	for i = 1, triCount do
 		vert[n] 	= o_vert[1]
 		vert[n + 1] = o_vert[i + 1]
@@ -298,11 +423,85 @@ local function PolyChop( o_vert )
 	return vert
 end
 
+function meta_face:GenerateDisplacementTriangles()
+	if not self:IsDisplacement() then return end
+	local verts = self:GenerateVertexData()
+	local dispInfo = self:GetDisplacementInfo()
+
+	local power = dispInfo.power
+	local power2 = 2 ^ power
+	local power2A = power2 + 1
+	local power2B = power2 + 2
+	local power2C = power2 + 3
+
+	local tris = {}
+
+	do
+		local table_insert = table.insert
+		local blockRange = 2 ^ ( power - 1 )
+		local function addIdx( idx )
+			idx = idx + 1
+			table_insert( tris, verts[idx] )
+		end
+
+		local lineOffset, offset
+		for line = 0, ( power2 - 1 ) do
+			lineOffset = power2A * line
+
+			for block = 0, ( blockRange - 1 ) do
+				offset = lineOffset + 2 * block
+
+				if line % 2 == 0 then
+					-- |\|/|
+					addIdx( offset + 0 )
+					addIdx( offset + power2A )
+					addIdx( offset + 1 )
+
+					addIdx( offset + power2A )
+					addIdx( offset + power2B )
+					addIdx( offset + 1 )
+
+					addIdx( offset + power2B )
+					addIdx( offset + power2C )
+					addIdx( offset + 1 )
+
+					addIdx( offset + power2C )
+					addIdx( offset + 2 )
+					addIdx( offset + 1 )
+				else
+					-- |/|\|
+					addIdx( offset + 0 )
+					addIdx( offset + power2A )
+					addIdx( offset + power2B )
+
+					addIdx( offset + 1 )
+					addIdx( offset + 0 )
+					addIdx( offset + power2B )
+
+					addIdx( offset + 2 )
+					addIdx( offset + 1 )
+					addIdx( offset + power2B )
+
+					addIdx( offset + power2C )
+					addIdx( offset + 2 )
+					addIdx( offset + power2B )
+				end
+			end
+		end
+	end
+
+	return tris
+end
+
 ---Returns a table in form of a polygon-mesh for triangles. [Not Cached]
 ---TAB[ID] = {pos = position, u = u, v = v, lu = lightU, lv = lightV }
 ---@return table
 function meta_face:GenerateVertexTriangleData()
-	return PolyChop( self:GenerateVertexData() )
+	if self:IsDisplacement() then
+		return self:GenerateDisplacementTriangles()
+	else
+		return PolyChop( self:GenerateVertexData() )
+	end
 end
 
 ---All mesh-data regarding said face. Should use face:GenerateVertexTriangleData intead!
@@ -325,7 +524,7 @@ if CLIENT then
 		-- Tex
 		local texinfo = self:GetTexInfo()
 		if bit.band(texinfo.flags, 0x80) ~= 0 or bit.band(texinfo.flags, 0x200) ~= 0 then self._mesh = false return self._mesh end
-		
+
 		local meshData = self:GenerateVertexTriangleData()
 		if not meshData then return self._mesh end
 		self._mesh = Mesh( self:GetMaterial() )
