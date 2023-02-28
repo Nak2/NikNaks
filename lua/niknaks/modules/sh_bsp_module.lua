@@ -885,27 +885,40 @@ do
 		return sideLengh * sideLengh, (sideLengh - 1) * (sideLengh - 1) * 2 * 3
 	end
 
-	local m_ddispinfo_t = 172 * 8
+	local m_ddispinfo_t = 176 * 8
 
 	---Returns the DispInfo data.
-	---@return table
+	---@return table,table
 	function meta:GetDispInfo()
-		if self._dispinfo then return self._dispinfo end
+		if self._dispinfo then
+			return self._dispinfo, self._dispinfo_byface
+		end
 
 		self._dispinfo = {}
-		self._dispinfo_byoffset = {}
+		self._dispinfo_byface = {}
 		local data = self:GetLump( 26 )
 
+		-- 	168	24
+		-- 169	161
+		-- 170	132
+		-- 171	105
+		-- 172	80
+		-- 173	57
+		-- 174	36
+		-- 175	17
+		-- 176	0
+		-- 177	162
+		-- 178	150
 		for i = 0, 10 do
 			local n = 168 + i
-		    print( tostring( n ), data:Size() % n )
+			print( tostring( n ), data:Size() % n )
 		end
 		local dispInfoCount = data:Size() / m_ddispinfo_t
 
 		local target
 		for i = 0, dispInfoCount - 1 do
 			target = i * m_ddispinfo_t
-			print( i, target )
+			print( "Current:", data:Tell(), "Target:", target )
 
 			if data:Tell() ~= target then
 				print( "ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell() )
@@ -937,37 +950,41 @@ do
 			verify( 24 )
 
 			-- 2 bytes
-			q.minTess = data:ReadShort()
+			q.flags = data:ReadUShort()
 			verify( 26 )
+
+			-- 2 bytes
+			q.minTess = data:ReadShort()
+			verify( 28 )
 
 			-- 4 bytes
 			q.smoothingAngle = data:ReadFloat()
-			verify( 30 )
+			verify( 32 )
 
 			-- 4 bytes
 			q.contents = data:ReadLong()
-			verify( 34 )
+			verify( 36 )
 
 			-- 2 bytes
 			q.MapFace = data:ReadUShort()
-			verify( 36 )
+			verify( 38 )
 
 			-- 4 bytes 
 			q.LightmapAlphaStart = data:ReadLong()
-			verify( 40 )
+			verify( 42 )
 
 			-- 4 bytes
 			q.LightmapSamplePositionStart = data:ReadLong()
-			verify( 44 )
+			verify( 46 )
 
-			-- 48 bytes
-			q.EdgeNeighbors = CDispNeighbor( data )
-			verify( 92 )
+			data:Skip( 88 * 8 )
+			-- -- 48 bytes
+			-- q.EdgeNeighbors = CDispNeighbor( data )
+			-- verify( 94 )
 
-			-- 40 bytes
-			q.CornerNeighbors = CDispCornerNeighbors( data )
-			verify( 132 )
-
+			-- -- 40 bytes
+			-- q.CornerNeighbors = CDispCornerNeighbors( data )
+			verify( 134 )
 
 			-- 4 bytes * 10 = 40 bytes
 			q.allowedVerts = {}
@@ -975,19 +992,20 @@ do
 				q.allowedVerts[v] = data:ReadLong()
 			end
 			assert( table.Count( q.allowedVerts ) == 10, table.Count( q.allowedVerts ) )
-			verify( 172 )
+			verify( 174 )
+
+			data:Skip( 8 * 2 )
 
 			local offset = i * m_ddispinfo_t
 			q.offset = offset
 
 			self._dispinfo[i] = q
-			self._dispinfo_byoffset[offset] = q
+			self._dispinfo_byface[q.MapFace] = q
 		end
 
 		self:ClearLump( 26 )
-		return self._dispinfo
+		return self._dispinfo, self._dispinfo_byface
 	end
-
 
 	---!! DEBUG FUNCTIONS !!
 	function meta:GetMaterialMeshs()
