@@ -153,3 +153,41 @@ local string_format, string_sub = string.format, string.sub
 	function COLOR:IsDark()
 		return ColorToLuminance(self) < 127.5
 	end
+
+-- ColorRGBExp32
+	local gamma = 2.2
+	local overbrightFactor = 0.5
+
+	-- convert texture to linear 0..1 value
+	local function TexLightToLinear( col, exponent )
+		return col * ( ( 2 ^ exponent ) / 255  )
+	end
+
+	-- linear (0..4) to screen corrected vertex space (0..1?)
+	local function LinearToVertexLight( col )
+		return overbrightFactor * ( col ^ ( 1 / gamma ) )
+	end
+
+	-- https://github.com/ValveSoftware/source-sdk-2013/blob/master/sp/src/utils/vrad/lightmap.cpp#L3551
+	function NikNaks.ColorRGBExp32ToColor( struct )
+		local exponent = struct.exponent
+		local linearColor = {
+			TexLightToLinear( struct.r, exponent ),
+			TexLightToLinear( struct.g, exponent ),
+			TexLightToLinear( struct.b, exponent )
+		}
+
+		local vertexColor = {
+			math.min( LinearToVertexLight( linearColor[1] ), 1 ),
+			math.min( LinearToVertexLight( linearColor[2] ), 1 ),
+			math.min( LinearToVertexLight( linearColor[3] ), 1 )
+		}
+
+		return Color(
+			math.Round( vertexColor[1] * 255 ),
+			math.Round( vertexColor[2] * 255 ),
+			math.Round( vertexColor[3] * 255 ),
+			255
+		)
+	end
+

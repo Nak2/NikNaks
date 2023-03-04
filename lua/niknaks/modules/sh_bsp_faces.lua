@@ -13,6 +13,7 @@ meta_face.MetaName = "BSP Faces"
 NikNaks.__metatables["BSP Faces"] = meta_face
 
 local MAX_MAP_FACES = 65536 
+
 ---Returns all faces. ( Warning, uses a lot of memory )
 ---@return table
 function meta:GetFaces()
@@ -60,6 +61,64 @@ local function __findEntityUsingBrush( self )
 	end
 	return self.__funcBrush
 end
+
+local function __readColorRGBExp32 ( data )
+	return NikNaks.ColorRGBExp32ToColor( {
+		r = data:ReadByte(),
+		g = data:ReadByte(),
+		b = data:ReadByte(),
+		exponent = data:ReadSignedByte()
+	} )
+end
+
+-- Returns the lightmap samples for the face.
+-- @return table
+function meta_face:GetLightmapSamples()
+	local lightofs = self.lightofs
+	if lightofs == -1 then return end
+	if self._lightmap_samples then return self._lightmap_samples end
+
+	local samples = {
+		average = {},
+		full = {}
+	}
+
+	self._lightmap_samples = samples
+
+	local has_bumpmap = self:GetMaterial():GetString( "$bumpmap" ) ~= nil
+	local luxel_count = ( self.LightmapTextureSizeInLuxels[1] + 1 ) * ( self.LightmapTextureSizeInLuxels[2] + 1 )
+
+	local lightstyle_count = 0
+	for _, v in ipairs( self.styles ) do
+		if v ~= 255 then lightstyle_count = lightstyle_count + 1 end
+	end
+
+	-- "For faces with bumpmapped textures, there are four times the usual number of lightmap samples"
+	local sample_count = lightstyle_count * luxel_count
+	if has_bumpmap then sample_count = sample_count * 4 end
+
+	local data = self.__map:GetLump( 8 )
+
+	-- Get the average samples
+	-- "Immediately preceeding the lightofs-referenced sample group,
+	--  there are single samples containing the average lighting on the face, one for each lightstyle,
+	--  in reverse order from that given in the styles[] array."
+	local color, exponent
+	data:Seek( ( lightofs * 8 ) - ( 32 * lightstyle_count ) )
+	for _ = 1, lightstyle_count do
+		color, exponent = __readColorRGBExp32( data )
+		table.insert( samples.average, 1, { color = color, exponent = exponent } )
+	end
+
+	-- Get the full samples
+	for _ = 1, sample_count do
+		color, exponent = __readColorRGBExp32( data )
+		table.insert( samples.full, { color = color, exponent = exponent } )
+	end
+
+	return samples
+end
+
 
 ---Returns the face-index.
 ---@return number
