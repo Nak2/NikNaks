@@ -188,6 +188,6 @@ local string_format, string_sub = string.format, string.sub
 			math.Round( vertexColor[2] * 255 ),
 			math.Round( vertexColor[3] * 255 ),
 			255
-		)
+		), exponent
 	end
 
