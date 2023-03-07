@@ -6,7 +6,7 @@ local tostring, tonumber, tobool, Angle, Vector, string_ToColor = tostring, tonu
 
 -- Lua based type fix 
 -- TODO: Note sure if it should be added
-if false then	
+if false then
 	NikNaks.oldType = type
 	function NikNaks.isnumber( var )
 		local mt = getmetatable( var )
@@ -72,11 +72,11 @@ if false then
 	end
 end
 
----Same as AccessorFunc, but will make 'Set' functions return self. Allowing you to chain-call.
----@param tab table
----@param varname string
----@param name string
----@param iForce? number
+--- Same as AccessorFunc, but will make 'Set' functions return self. Allowing you to chain-call.
+--- @param tab table
+--- @param varname string
+--- @param name string
+--- @param iForce? number
 function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
 	if not tab then debug.Trace() end
 	tab[ "Get" .. name ] = function( self ) return self[ varname ] end
@@ -110,12 +110,13 @@ function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
 end
 
 NikNaks.util = {}
+
 -- Hull
 do
-	---Returns a HULL_ENUM fitting the hull given.
-	---@param vecMin Vector
-	---@param vecMax Vector
-	---@return number HULL_ENUM
+	--- Returns a HULL_ENUM fitting the hull given.
+	--- @param vecMin Vector
+	--- @param vecMax Vector
+	--- @return number HULL_ENUM
 	function NikNaks.util.FindHull( vecMin, vecMax )
 		local wide = max(-vecMin.x, -vecMin.y, vecMax.x, vecMax.y)
 		local high = vecMax.z - vecMin.z
@@ -136,12 +137,12 @@ do
 		end
 	end
 
-	---Returns a HULL_ENUM matching the entitys hull.
-	---@param entity Entity
-	---@return number HULL_ENUM
+	--- Returns a HULL_ENUM matching the entitys hull.
+	--- @param entity Entity
+	--- @return number HULL_ENUM
 	function NikNaks.util.FindEntityHull( entity )
 		if entity.GetHull then return entity:GetHull() end
 		local mi, ma = entity:OBBMins(), entity:OBBMaxs()
-		return FindHull(mi, ma)
+		return FindHull( mi, ma )
 	end
 end
