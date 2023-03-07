@@ -143,7 +143,9 @@ end
 function meta:GetStaticProps()
 	if self._staticprops then return self._staticprops end
 
-	local b, propVersion = self:GetGameLump( 1936749168 ) -- 1936749168 == "sprp"
+	local gameLump = self:GetGameLump( 1936749168 ) -- 1936749168 == "sprp"
+	local b = gameLump.buffer
+	local propVersion = gameLump.version
 
 	if b:Size() < 1 or not NikNaks._Source:find( "niknak" ) then -- This map doesn't have staticprops, or doesn't support them.
 		self._staticprops = {}
