@@ -2,8 +2,8 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 
 -- Globals
-NikNaks.vector_zero = Vector(0,0,0)
-NikNaks.vector_down = Vector(0,0,-1)
+NikNaks.vector_zero = Vector( 0, 0, 0 )
+NikNaks.vector_down = Vector( 0, 0, -1 )
 
 NikNaks.angle_up = vector_up:Angle()
 NikNaks.angle_down = NikNaks.vector_down:Angle()
