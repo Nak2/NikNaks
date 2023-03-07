@@ -8,7 +8,7 @@ NikNaks.Map = {}
 local obj_tostring = "BSP %s [ %s ]"
 local format = string.format
 
----@class BSPObject
+--- @class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
 --- @return File
@@ -77,7 +77,7 @@ local thisMapObject
 
 --- Reads the BSP file and returns it as an object.
 --- @param fileName string
---- @return BSPObject?
+--- @return BSPObject
 --- @return BSP_ERROR_CODE?
 function NikNaks.Map( fileName )
 	-- Handle filename
@@ -559,7 +559,12 @@ do
 
 	--- @return string[]
 	function meta:GetTextures()
-		return table.Copy( self:GetTexdataStringData() )
+		local c = {}
+		local q = self:GetTexdataStringData()
+		for i = 1, #q do
+			c[i] = q[i]
+		end
+		return c
 	end
 
 	local function getTexByID( self, id )
