@@ -11,8 +11,6 @@ local format = string.format
 ---@class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
-local abs = math.abs
-
 local function openFile( self )
 	assert(self._mapfile, "BSP object has nil mapfile path!")
 	local f = file.Open(self._mapfile,"rb","GAME")
@@ -85,7 +83,7 @@ function NikNaks.Map( fileName )
 			fileName = "maps/" .. fileName	-- Add "maps" folder
 		end
 	end
-	
+
 	-- Check to see if it is the map we're on. This function might be called multiple times, better to cache it.
 	if thisMap == fileName and thisMapObject and FIXMEPLZ then
 		return thisMapObject
@@ -133,7 +131,7 @@ end
 -- Smaller functions
 do
 	---Returns the mapname.
-	---@return striing
+	---@return string
 	function meta:GetMapName()
 		return self._mapname or "Unknown"
 	end
@@ -790,54 +788,223 @@ do
 		return self._dispTris
 	end
 
-	local m_CDispNeighbor = 58
 	local m_AllowedVerts = 10
+
+	local MAX_DISP_NEIGHBORS = 4
 	local MAX_DISP_CORNER_NEIGHBORS = 4
-	local function CDispCornerNeighbors( data )
-		local q = {}
-		q.m_Neighbors = {}
-		for i = 0, MAX_DISP_CORNER_NEIGHBORS - 1 do
-			q.m_Neighbors[i] = data:ReadShort()
+
+	local function CDispSubNeighbor( data )
+		local sub = {}
+
+		-- 2 bytes
+		local neighborIdx = data:ReadUShort()
+		sub.neighbor = neighborIdx
+
+		-- 0xFFFF if there is no neighbor here.
+		if neighborIdx == 0xFFFF then
+			-- When there are no neighbors, the rest of the data may be junk (and is irrelevant anyway)
+			print( data:Tell() )
+			data:Skip( 3 * 8 )
+			print( data:Tell() )
+			print()
+		else
+			-- 1 byte
+			sub.neighborOrientation = data:ReadUInt( 8 )
+			assert( sub.neighborOrientation <= 3, tostring( sub.neighborOrientation ) .. " - " .. tostring( neighborIdx ) )
+
+			-- 1 byte
+			sub.span = data:ReadUInt( 8 )
+			assert( sub.span >= 0, sub.span )
+			assert( sub.span <= 2, tostring( sub.span ) .. " - " .. tostring( neighborIdx ) )
+
+			-- 1 byte
+			sub.neighborSpan = data:ReadUInt( 8 )
+			assert( sub.neighborSpan >= 0, sub.neighborSpan )
+			assert( sub.neighborSpan <= 2, tostring( sub.neighborSpan ) .. " - " .. tostring( neighborIdx ) )
 		end
-		q.m_nNeighbors = data:ReadByte()
-		return q
+
+		-- 1 byte
+		data:ReadUInt( 8 )
+
+		return sub
 	end
-	
+
+	local function CDispNeighbor( data )
+		local edgeNeighbors = {}
+
+		-- 4 * 12 = 48 bytes
+		for neighbor = 1, MAX_DISP_NEIGHBORS do
+			local subNeighbors = {}
+			print( "Neighbor:", neighbor )
+
+			-- 6 bytes
+			subNeighbors[1] = CDispSubNeighbor( data )
+
+			-- 6 bytes
+			subNeighbors[2] = CDispSubNeighbor( data )
+
+			edgeNeighbors[neighbor] = { subNeighbors = subNeighbors }
+		end
+
+		return edgeNeighbors
+	end
+
+	local function CDispCornerNeighbors( data )
+		local cornerNeighbors = {}
+
+		-- 10 bytes * 4 = 40 bytes
+		for c = 1, 4 do
+			local neighbor = {}
+			local neighbors = {}
+
+			-- 2 bytes * 4 = 8 bytes
+			for i = 1, MAX_DISP_CORNER_NEIGHBORS do
+				neighbors[i] = data:ReadUShort()
+			end
+
+			assert( #neighbors == 4, #neighbors )
+			neighbor.neighbors = neighbors
+
+			-- 1 byte
+			-- Total: 9 bytes
+			neighbor.nNeighbors = data:ReadUInt( 8 )
+
+			-- 1 byte
+			-- Total: 10 bytes
+			data:ReadUInt( 8 )
+
+			cornerNeighbors[c] = neighbor
+		end
+
+		return cornerNeighbors
+	end
+
 	-- Returns nVerts and nIndices
 	local function CalcMaxNumVertsAndIndices( power )
 		local sideLengh = bit.rshift(1, power) + 1
 		return sideLengh * sideLengh, (sideLengh - 1) * (sideLengh - 1) * 2 * 3
 	end
 
+	local m_ddispinfo_t = 176 * 8
+
 	---Returns the DispInfo data.
-	---@return table
+	---@return table,table
 	function meta:GetDispInfo()
-		if self._dispinfo then return self._dispinfo end
-		self._dispinfo = {}
-		local data = self:GetLump( 26 )
-		for i = 0, data:Size() / 1408 - 1 do
-			local q = {}
-			q.startPosition = data:ReadVector()
-			q.DispVertStart = data:ReadLong()
-			q.DispTriStart = data:ReadLong()
-			q.power = data:ReadLong()
-			q.minTess = data:ReadLong()
-			q.smoothingAngle = data:ReadFloat()
-			q.contents = data:ReadLong()
-			q.MapFace = data:ReadUShort()
-			q.LightmapAlphaStart = data:ReadLong()
-			q.LightmapSamplePositionStart = data:ReadLong()
-			-- 46 bytes used. 130 bytes left regarding corner neighbors .. ect
-			-- allowedVerts are 40 bytes (10 * 4), therefore neighbors are 90 bytes
-			data:Skip( 720 ) -- CDispCornerNeighbors + CDispNeighbor
-			q.allowedVerts = {}
-			for i = 0, m_AllowedVerts - 1 do
-				q.allowedVerts[i] = data:ReadULong()
-			end
-			self._dispinfo[i] = q
+		if self._dispinfo then
+			return self._dispinfo, self._dispinfo_byface
 		end
+
+		self._dispinfo = {}
+		self._dispinfo_byface = {}
+		local data = self:GetLump( 26 )
+
+		-- 	168	24
+		-- 169	161
+		-- 170	132
+		-- 171	105
+		-- 172	80
+		-- 173	57
+		-- 174	36
+		-- 175	17
+		-- 176	0
+		-- 177	162
+		-- 178	150
+		for i = 0, 10 do
+			local n = 168 + i
+			print( tostring( n ), data:Size() % n )
+		end
+		local dispInfoCount = data:Size() / m_ddispinfo_t
+
+		local target
+		for i = 0, dispInfoCount - 1 do
+			target = i * m_ddispinfo_t
+			print( "Current:", data:Tell(), "Target:", target )
+
+			if data:Tell() ~= target then
+				print( "ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell() )
+			end
+
+			local function verify( expectedBytes )
+				local here = data:Tell()
+				assert( here == target + ( expectedBytes * 8 ), ( here - target ) / 8 )
+			end
+
+			local q = {}
+
+			-- 4 bytes * 3 = 12 bytes
+			q.startPosition = data:ReadVector()
+			verify( 12 )
+
+			-- 4 bytes
+			q.DispVertStart = data:ReadLong()
+			verify( 16 )
+
+			-- 4 bytes
+			q.DispTriStart = data:ReadLong()
+			verify( 20 )
+
+			-- 4 bytes
+			q.power = data:ReadLong()
+			assert( q.power >= 2, q.power )
+			assert( q.power <= 4, q.power )
+			verify( 24 )
+
+			-- 2 bytes
+			q.flags = data:ReadUShort()
+			verify( 26 )
+
+			-- 2 bytes
+			q.minTess = data:ReadShort()
+			verify( 28 )
+
+			-- 4 bytes
+			q.smoothingAngle = data:ReadFloat()
+			verify( 32 )
+
+			-- 4 bytes
+			q.contents = data:ReadLong()
+			verify( 36 )
+
+			-- 2 bytes
+			q.MapFace = data:ReadUShort()
+			verify( 38 )
+
+			-- 4 bytes 
+			q.LightmapAlphaStart = data:ReadLong()
+			verify( 42 )
+
+			-- 4 bytes
+			q.LightmapSamplePositionStart = data:ReadLong()
+			verify( 46 )
+
+			data:Skip( 88 * 8 )
+			-- -- 48 bytes
+			-- q.EdgeNeighbors = CDispNeighbor( data )
+			-- verify( 94 )
+
+			-- -- 40 bytes
+			-- q.CornerNeighbors = CDispCornerNeighbors( data )
+			verify( 134 )
+
+			-- 4 bytes * 10 = 40 bytes
+			q.allowedVerts = {}
+			for v = 0, m_AllowedVerts - 1 do
+				q.allowedVerts[v] = data:ReadLong()
+			end
+			assert( table.Count( q.allowedVerts ) == 10, table.Count( q.allowedVerts ) )
+			verify( 174 )
+
+			data:Skip( 8 * 2 )
+
+			local offset = i * m_ddispinfo_t
+			q.offset = offset
+
+			self._dispinfo[i] = q
+			self._dispinfo_byface[q.MapFace] = q
+		end
+
 		self:ClearLump( 26 )
-		return self._dispinfo
+		return self._dispinfo, self._dispinfo_byface
 	end
 
 	---!! DEBUG FUNCTIONS !!

@@ -48,7 +48,7 @@ NikNaks.AIN_ERROR_VERSIONNUM	= 4
 NikNaks.AIN_ERROR_ZONEPATCH		= 5	-- This error is thrown when the AIN-parser repairs the data. It will still return the data successfully.
 
 -- naksbot
-NikNaks.PATHTYPE_NONE=-1	-- In case there are no path-options on the map
+NikNaks.PATHTYPE_NONE = -1	-- In case there are no path-options on the map
 NikNaks.PATHTYPE_AIN = 0
 NikNaks.PATHTYPE_NAV = 1
 NikNaks.PATHTYPE_NIKNAV = 2
@@ -56,3 +56,13 @@ NikNaks.PATHTYPE_NIKNAV = 2
 -- How the NPC should move
 NikNaks.PATHMOVETYPE_GROUND = 0
 NikNaks.PATHMOVETYPE_FLY 	= 1
+
+-- CDispSubNeighbor
+NikNaks.CORNER_TO_CORNER = 0
+NikNaks.CORNER_TO_MIDPOINT = 1
+NikNaks.MIDPOINT_TO_CORNER = 3
+
+NikNaks.ORIENTATION_CCW_0 = 0
+NikNaks.ORIENTATION_CCW_90 = 1
+NikNaks.ORIENTATION_CCW_180 = 2
+NikNaks.ORIENTATION_CCW_270 = 3
