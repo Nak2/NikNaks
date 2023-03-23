@@ -117,6 +117,14 @@ function meta_leaf:DebugRender( col )
 	render.SetBlend( 1 )
 end
 
+---Returns true if the position is within the leaf.
+---@return bool
+function meta_leaf:IsPositionWithin( position )
+	local l = self.__map:PointInLeaf(0, position)
+	if not l then return false end
+	return l:GetIndex() == self:GetIndex()
+end
+
 ---Returns the leaf index.
 ---@return number
 function meta_leaf:GetIndex()
@@ -171,7 +179,7 @@ function meta_leaf:GetFaces()
 	local faces = self.__map:GetFaces()
 	local leafFace = self.__map:GetLeafFaces()
 	local c = self.firstleafface
-	for i = 0, self.numleaffaces do
+	for i = 0, self.numleaffaces - 1 do
 		local f_id = leafFace[ i + c ]
 		self._faces[i + 1] = faces[f_id]
 	end
@@ -213,4 +221,51 @@ end
 ---@return number
 function meta_leaf:GetCluster()
 	return self.cluster
+end
+
+---Returns a list of all leafs around the given leaf.
+---@param range? Number
+---@return table
+function meta_leaf:GetAdjacentLeafs()
+	local t, i, s = {}, 1, 2
+	for _, leaf in ipairs( self.__map:AABBInLeafs(0, self.mins, self.maxs, s) ) do
+		if leaf == self then continue end
+		t[i] = leaf
+		i = i + 1
+	end
+	return t
+end
+
+---Returns true if the leafs are adjacent to each other.
+---@return bool
+function meta_leaf:IsLeafAdjacent( leaf )
+	for _, c_leaf in ipairs( self:GetAdjacentLeafs() ) do
+		if c_leaf == leaf then return true end
+	end
+	return false
+end
+
+do
+	local clamp = math.Clamp
+
+	---Roughly returns the distance from leaf to the given position.
+	---@param position Vector
+	---@return number
+	function meta_leaf:Distance( position )
+		local cPos = Vector(clamp(position.x, self.mins.x, self.maxs.x),
+							clamp(position.y, self.mins.y, self.maxs.y),
+							clamp(position.z, self.mins.z, self.maxs.z))
+		return cPos:Distance( position )
+	end
+
+	---Roughly returns the distance from leaf to the given position.
+	---@param position Vector
+	---@return number
+	function meta_leaf:DistToSqr( position )
+		local cPos = Vector(clamp(position.x, self.mins.x, self.maxs.x),
+							clamp(position.y, self.mins.y, self.maxs.y),
+							clamp(position.z, self.mins.z, self.maxs.z))
+		return cPos:DistToSqr( position )
+	end
+
 end

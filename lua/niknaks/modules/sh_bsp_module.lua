@@ -11,7 +11,7 @@ local format = string.format
 ---@class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
-local abs = math.abs
+local abs, min, max = math.abs, math.min, math.max
 
 local function openFile( self )
 	assert(self._mapfile, "BSP object has nil mapfile path!")
@@ -133,7 +133,7 @@ end
 -- Smaller functions
 do
 	---Returns the mapname.
-	---@return striing
+	---@return string
 	function meta:GetMapName()
 		return self._mapname or "Unknown"
 	end
@@ -160,6 +160,21 @@ end
 
 -- Lump functions
 do
+	if SERVER then
+		---Returns true if the server has a lumpfile for the given lump
+		---@param lump_id number
+		---@return bool
+		---@server
+		function meta:HasLumpFile( lump_id )
+			if self._lumpfile and self._lumpfile[lump_id] ~= nil then
+				return self._lumpfile[lump_id]
+			end
+			self._lumpfile = self._lumpfile or {}
+			self._lumpfile[lump_id] = file.Exists("maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp", "GAME")
+			return self._lumpfile[lump_id]
+		end
+	end
+
 	-- A list of lumps that are known to be LZMA compressed for TF2 / other. In theory we could apply it to everything
 	-- However there might be some rare cases where the data start with "LZMA", and trigger this.
 
@@ -178,6 +193,8 @@ do
 		local data
 		-- Check for LUMPs
 		if file.Exists("maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp", "GAME") then -- L4D has _s_ and _h_ files too. Depending on the gamemode.
+			if not self._lumpfile then self._lumpfile = {} end
+			self._lumpfile[lump_id] = true
 			data = file.Read("maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp", "GAME")
 		elseif lump_h.filelen > 0 then
 			local f = openFile( self )
@@ -194,7 +211,7 @@ do
 		return self._lumpstream[lump_id]
 	end
 
-	---Deletes cached lummp_data
+	---Deletes the cached BitBuffer for the given LumpId.
 	---@param lump_id number
 	function meta:ClearLump( lump_id )
 		self._lumpstream[lump_id] = nil
@@ -216,6 +233,8 @@ do
 		-- Get raw data
 		local data
 		if file.Exists("maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp", "GAME") then
+			if not self._lumpfile then self._lumpfile = {} end
+			self._lumpfile[lump_id] = true
 			data = file.Read("maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp", "GAME")
 		elseif lump_h.filelen > 0 then
 			local f = openFile( self )
@@ -478,10 +497,11 @@ do
 		self:ClearLump( 43 )
 		return self._texstr
 	end
+	
 	function meta:GetTextures()
 		local c = {}
 		local q = self:GetTexdataStringData()
-		for i = 1,#q do
+		for i = 0,#q do
 			c[i] = q[i]
 		end
 		return c
@@ -675,10 +695,83 @@ do
 	---@param leafObject? lastVis
 	---@return leafObject
 	---@return boolean newLeaf
-	function meta:PointInLeafCache( iNode, point, lastVis )
+	function meta:PointInLeafCache( iNode, position, lastVis )
 		if not lastVis then return self:PointInLeaf( iNode, point ), true end
 		if point:WithinAABox( lastVis.mins, lastVis.maxs ) then return lastVis, false end
 		return self:PointInLeaf( iNode, point ), true
+	end
+
+	do
+		local function locateBoxLeaf( iNode, tab, mins, maxs, nodes, planes, leafs )
+			local cornerMin, cornerMax = Vector(0,0,0), Vector(0,0,0)
+			while iNode >= 0 do
+				local node = nodes[ iNode ]
+				local plane = planes[ node.planenum ]
+				for i = 1, 3 do
+					if( plane.normal[i] >= 0) then
+						cornerMin[i] = mins[i]
+						cornerMax[i] = maxs[i]
+					else
+						cornerMin[i] = maxs[i]
+						cornerMax[i] = mins[i]
+					end
+				end
+				if plane.normal:Dot(cornerMax) - plane.dist <= -TEST_EPSILON  then
+					iNode = node.children[2]
+				elseif plane.normal:Dot(cornerMin) - plane.dist >= TEST_EPSILON then
+					iNode = node.children[1]
+				else
+					if not locateBoxLeaf(node.children[1], tab, mins, maxs, nodes, planes, leafs) then
+						return false
+					end
+					return locateBoxLeaf(node.children[2], tab, mins, maxs, nodes, planes, leafs)
+				end
+			end
+			tab[#tab + 1] = leafs[ -1 -iNode ]
+			return true
+		end
+
+		---Returns a list of leafs within the given two positions.
+		---@param iNode? number
+		---@param point Vector
+		---@param point2 Vector
+		---@param add? number
+		---@return table		
+		function meta:AABBInLeafs( iNode, point, point2, add )
+			add = add or 0
+			local mins = Vector(min(point.x, point2.x) - add, min(point.y, point2.y) - add, min(point.z, point2.z) - add)
+			local maxs = Vector(max(point.x, point2.x) + add, max(point.y, point2.y) + add, max(point.z, point2.z) + add)
+			local tab = {}
+			locateBoxLeaf(iNode or 0, tab, mins, maxs, self:GetNodes(), self:GetPlanes(), self:GetLeafs())
+			return tab
+		end
+	end
+
+	do
+		local function locateSphereLeaf( iNode, tab, origin, radius, nodes, planes, leafs)
+			while iNode >= 0 do
+				local node = nodes[ iNode ]
+				local plane = planes[ node.planenum ]
+				if plane.normal:Dot(origin) + radius - plane.dist <= -TEST_EPSILON then
+					iNode = node.children[2]
+				elseif plane.normal:Dot(origin) - radius - plane.dist >= TEST_EPSILON then
+					iNode = node.children[1]
+				else
+					if not locateSphereLeaf( node.children[1], tab, origin, radius, nodes, planes, leafs ) then
+						return false
+					end
+					return locateSphereLeaf( node.children[2], tab, origin, radius, nodes, planes, leafs )
+				end
+			end
+			tab[#tab + 1] = leafs[ -1 -iNode ]
+			return true
+		end
+		---Returns a list of leafs within the given sphere.
+		function meta:SphereInLeafs(iNode, origin, radius)
+			local tab = {}
+			locateSphereLeaf(iNode, tab, origin, radius, self:GetNodes(), self:GetPlanes(), self:GetLeafs())
+			return tab
+		end
 	end
 
 	---Returns the vis-cluster from said point.
@@ -715,7 +808,7 @@ do
 		if self._leaffaces then return self._leaffaces end
 		local data = self:GetLump( 16 )
 		self._leaffaces = {}
-		for i = 1, math.min( data:Size() / 16, MAX_MAP_LEAFFACES ) do
+		for i = 0, math.min( data:Size() / 16, MAX_MAP_LEAFFACES ) do
 			self._leaffaces[i] = data:ReadUShort()
 		end
 		self:ClearLump( 16 )
@@ -759,40 +852,6 @@ end
 
 -- Faces and Displacments
 do
-	---Returns the DispVerts data
-	---@return table
-	function meta:GetDispVerts()
-		if self._dispVert then return self._dispVert end
-		local data = self:GetLump( 33 )
-		self._dispVert = {}
-		for i = 0, data:Size() / 160 - 1 do
-			self._dispVert[i] = {
-				vec = data:ReadVector(),
-				dist = data:ReadFloat(),
-				alpha = data:ReadFloat()
-			}
-		end
-		self:ClearLump( 33 )
-		return self._dispVert
-	end
-
-	---Holds flags for the triangle in the displacment mesh.
-	---Returns the DispTris data
-	---@return table
-	function meta:GetDispTris()
-		if self._dispTris then return self._dispTris end
-		self._dispTris = {}
-		local data = self:GetLump( 48 )
-		for i = 0, data:Size() / 16 - 1 do
-			self._dispTris[i] = data:ReadUShort()
-		end
-		self:ClearLump( 48 )
-		return self._dispTris
-	end
-
-	local m_CDispNeighbor = 58
-	local m_AllowedVerts = 10
-	local MAX_DISP_CORNER_NEIGHBORS = 4
 	local function CDispCornerNeighbors( data )
 		local q = {}
 		q.m_Neighbors = {}
@@ -807,37 +866,6 @@ do
 	local function CalcMaxNumVertsAndIndices( power )
 		local sideLengh = bit.rshift(1, power) + 1
 		return sideLengh * sideLengh, (sideLengh - 1) * (sideLengh - 1) * 2 * 3
-	end
-
-	---Returns the DispInfo data.
-	---@return table
-	function meta:GetDispInfo()
-		if self._dispinfo then return self._dispinfo end
-		self._dispinfo = {}
-		local data = self:GetLump( 26 )
-		for i = 0, data:Size() / 1408 - 1 do
-			local q = {}
-			q.startPosition = data:ReadVector()
-			q.DispVertStart = data:ReadLong()
-			q.DispTriStart = data:ReadLong()
-			q.power = data:ReadLong()
-			q.minTess = data:ReadLong()
-			q.smoothingAngle = data:ReadFloat()
-			q.contents = data:ReadLong()
-			q.MapFace = data:ReadUShort()
-			q.LightmapAlphaStart = data:ReadLong()
-			q.LightmapSamplePositionStart = data:ReadLong()
-			-- 46 bytes used. 130 bytes left regarding corner neighbors .. ect
-			-- allowedVerts are 40 bytes (10 * 4), therefore neighbors are 90 bytes
-			data:Skip( 720 ) -- CDispCornerNeighbors + CDispNeighbor
-			q.allowedVerts = {}
-			for i = 0, m_AllowedVerts - 1 do
-				q.allowedVerts[i] = data:ReadULong()
-			end
-			self._dispinfo[i] = q
-		end
-		self:ClearLump( 26 )
-		return self._dispinfo
 	end
 
 	---!! DEBUG FUNCTIONS !!
@@ -1022,6 +1050,28 @@ do
 		local leaf = self:PointInLeaf( 0, position )
 		if not leaf then return true end -- No leaf? Shouldn't be possible.
 		return leaf:IsOutsideMap()
+	end
+
+	---Returns true if the sphere is outside the map
+	---@param position Vector
+	---@param range number
+	---@return boolean
+	function meta:IsSphereOutsideMap( position, range )
+		for _, leaf in pairs( self:SphereInLeafs( 0, position, range ) ) do
+			if leaf:IsOutsideMap() then return true end
+		end
+		return false
+	end
+
+		---Returns true if the AABB is outside the map
+	---@param position Vector
+	---@param position2 Vector
+	---@return boolean
+	function meta:IsAABBOutsideMap( position, position2 )
+		for _, leaf in pairs( self:AABBInLeafs( 0, position, position2 ) ) do
+			if leaf:IsOutsideMap() then return true end
+		end
+		return false
 	end
 
 	---Returns a lsit of all materials used by the map.

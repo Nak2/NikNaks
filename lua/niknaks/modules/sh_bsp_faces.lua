@@ -22,7 +22,8 @@ function meta:GetFaces()
 	local data = self:GetLump( 7 )
 	for i = 0, math.min(data:Size() / 448, MAX_MAP_FACES) - 1 do
 		local t = {}
-		t.plane 	= self:GetPlanes()[ data:ReadUShort() ]
+		t.planenum = data:ReadUShort()
+		t.plane 	= self:GetPlanes()[ t.planenum ]
 		t.side 		= data:ReadByte() -- 1 = same direciton as face
 		t.onNode 	= data:ReadByte() -- 1 if on node, 0 if in leaf
 		t.firstedge = data:ReadLong()
@@ -47,6 +48,11 @@ function meta:GetFaces()
 	end
 	self:ClearLump( 7 )
 	return self._faces
+end
+
+-- Returns the original face
+function meta:GetOriginalFace()
+	return self.__map:GetOriginalFaces()[self.origFace]
 end
 
 -- We make a small hack to cache and get the entities using brush-models.
@@ -167,29 +173,36 @@ end
 ---Returns true if the face-texture is translucent
 ---@return boolean
 function meta_face:IsTranslucent()
-	local texinfo = self:GetTexInfo() or 0
+	local texinfo = self:GetTexInfo()
 	return bit.band(texinfo.flags, 0x10)~= 0
 end
 
 ---Returns true if the face is part of 2D skybox.
 ---@return boolean
 function meta_face:IsSkyBox()
-	local texinfo = self:GetTexInfo() or 0
-	return bit.band(texinfo.flags, 0x2)~= 0
+	local texinfo = self:GetTexInfo()
+	return bit.band(texinfo.flags, 0x2) ~= 0
 end
 
 ---Returns true if the face is part of 3D skybox
 ---@return boolean
 function meta_face:IsSkyBox3D()
-	local texinfo = self:GetTexInfo() or 0
+	local texinfo = self:GetTexInfo()
 	return bit.band(texinfo.flags, 0x4)~= 0
 end
 
 ---Returns true if the face's texinfo has said flag
 ---@return boolean
 function meta_face:HasTexInfoFlag( flag )
-	local texinfo = self:GetTexInfo() or 0
-	return bit.band(texinfo.flags, flag)~= 0
+	local texinfo = self:GetTexInfo()
+	return bit.band(texinfo.flags, flag) ~= 0
+end
+
+---Returns true if the face's texinfo has said flag
+---@return boolean
+function meta_face:GetTexInfoFlags()
+	local texinfo = self:GetTexInfo()
+	return texinfo.flags
 end
 
 ---Returns true if the face is part of the world and not another entity.
@@ -218,19 +231,34 @@ function meta_face:IsDisplacment()
 	return self.dispinfo > -1
 end
 
+function meta_face:GetDispInfo()
+	if self.dispinfo < 0 then return nil end
+	return self.__map:GetDispInfos()[self.dispinfo]
+end
+
+-- Returns the contents for the given face or nil if none.
+function meta_face:GetContents()
+	local disp = self:GetDispInfo()
+	return disp and disp.contents
+end
+
 ---Returns the vertex positions for the face. [Not Cached]
 ---Note this will ignore BModel-positions!
 ---@return table
 function meta_face:GetVertexs()
+	if self._vertex then return self._vertex end
 	local t = {}
-	if not self:IsDisplacment() then
+	local dispInfo = self:GetDispInfo()
+	if not dispInfo then
 		for i = 0, self.numedges - 1 do
 			t[i + 1] = self.__map:GetSurfEdgesIndex( self.firstedge + i )
 		end
+		self._vertex = t
 		return t
 	end
 	-- This is a displacment
 	-- TODO: Calculate the displacment mesh and return it here
+	--local dispVertStart =
 end
 
 ---Returns a table in form of a polygon-mesh. [Not Cached]
@@ -299,7 +327,9 @@ end
 ---TAB[ID] = {pos = position, u = u, v = v, lu = lightU, lv = lightV }
 ---@return table
 function meta_face:GenerateVertexTriangleData()
-	return PolyChop( self:GenerateVertexData() )
+	if self._vertTriangleData then return self._vertTriangleData end
+	self._vertTriangleData = PolyChop( self:GenerateVertexData() )
+	return self._vertTriangleData
 end
 
 ---All mesh-data regarding said face. Should use face:GenerateVertexTriangleData intead!
@@ -311,6 +341,54 @@ function meta_face:GenerateMeshData()
 	t.material = self:GetTexture()
 	return {t}
 end
+
+do
+	local mt = getmetatable(Vector(0,0,0))
+	local dot = mt.Dot
+	local cross, abs = mt.Cross, math.abs
+	local function rayTriangleIntersect(orig, dir, v0, v1, v2)
+		local v0v1 = v1 - v0
+		local v0v2 = v2 - v0
+		local pvec = cross(dir,v0v2)
+		local det = dot(v0v1, pvec)
+	
+		// ray and triangle are parallel if det is close to 0
+		if abs(det) < 0.01 then return false end 
+	
+		local invDet = 1 / det
+	
+		local tvec = orig - v0
+		local u = dot(tvec, pvec) * invDet
+		if (u < 0 or u > 1) then return false end
+	
+		local qvec = cross(tvec,v0v1) 
+		local v = dot(dir, qvec) * invDet 
+		if (v < 0 or u + v > 1) then return false end
+	
+		t = dot(v0v2, qvec) * invDet
+	
+		return true, u, v, t
+	end
+
+	-- TODO: Fix UV coordinats being relative to triangle-mesh, and not surface.mesh
+	function meta_face:IsRayIntersecting( origin, dir )
+		local poly = self:GetVertexs()
+		local j = 1
+		local result_hit, u, v, dis = false
+		for i = 1, #poly - 2 do
+			local v0 = poly[1]
+			local v1 = poly[i + 1]
+			local v2 = poly[i + 2]
+			local hit, ru, rv, t = rayTriangleIntersect(origin, dir, v0, v1, v2)
+			if hit and (not dis or dis < t) and t > 0 then
+				result_hit, u, v, dis = true, ru, rv, t
+			end
+			j = j + 3
+		end
+		return result_hit, u, v, t
+	end
+end
+
 
 if CLIENT then
 	NIKNAKS_TABOMESH = NIKNAKS_TABOMESH or {}
@@ -326,6 +404,13 @@ if CLIENT then
 		local meshData = self:GenerateVertexTriangleData()
 		if not meshData then return self._mesh end
 		self._mesh = Mesh( self:GetMaterial() )
+		local lData = face:GetLightmapSamples()
+		local data = lData.average and lData.average[1]
+		local col = color_white
+		if (data) then
+			col = data
+			print("!", col)
+		end
 		-- Vert
 		mesh.Begin( self._mesh, MATERIAL_TRIANGLES, #meshData )
 		for i = 1, #meshData do
@@ -333,6 +418,7 @@ if CLIENT then
 			-- > Mesh
 			mesh.Normal( vert.normal )
 			mesh.Position( vert.pos ) -- Set the position
+			mesh.Color(col.r, col.g, col.b, col.a)
 			mesh.TexCoord( 0, vert.u, vert.v ) -- Set the texture UV coordinates
 			mesh.TexCoord( 1, vert.lu, vert.lv ) -- Set the lightmap UV coordinates
 			mesh.TexCoord( 2, vert.lu, vert.lv  ) -- Set the lightmap UV coordinates
@@ -361,18 +447,30 @@ if CLIENT then
 		return self
 	end
 
-	---Generates a mesh for the face and renders it.
-	---@param dontGenerate boolean
-	---@return boolean didGenerateMesh
-	function meta_face:DebugRender( dontGenerate )
-		local _mesh = self:GetMesh()
-		if not _mesh and dontGenerate then return false end
-		_mesh = _mesh or self:BuildMesh()
-		if not IsValid(_mesh) then return end
-		render.SetMaterial( self:GetMaterial() )
-		_mesh:Draw()
-		return true
+	---Pushes the face-mesh into a dynamic-render. Better to generate the mesh and let the engine do this.
+	function meta_face:DebugRender( materialOverride )
+		local verts = self:GenerateVertexTriangleData()
+		if not verts then return end -- Invalid data?
+		render.SetMaterial( materialOverride or self:GetMaterial() )
+		mesh.Begin( MATERIAL_TRIANGLES, #verts / 3 ) -- Begin writing to the dynamic mesh
+		for i = 1, #verts do
+			mesh.Position( verts[i].pos ) -- Set the position
+			mesh.TexCoord( 0, verts[i].u, verts[i].v ) -- Set the texture UV coordinates
+			mesh.AdvanceVertex() -- Write the vertex
+		end
+		mesh.End()
 	end
+
+	function meta_face:GetOrigin()
+		local func_brush = __findEntityUsingBrush(self.__map)[self.__bmodel]
+		return func_brush and func_brush.origin or vector_origin
+	end
+
+	function meta_face:TryMerge( face, planenormal, dontCreate )
+		local winding = self:WindingFromFace( self:GetOrigin() )
+		return winding:TryMerge( face:WindingFromFace( face:GetOrigin() ), planenormal, dontCreate)		
+	end
+
 	for k, _mesh in pairs( NIKNAKS_TABOMESH ) do
 		if IsValid(_mesh) then
 			_mesh:Destroy()

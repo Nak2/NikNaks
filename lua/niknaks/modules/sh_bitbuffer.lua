@@ -77,7 +77,7 @@ end
 ---@return BitBuffer
 NikNaks.BitBuffer.Create = create
 setmetatable(NikNaks.BitBuffer,{
-	__call = function(_, data ) return create( data ) end
+	__call = function(_, data, little_endian ) return create( data, little_endian ) end
 })
 
 -- Simple int->string and reverse. ( Little-Endian )
@@ -208,7 +208,7 @@ do
 	end
 
 	---Returns true if the bitbuffer is big-endian
-	---@param boolean
+	---@return boolean
 	function meta:IsBigEndian()
 		return not self._little_endian
 	end
@@ -311,6 +311,7 @@ do
 
 	---Writes a boolean
 	---@param b boolean
+	---@return self
 	function meta:WriteBoolean( b )
 		local tell = self._tell
 		self._tell = tell + 1

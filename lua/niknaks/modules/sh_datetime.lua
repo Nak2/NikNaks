@@ -225,7 +225,7 @@ function NikNaks.DateTime.Get(var, t_zone)
 	-- Create object and return
 	local t = {}
 	t.unix = var
-	t.timezone = t_zone
+	t.timezone = t_zone or 0
 	setmetatable(t,datetime_obj)
 	return t
 end

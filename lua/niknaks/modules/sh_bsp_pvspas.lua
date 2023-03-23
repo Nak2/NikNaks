@@ -49,6 +49,7 @@ do
 	---@return PVSObject
 	function meta:CreatePVS()
 		local t = {}
+		t.__map = self
 		setmetatable( t, meta_pvs )
 		return t
 	end
@@ -121,6 +122,7 @@ do
 	---@return PVSObject
 	function meta_leaf:CreatePVS()
 		local PVS = {}
+		PVS.__map = self.__map
 		setmetatable( PVS, meta_pvs )
 		if self.cluster < 0 then return PVS end -- Leaf invalid. Return empty PVS.
 		local vis = self.__map:GetVisibility()
