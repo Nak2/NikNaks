@@ -695,7 +695,7 @@ do
 	---@param leafObject? lastVis
 	---@return leafObject
 	---@return boolean newLeaf
-	function meta:PointInLeafCache( iNode, position, lastVis )
+	function meta:PointInLeafCache( iNode, point, lastVis )
 		if not lastVis then return self:PointInLeaf( iNode, point ), true end
 		if point:WithinAABox( lastVis.mins, lastVis.maxs ) then return lastVis, false end
 		return self:PointInLeaf( iNode, point ), true
