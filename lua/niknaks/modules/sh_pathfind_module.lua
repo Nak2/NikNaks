@@ -4,10 +4,13 @@ local NikNaks = NikNaks
 local CurTime, setmetatable, IsValid = CurTime, setmetatable, IsValid
 local min, max, cos = math.min, math.max, math.cos
 
----@class LPathFollower
+--- @class LPathFollower
+--- @field _segments LPathFollowerSegment[]
 local meta = {}
 meta.__index = meta
-meta.__tostring = function(self) return "LPathFollower Age: " .. self:GetAge() end
+meta.__tostring = function( self )
+	return "LPathFollower Age: " .. self:GetAge()
+end
 NikNaks.__metatables["LPathFollower"] = meta
 
 --[[
@@ -16,10 +19,11 @@ NikNaks.__metatables["LPathFollower"] = meta
 	t._age = CurTime()
 	
 ]]
----Creates an empty path-follower
----@param start_pos  Vector
----@return LPathFollower
+--- Creates an empty path-follower
+--- @param start_pos  Vector
+--- @return LPathFollower
 function meta.CreatePathFollower( start_pos )
+	--- @class LPathFollower
 	local t = {}
 	t._segments = {}
 	t._start = start_pos
@@ -29,23 +33,27 @@ function meta.CreatePathFollower( start_pos )
 	t._cursor = 1
 	t._cursor_dis = 0
 	t._cursor_lef = 0
-	setmetatable( t, meta)
-	return t
+
+	return setmetatable( t, meta )
 end
 
----Adds a segment
----@param from Vector
----@param to Vector
----@param curvature number
----@param move_type number
-function meta:AddSegment(from, to, curvature, move_type)
+--- Adds a segment.
+--- @param from Vector
+--- @param to Vector
+--- @param curvature number
+--- @param move_type number
+--- @return LPathFollowerSegment
+function meta:AddSegment( from, to, curvature, move_type )
+	--- @class LPathFollowerSegment
 	local seg = {}
 		seg.curvature = curvature or 0
 		seg.move_type = move_type or 1
-		seg.distanceFromStart = from:Distance(to)
-		local n = (to - from):GetNormalized()
+		seg.distanceFromStart = from:Distance( to )
+
+		local n = ( to - from ):GetNormalized()
 		seg.forward = n
-		seg.yaw = (-n):Angle().y
+		seg.yaw = ( -n ):Angle().y
+
 		if n.z > 0.7 or n.z < -0.7 then
 			self.how = 9
 		else
@@ -59,13 +67,15 @@ function meta:AddSegment(from, to, curvature, move_type)
 				seg.how = 3
 			end
 		end
-		seg.length = from:Distance(to)
+
+		seg.length = from:Distance( to )
 		seg.s_lengh = self._length
 		seg.pos = to
 		--seg.ladder
 		--seg.node
 		--seg.area
 		--seg.nna
+
 	self._length = self._length + seg.length
 	self._segments[#self._segments + 1] = seg
 	return seg
@@ -73,73 +83,87 @@ end
 
 -- Default easy functions
 do
-	---Returns the length of the path
-	---@return number
+	--- Returns the length of the path.
 	function meta:GetLength()
 		return self._length or 0
 	end
-	---Returns the first segment
-	---@return table
+
+	--- Returns the first segment.
 	function meta:FirstSegment()
 		return self._segments[1]
 	end
-	---Returns the last segment
-	---@return table
+
+	--- Returns the last segment.
 	function meta:LastSegment()
 		return self._segments[#self._segments]
 	end
-	---Returns all segments
-	---@return table
+
+	--- Returns all segments.
 	function meta:GetAllSegments()
 		return self._segments
 	end
-	---Returns the age of the path
-	---@return number
+
+	--- Returns the age of the path.
 	function meta:GetAge()
 		return CurTime() - self._age
 	end
-	---Resets the age of the path.
+
+	--- Resets the age of the path.
 	function meta:ResetAge()
 		self._age = CurTime()
 	end
-	---Returns true if the path is valid
-	---@return boolean
+
+	--- Returns true if the path is valid.
 	function meta:IsValid()
 		return self._valid or false
 	end
-	---Invalidates the path
+
+	--- Invalidates the path.
 	function meta:Invalidate()
 		self._valid = false
 	end
-	---Returns the starting position of the path
-	---@return Vector
+
+	--- Returns the starting position of the path.
 	function meta:GetStart()
 		return self._start
 	end
-	---Returns the ending position of the path (Note, will update if the target is an entity)
+
+	--- Returns the ending position of the path (Note, will update if the target is an entity).
 	function meta:GetEnd()
 		if IsValid( self.target_ent ) then
 			return self.target_ent:GetPos()
 		end
+
 		return self._segments[#self._segments].pos
 	end
 end
 
 -- Cursor
-local findClosestSeg 
+local findClosestSeg
 do
+	--- Returns the cursor position.
+	--- @return number
+	--- @return number
 	local function findCursor( self, distance )
 		local q = self._segments
-		distance = min(self._length, distance)
+		distance = min( self._length, distance )
+
 		for i = 1, #q do
 			if distance <= q[i].s_lengh + q[i].length then
-				return i, distance - (q[i].s_lengh + q[i].length )
+				return i, distance - ( q[i].s_lengh + q[i].length )
 			end
 		end
+
 		return 1, distance
 	end
-	function findClosestSeg( self, position )
+
+	--- Returns the closest segment and its index.
+	--- @param position Vector
+	--- @return LPathFollowerSegment
+	--- @return number
+	findClosestSeg = function( self, position )
 		local c, d, q
+
 		for i, seg in pairs( self._segments ) do
 			local dis = seg.pos:DistToSqr( position )
 			if not c or c > dis then
@@ -148,34 +172,43 @@ do
 				q = i
 			end
 		end
+
 		return d, q
 	end
+
+	--- Returns the closest position along the path to said position.
+	--- @param position Vector
+	--- @return Vector
 	local function findClosestBetween( A, dir, position, maxLength )
 		local v = position - A
 		local d = v:Dot( dir )
-		return A + dir * max(0, min(d, maxLength))
+		return A + dir * max( 0, min( d, maxLength ) )
 	end
-	---Returns the position on the path by given distance
-	---@param distance number
-	---@return Vector
+
+	--- Returns the position on the path by given distance
+	--- @param distance number
+	--- @return Vector
 	function meta:GetPositionOnPath( distance )
 		local seg_id, lef = findCursor( self, distance )
 		local t = self._segments
 		local seg = t[seg_id]
 		return seg.pos + seg.forward * lef
 	end
-	---Returns the closest position along the path to said position.
-	---@param position Vector
-	---@return Vector
+
+	--- Returns the closest position along the path to said position.
+	--- @param position Vector
+	--- @return Vector
 	function meta:GetClosestPosition( position )
 		-- Locate the closest points
-		local seg, seg_id = findClosestSeg(self, position)
+		local seg, seg_id = findClosestSeg( self, position )
 		if not seg then return self:GetStart() end -- Fallback to the start pos
-		local max_seg, other_seg = #self._segments
+
+		local max_seg = #self._segments
+
 		if seg_id <= 1 then
 			local n_seg = self._segments[seg_id + 1]
-			local v1 = findClosestBetween(self:GetStart(), seg.forward, position, seg.length)
-			local v2 = findClosestBetween(seg.pos, n_seg.forward, position, n_seg.length)
+			local v1 = findClosestBetween( self:GetStart(), seg.forward, position, seg.length )
+			local v2 = findClosestBetween( seg.pos, n_seg.forward, position, n_seg.length )
 			if v1:DistToSqr( position ) > v2:DistToSqr( position ) then
 				return v2
 			else
@@ -183,12 +216,12 @@ do
 			end
 		elseif seg_id >= max_seg then
 			local s_seg = self._segments[max_seg - 1]
-			return findClosestBetween(s_seg.pos, seg.forward, position, seg.length)
+			return findClosestBetween( s_seg.pos, seg.forward, position, seg.length )
 		else
 			local p_seg = self._segments[seg_id - 1]
 			local n_seg = self._segments[seg_id + 1]
-			local v1 = findClosestBetween(p_seg.pos, seg.forward, position, seg.length)
-			local v2 = findClosestBetween(seg.pos, n_seg.forward, position, n_seg.length)
+			local v1 = findClosestBetween( p_seg.pos, seg.forward, position, seg.length )
+			local v2 = findClosestBetween( seg.pos, n_seg.forward, position, n_seg.length )
 			if v1:DistToSqr( position ) > v2:DistToSqr( position ) then
 				return v2
 			else
@@ -197,33 +230,37 @@ do
 		end
 	end
 
-	---Moves the cursor to the start of the path.
+	--- Moves the cursor to the start of the path.
 	function meta:MoveCursorToStart()
 		self._cursor_dis = 0
 		self._cursor_lef = 0
 		self._cursor = 1
 	end
-	-- Moves the cursor to the end of the path.
+
+	--- Moves the cursor to the end of the path.
 	function meta:MoveCursorToEnd()
 		self._cursor_dis = self:GetLength()
 		self._cursor = #self._segments
 		self._cursor_lef = self._segments[self._cursor].length
 	end
-	---Returns the cursor progress along the path
-	---@return number
+
+	--- Returns the cursor progress along the path
+	--- @return number
 	function meta:GetCursorPosition()
 		return self._cursor_dis
 	end
-	---Moves the cursor to said distance.
-	---@param distance number
+
+	--- Moves the cursor to said distance.
+	--- @param distance number
 	function meta:MoveCursorTo( distance )
 		self._cursor_dis = distance
 		local seg_id, lef = findCursor( self, distance )
 		self._cursor = seg_id
 		self._cursor_lef = lef
 	end
+
 	--- Moves the cursor said distance
-	---@param distance number
+	--- @param distance number
 	function meta:MoveCursor( distance )
 		self._cursor_dis = self._cursor_dis + distance
 		local nd = self._cursor_lef + distance
@@ -237,34 +274,21 @@ do
 		end
 	end
 
-	-- Moves the cursor a distance
-	---@param distance number
-	function meta:MoveCursor( distance )
-		local newdis = self._cursor_dis + distance
-		local seg = self._segments[self._cursor]
-		if newdis < 0 or newdis > seg.length then -- Update segment
-			local newcursor, dis = calc( self._segments, newdis )
-
-		else
-			self._cursor_dis = newdis
-		end
-	end
-
-	---Returns the closest sequence.
-	---@param position Vector
-	---@return table
+	--- Returns the closest sequence.
+	--- @param position Vector
+	--- @return LPathFollowerSegment
+	--- @return number
 	function meta:FindClosestSeg( position )
-		return findClosestSeg( self, position)
+		return findClosestSeg( self, position )
 	end
 
-	---Returns the distance from the path.
-	---@param position Vector
-	---@return number
+	--- Returns the distance from the path.
+	--- @param position Vector
+	--- @return number
 	function meta:FindDistanceFromPath( position )
 		return self:GetClosestPosition( position ):Distance( position )
 	end
 
-	
 end
 
 -- NPC stuff
@@ -278,28 +302,33 @@ do
 	]]
 	function meta:Update( ent, toleranceSqrt )
 		-- Make sure it is a valid entity and it has loco
-		if not IsValid(ent) or not ent.loco then return true end
-		local ent_pos = ent:GetPos()
+		if not IsValid( ent ) or not ent.loco then return true end
+
+		local entPos = ent:GetPos()
 		local seq, id = nil, ent._cursor
+
 		-- Located the closest segment, and use that
 		if not id then
-			seq, id = findClosestSeg( self, ent_pos)
+			seq, id = findClosestSeg( self, entPos )
 			ent._cursor = id
 		else
 			seq = self._segments[id]
 		end
+
 		if not seq then return true end -- No segment, we must have reached the end
+
 		local goal = seq.pos
-		if goal:DistToSqr( ent_pos ) < toleranceSqrt then
+		if goal:DistToSqr( entPos ) < toleranceSqrt then
 			if id >= #self._segments then return true end -- Reached the end
 			id = id + 1
 			seq = self._segments[id]
 			goal = seq.pos
 			ent._cursor = ent._cursor + 1
 		end
+
 		ent.loco:Approach( goal, 1 )
 		ent.loco:FaceTowards( goal )
-		ent:SetAngles( Angle(0,(ent:GetPos() - goal):Angle().y, 0))
+		ent:SetAngles( Angle( 0, ( ent:GetPos() - goal ):Angle().y, 0 ) )
 	end
 
 end
@@ -311,6 +340,7 @@ do
 		net.WriteUInt( n, 16 )
 		net.WriteFloat( path._age )
 		net.WriteVector( path._start )
+
 		for i = 1, n do
 			local seg = path._segments[i]
 			net.WriteVector( seg.pos - seg.length * seg.forward )
@@ -319,14 +349,17 @@ do
 			net.WriteUInt( seg.move_type, 8 )
 		end
 	end
+
 	function NikNaks.net.ReadPath()
-		local n = net.ReadUInt( 16)
+		local n = net.ReadUInt( 16 )
 		local age = net.ReadFloat()
 		local path = meta.CreatePathFollower( net.ReadVector() )
 		path._age = age
-		for i = 1, n do
+
+		for _ = 1, n do
 			path:AddSegment( net.ReadVector(), net.ReadVector(), net.ReadFloat(), net.ReadUInt( 8 ) )
 		end
+
 		return path
 	end
 end

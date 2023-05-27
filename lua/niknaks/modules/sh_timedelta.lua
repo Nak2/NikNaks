@@ -2,51 +2,81 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 -- License: https://github.com/Nak2/NikNaks/blob/main/LICENSE
 
--- TimeDelata
-NikNaks.TimeDelta = {}
-NikNaks.TimeDelta.Milisecond = 0.001
-NikNaks.TimeDelta.Second = 1
-NikNaks.TimeDelta.Minute = 60
-NikNaks.TimeDelta.Hour = 3600
-NikNaks.TimeDelta.Day = 86400
-NikNaks.TimeDelta.Week = 604800
-NikNaks.TimeDelta.Year = 31536000
-NikNaks.TimeDelta.Decade = 315359654
-NikNaks.TimeDelta.Century = 3153596543
-
-local meta, tab = {}, {}
+--- @class TimeDelta
+--- @operator add:TimeDelta|DateTime
+--- @operator sub:TimeDelta|DateTime
+--- @operator mul:TimeDelta
+--- @operator div:TimeDelta
+--- @operator pow:TimeDelta
+--- @operator mod:TimeDelta
+local meta = {}
 meta.__index = meta
 meta.MetaName = "TimeDelta"
 NikNaks.__metatables["TimeDelta"] = meta
 
+--- @class TimeDeltaModule
+--- @operator call:TimeDelta 
+local TimeDelta = {}
+TimeDelta.Milisecond = 0.001
+TimeDelta.Second = 1
+TimeDelta.Minute = 60
+TimeDelta.Hour = 3600
+TimeDelta.Day = 86400
+TimeDelta.Week = 604800
+TimeDelta.Year = 31536000
+TimeDelta.Decade = 315359654
+TimeDelta.Century = 3153596543
+TimeDelta._steps = { "Year", "Day", "Hour", "Minute", "Second", "Milisecond" }
+
+setmetatable( TimeDelta, {
+	__index = TimeDelta,
+	__call = function( _, time )
+		return setmetatable( { time = time }, meta )
+	end
+} )
+
+NikNaks.TimeDelta = TimeDelta
+
+
 do
-	local floor, q, abs = math.floor, {"year", "day", "hour","minute", "second", "milisecond"}, math.abs
+	local abs = math.abs
+	local floor = math.floor
+	local steps = TimeDelta._steps
+
 	--- Returns the time as a table
-	---@return table
+	--- @return table
 	function meta:ToTable()
 		if self._tab then return self._tab end
-		local t, num, f = {}, abs(self.time), self.time < 0 and -1 or 1
-		local ily = NikNaks.DateTime.IsLeapYear
-		for i = 1, #q do
-			local s = q[i]
-			local v = tab[s]
+
+		local t = {}
+		local num = abs( self.time )
+		local f = self.time < 0 and -1 or 1
+		local isLeapYear = NikNaks.DateTime.IsLeapYear
+
+		local function processStep( i )
+			local step = steps[i]
+			local value = steps[step]
+
 			-- Leap year
-			if num < v then continue end
+			if num < value then return end
+
 			if i == 1 then -- Since years aren't whole numbers, we need to round the tiniest amount, or floor is going to count down.
 				local n = 0
-				local y = self.year
-				local v = ily(y) and 31622400 or 31536000
+				local y = TimeDelta.Year
+				local v = isLeapYear( y ) and 31622400 or 31536000
+
 				while num >= v do
 					local q = 1 * f
 					if num >= v then
 						n = n + 1
 						num = num - v
 						y = y + q
-						v = ily(y) and 31622400 or 31536000
+						v = isLeapYear( y ) and 31622400 or 31536000
 					else
 						break
 					end
 				end
+
 				t[s] = n * f
 			else
 				local n = floor( num / v )
@@ -54,66 +84,115 @@ do
 				num = num - v * n
 			end
 		end
+
+		for i = 1, #steps do
+			processStep( i )
+		end
+
 		self._tab = t
 		return t
 	end
 end
 
--- Create tab[<X>], Get<X> and Set<X>
-for key, var in pairs( NikNaks.TimeDelta ) do
-	local low = key:lower()
-	local keys = key.."s"
-	if key == "Century" then
-		keys = "Centuries"
-	end
-	meta["Get" .. keys] = function(self)
-		return self.time / var
+-- Getters
+do
+	--- Generic getter function to get the time amount of the given time type
+	--- @param key string The name of the time type to get
+	--- @return number
+	function meta:_getter( key )
+		return self.time / TimeDelta[key]
 	end
 
-	meta["Add" .. keys] = function(self, num)
-		self.time = self.time + num * var
-		self._tab = nil
-		return self
-	end
-
-	meta["Remove" .. keys] = function(self, num)
-		self.time = self.time - num * var
-		self._tab = nil
-		return self
-	end
-	meta["Sub" .. keys] = meta["Remove" .. keys]
-
-	tab[low] = var
+	function meta:GetMiliseconds() return self:_getter( "Milisecond" ) end
+	function meta:GetSeconds() return self:_getter( "Second" ) end
+	function meta:GetMinutes() return self:_getter( "Minute" ) end
+	function meta:GetHours() return self:_getter( "Hour" ) end
+	function meta:GetDays() return self:_getter( "Day" ) end
+	function meta:GetWeeks() return self:_getter( "Week" ) end
+	function meta:GetMonths() return self:_getter( "Month" ) end
+	function meta:GetYears() return self:_getter( "Year" ) end
+	function meta:GetDecades() return self:_getter( "Decade" ) end
+	function meta:GetCenturies() return self:_getter( "Century" ) end
 end
 
-NikNaks.TimeDelta.__index = NikNaks.TimeDelta
-setmetatable(NikNaks.TimeDelta, {__call = function(_, num, year)
-	local t = {}
-	t.time = num
-	t.year = year or NikNaks.DateTime.year
-	setmetatable(t, meta)
-	return t
-end})
+-- Adders
+do
+	--- Generic adder function to add given time amount to the TimeDelta
+	--- @param key string The name of the time type to add
+	--- @param num number The amount of time to add
+	--- @return self TimeDelta
+	function meta:_adder( key, num )
+		self.time = self.time + ( num * TimeDelta[key] )
+		self._tab = nil
+		return self
+	end
+
+	--- @param n number
+	function meta:AddMiliseconds( n ) return self:_adder( "Milisecond", n ) end --- @param n number
+	function meta:AddSeconds( n ) return self:_adder( "Second", n ) end         --- @param n number
+	function meta:AddMinutes( n ) return self:_adder( "Minute", n ) end         --- @param n number
+	function meta:AddHours( n ) return self:_adder( "Hour", n ) end             --- @param n number
+	function meta:AddDays( n ) return self:_adder( "Day", n ) end               --- @param n number
+	function meta:AddWeeks( n ) return self:_adder( "Week", n ) end             --- @param n number
+	function meta:AddMonths( n ) return self:_adder( "Month", n ) end           --- @param n number
+	function meta:AddYears( n ) return self:_adder( "Year", n ) end             --- @param n number
+	function meta:AddDecades( n ) return self:_adder( "Decade", n ) end         --- @param n number
+	function meta:AddCenturies( n ) return self:_adder( "Century", n ) end      --- @param n number
+end
+
+-- Subtractors
+do
+	--- Generic subtractor function to subtract given time amount from the TimeDelta
+	--- @param key string The name of the time type to subtract
+	--- @param num number The amount of time to subtract
+	--- @return self TimeDelta
+	function meta:_subtractor( key, num )
+		self.time = self.time - ( num * TimeDelta[key] )
+		self._tab = nil
+		return self
+	end
+
+	function meta:SubMiliseconds( n ) return self:_subtractor( "Milisecond", n ) end --- @param n number
+	function meta:SubSeconds( n ) return self:_subtractor( "Second", n ) end         --- @param n number
+	function meta:SubMinutes( n ) return self:_subtractor( "Minute", n ) end         --- @param n number
+	function meta:SubHours( n ) return self:_subtractor( "Hour", n ) end             --- @param n number
+	function meta:SubDays( n ) return self:_subtractor( "Day", n ) end               --- @param n number
+	function meta:SubWeeks( n ) return self:_subtractor( "Week", n ) end             --- @param n number
+	function meta:SubMonths( n ) return self:_subtractor( "Month", n ) end           --- @param n number
+	function meta:SubYears( n ) return self:_subtractor( "Year", n ) end             --- @param n number
+	function meta:SubDecades( n ) return self:_subtractor( "Decade", n ) end         --- @param n number
+	function meta:SubCenturies( n ) return self:_subtractor( "Century", n ) end      --- @param n number
+end
 
 -- ToString
 do
-	local q, abs = {"year", "day", "hour","minute", "second", "milisecond"}, math.abs
+	local abs = math.abs
+	local steps = TimeDelta._steps
+
 	function meta:__tostring()
-		local tab = self:ToTable()
-		local kv, str = #table.GetKeys(tab)
+		local str
 		local si = 0
-		for i = 1, #q do
-			local time_type = q[i]
-			if not tab[time_type] then continue end
-			si = si + 1
-			local number, middle = abs(tab[time_type]), (si == kv and " and " or ", ")
-			time_type = number == 1 and time_type or time_type.."s"
-			if not str then
-				str = number .. " " .. time_type
-			else
-				str = str .. middle .. number .. " " .. time_type
+		local tab = self:ToTable()
+		local kv = #table.GetKeys( tab )
+
+		for i = 1, #steps do
+			local step = steps[i]
+
+			if tab[step] then
+				si = si + 1
+
+				local number = abs( tab[step] )
+				local middle = ( si == kv and " and " or ", " )
+				step = number == 1 and step or step .. "s"
+
+				if not str then
+					str = number .. " " .. step
+				else
+					str = str .. middle .. number .. " " .. step
+				end
 			end
 		end
+
 		return str or "nil"
 	end
 end
@@ -128,146 +207,74 @@ end
 
 -- Operations
 do
-	function meta.__add(a, b)
-		if not getmetatable(a) then -- A is most likely a number
-			local t = {}
-			t.time = b.time + a
-			setmetatable(t, meta)
-			return t
-		elseif not getmetatable(b) then -- B is most likely a number
-			local t = {}
-			t.time = a.time + b
-			setmetatable(t, meta)
-			return t
-		else -- Both is a form of an object
-			if a.unix and b.time then
-				return NikNaks.DateTime(a.unix + b.time)
-			elseif b.unix and a.time then
-				return NikNaks.DateTime(b.unix + a.time)
-			else
-				local t = {}
-				t.time = (a.time or a) + (b.time or b)
-				setmetatable(t, meta)
-				return t
-			end
+	--- @param b TimeDelta|number
+	--- @return TimeDelta|DateTime
+	function meta:__add( b )
+		if isnumber( b ) then
+			return TimeDelta( self.time + b )
+		end
+
+		if self.unix and b.time then
+			return NikNaks.DateTime( self.unix + b.time )
+		elseif b.unix and self.time then
+			return NikNaks.DateTime( b.unix + self.time )
 		end
 	end
 
-	function meta.__sub(a, b)
-		if not getmetatable(a) then -- A is most likely a number
-			local t = {}
-			t.time = b.time - a
-			setmetatable(t, meta)
-			return t
-		elseif not getmetatable(b) then -- B is most likely a number
-			local t = {}
-			t.time = a.time - b
-			setmetatable(t, meta)
-			return t
-		else -- Both is a form of an object
-			if a.unix and b.time then
-				return NikNaks.DateTime(a.unix - b.time)
-			elseif b.unix and a.time then
-				return NikNaks.DateTime(b.unix - a.time)
-			else
-				local t = {}
-				t.time = (a.time or a) - (b.time or b)
-				setmetatable(t, meta)
-				return t
-			end
+	--- @param b TimeDelta|number
+	--- @return TimeDelta|DateTime
+	function meta:__sub( b )
+		if isnumber( b ) then
+			return TimeDelta( self.time - b )
+		end
+
+		if self.unix and b.time then
+			return NikNaks.DateTime( self.unix - b.time )
+		elseif b.unix and self.time then
+			return NikNaks.DateTime( b.unix - self.time )
 		end
 	end
 
-	function meta.__mul(a, b)
-		if not getmetatable(a) then -- A is most likely a number
-			local t = {}
-			t.time = b.time * a
-			setmetatable(t, meta)
-			return t
-		elseif not getmetatable(b) then -- B is most likely a number
-			local t = {}
-			t.time = a.time * b
-			setmetatable(t, meta)
-			return t
-		else -- Both is a form of an object
-			local t = {}
-			t.time = (a.time or a) * (b.time or b)
-			setmetatable(t, meta)
-			return t
-		end
+	--- @param b TimeDelta|number
+	--- @return TimeDelta
+	function meta:__mul( b )
+		b = isnumber( b ) and b or b.time
+		return TimeDelta( self.time * b )
 	end
 
-	function meta.__div(a, b)
-		if not getmetatable(a) then -- A is most likely a number
-			local t = {}
-			t.time = b.time / a
-			setmetatable(t, meta)
-			return t
-		elseif not getmetatable(b) then -- B is most likely a number
-			local t = {}
-			t.time = a.time / b
-			setmetatable(t, meta)
-			return t
-		else -- Both is a form of an object
-			local t = {}
-			t.time = (a.time or a) / (b.time or b)
-			setmetatable(t, meta)
-			return t
-		end
+	--- @param b TimeDelta|number
+	--- @return TimeDelta
+	function meta:__div( b )
+		b = isnumber( b ) and b or b.time
+		return TimeDelta( self.time / b )
 	end
 
-	function meta.__pow(a, b)
-		if not getmetatable(a) then -- A is most likely a number
-			local t = {}
-			t.time = b.time ^ a
-			setmetatable(t, meta)
-			return t
-		elseif not getmetatable(b) then -- B is most likely a number
-			local t = {}
-			t.time = a.time ^ b
-			setmetatable(t, meta)
-			return t
-		else -- Both is a form of an object
-			local t = {}
-			t.time = (a.time or a) ^ (b.time or b)
-			setmetatable(t, meta)
-			return t
-		end
+	--- @param b TimeDelta|number
+	--- @return TimeDelta
+	function meta:__pow( b )
+		b = isnumber( b ) and b or b.time
+		return TimeDelta( self.time ^ b )
 	end
 
-	function meta.__mod(a, b)
-		if not getmetatable(a) then -- A is most likely a number
-			local t = {}
-			t.time = b.time % a
-			setmetatable(t, meta)
-			return t
-		elseif not getmetatable(b) then -- B is most likely a number
-			local t = {}
-			t.time = a.time % b
-			setmetatable(t, meta)
-			return t
-		else -- Both is a form of an object
-			local t = {}
-			t.time = (a.time or a) % (b.time or b)
-			setmetatable(t, meta)
-			return t
-		end
+	--- @param b TimeDelta|number
+	--- @return TimeDelta
+	function meta:__mod( b )
+		b = isnumber( b ) and b or b.time
+		return TimeDelta( self.time % b )
 	end
 
-	function meta.__concat(a, b)
-		return tostring(a) .. tostring(b)
+	--- @param b TimeDelta
+	function meta:__eq( b )
+		return self.time == b.time
 	end
 
-	-- Sadly Lua doesn't support mixed types for compare-operations
-	function meta.__eq(a, b)
-		return a.time == b.time
-	end
-	
-	function meta.__lt(a, b)
+	--- @param b TimeDelta
+	function meta:__lt( b )
 		return a.time < b.time
 	end
-	
-	function meta.__le(a, b)
+
+	--- @param b TimeDelta
+	function meta.__le( b )
 		return a.time <= b.time
 	end
 end
