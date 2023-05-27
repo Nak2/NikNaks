@@ -719,11 +719,11 @@ do
 
 		for i = 1, q, 4 do
 			local a, b, c, d = s_byte( str, i, i + 3 )
-			WriteUInt( self, bor( lshift( a, 24 ), lshift( b, 16 ), lshift( c, 8 ), d ), 32 )
+			self:WriteUInt( bor( lshift( a, 24 ), lshift( b, 16 ), lshift( c, 8 ), d ), 32 )
 		end
 
 		for i = q + 1, len do
-			WriteUInt( self, s_byte( str, i ), 8 )
+			self:WriteUInt( s_byte( str, i ), 8 )
 		end
 
 		return self
