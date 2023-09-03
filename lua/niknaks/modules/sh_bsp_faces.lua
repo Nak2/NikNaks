@@ -314,6 +314,7 @@ function meta_face:GetDisplacementVertexs( faceVertexData )
 			vertex = dispVertices[v]
 			if not vertex then
 			    print( "Unexpected end of vertex", "Start: " .. vertStart, "End: " .. vertEnd, "Current: " .. v )
+			    break
 			end
 
 			t1 = index % ( power2 + 1 ) / power2
