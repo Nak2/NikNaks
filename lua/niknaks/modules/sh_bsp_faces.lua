@@ -301,6 +301,10 @@ function meta_face:GetDisplacementVertexs( faceVertexData )
 
 	local vertices = {}
 	do
+	    local LerpVector = LerpVector
+	    local math_floor = math.floor
+	    local table_insert = table.insert
+
 		local dispVertices = self.__map:GetDispVerts()
 		local vertex, t1, t2, baryVert, dispVert, trueVert, textureUV, lightmapUV
 		local normal = baseVerts[1].normal
@@ -308,9 +312,12 @@ function meta_face:GetDisplacementVertexs( faceVertexData )
 		local index = 0
 		for v = vertStart, vertEnd do
 			vertex = dispVertices[v]
+			if not vertex then
+			    print( "Unexpected end of vertex", "Start: " .. vertStart, "End: " .. vertEnd, "Current: " .. v )
+			end
 
 			t1 = index % ( power2 + 1 ) / power2
-			t2 = math.floor( index / ( power2 + 1 ) ) / power2
+			t2 = math_floor( index / ( power2 + 1 ) ) / power2
 
 			baryVert = LerpVector( t2, A + ( AD * t1 ), B + ( BC * t1 ) )
 			dispVert = vertex.vec * vertex.dist
@@ -318,7 +325,7 @@ function meta_face:GetDisplacementVertexs( faceVertexData )
 			textureUV = LerpVector( t2, uvA + ( uvAD * t1 ), uvB + ( uvBC * t1 ) )
 			lightmapUV = LerpVector( t2, uv2A + ( uv2AD * t1 ), uv2B + ( uv2BC * t1 ) )
 
-			table.insert( vertices, {
+			table_insert( vertices, {
 				pos = trueVert,
 				normal = normal,
 				u = textureUV.x,
