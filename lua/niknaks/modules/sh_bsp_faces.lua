@@ -12,7 +12,7 @@ meta_face.__tostring = function(self) return format( obj_tostring, "Faces", self
 meta_face.MetaName = "BSP Faces"
 NikNaks.__metatables["BSP Faces"] = meta_face
 
-local MAX_MAP_FACES = 65536 
+local MAX_MAP_FACES = 65536
 
 ---Returns all faces. ( Warning, uses a lot of memory )
 ---@return table
