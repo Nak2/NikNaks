@@ -55,7 +55,7 @@ do
 
 		local function processStep( i )
 			local step = steps[i]
-			local value = steps[step]
+			local value = TimeDelta[step]
 
 			-- Leap year
 			if num < value then return end
@@ -77,11 +77,11 @@ do
 					end
 				end
 
-				t[s] = n * f
+				t[step] = n * f
 			else
-				local n = floor( num / v )
-				t[s] = n * f
-				num = num - v * n
+				local n = floor( num / value )
+				t[step] = n * f
+				num = num - value * n
 			end
 		end
 
