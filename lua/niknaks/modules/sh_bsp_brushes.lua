@@ -8,7 +8,7 @@ local format = string.format
 --- @class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
---- @class BrushObject
+--- @class BSPBrushObject
 local meta_brush = {}
 meta_brush.__index = meta_brush
 meta_brush.__tostring = function( self ) return format( obj_tostring, "BSP Brush", self.__id ) end
@@ -20,7 +20,7 @@ local MAX_MAP_BRUSHES = 8192
 local MAX_MAP_BRUSHSIDES = 65536
 
 --- Returns an array of the brush-data with brush-sides.
---- @return BrushObject[]
+--- @return BSPBrushObject[]
 function meta:GetBrushes()
 	if self._brushes then return self._brushes end
 
@@ -28,7 +28,7 @@ function meta:GetBrushes()
 
 	local data = self:GetLump( 18 )
 	for id = 1, math.min( data:Size() / 96, MAX_MAP_BRUSHES ) do
-		--- @class BrushObject
+		--- @class BSPBrushObject
 		local t = {}
 		local first = data:ReadLong()
 		local num = data:ReadLong()
@@ -77,19 +77,20 @@ function meta:GetBrushSides()
 	return self._brushside
 end
 
-
+---Returns the index of the brush.
+---@return integer
 function meta_brush:GetIndex()
 	return self.__id or -1
 end
 
 --- Returns the content flag the brush has.
---- @return number
+--- @return CONTENTS
 function meta_brush:GetContents()
 	return self.contents
 end
 
 --- Returns true if the brush has said content
---- @param CONTENTS number
+--- @param CONTENTS CONTENTS
 --- @return boolean
 function meta_brush:HasContents( CONTENTS )
 	if CONTENTS == 0 then return self.contents == CONTENTS end

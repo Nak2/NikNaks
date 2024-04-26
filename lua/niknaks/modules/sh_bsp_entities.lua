@@ -5,9 +5,9 @@
 -- Entities are stored in a KeyValues table.
 -- However we can't use the KeyValuesToTablePreserveOrder function, since some BSPs have errors within Entity Lump.
 
---- @class EntityObject
---- @field origin? Vector
---- @field angles? Angle
+--- @class BSPEntity # An object that represents an entity within the BSP.
+--- @field origin Vector
+--- @field angles Angle
 --- @field rendercolor? Color
 --- @field ontrigger? table
 --- @field classname? string
@@ -48,13 +48,14 @@ local function findNextExitToken( data, pos )
 end
 
 --- Convert a few things to make it easier to read entities.
---- @param t EntityObject
+--- @param t BSPEntity
 local function postEntParse( t )
-	t.origin = util.StringToType( t.origin or "0 0 0", "Vector" )
-	t.angles = util.StringToType( t.angles or "0 0 0", "Angle" )
+
+	t.origin = util.StringToType( t.origin or "0 0 0" --[[@as string]], "Vector" )
+	t.angles = util.StringToType( t.angles or "0 0 0" --[[@as string]], "Angle" )
 
 	if t.rendercolor then
-		local c = util.StringToType( t.rendercolor or "255 255 255", "Vector" )
+		local c = util.StringToType( t.rendercolor or "255 255 255" --[[@as string]], "Vector" )
 		t.rendercolor = Color( c.x, c.y, c.z, 255 )
 	end
 
@@ -76,9 +77,9 @@ local _tableTypes = {
 	["OnAllTrue"] = 	true,
 }
 
---- @return EntityObject
+--- @return BSPEntity
 local function ParseEntity( str )
-	--- @class EntityObject
+	--- @class BSPEntity
 	local t = {}
 
 	for key, value in string.gmatch( str, [["(.-)".-"(.-)"]] ) do
@@ -101,9 +102,9 @@ local function ParseEntity( str )
 	return t
 end
 
---- Tries to parse the entity-data.
+--- Parses the entity data from the BSP data.
 --- @param data string
---- @return EntityObject[]
+--- @return BSPEntity[]
 local function parseEntityData( data )
 	-- Cut the data into bits
 	local charPos = 1
@@ -138,7 +139,7 @@ end
 local meta = NikNaks.__metatables["BSP"]
 
 --- Returns a list of all raw-entity data within the BSP.
---- @return EntityObject[]
+--- @return BSPEntity[]
 function meta:GetEntities()
 	if self._entities then return self._entities end
 
@@ -151,21 +152,22 @@ function meta:GetEntities()
 	return self._entities
 end
 
---- Returns the raw entity data said entity.
+--- Returns the raw entity data for the specified index.
 --- @param index number
---- @return EntityObject
+--- @return BSPEntity?
 function meta:GetEntity( index )
 	return self:GetEntities()[index]
 end
 
---- Returns a list of entity data, matching the class.
+--- Returns a list of BSPEntities, matching the class.
 --- @param class string
---- @return EntityObject[]
+--- @return BSPEntity[]
 function meta:FindByClass( class )
 	local t = {}
 
 	for _, v in pairs( self:GetEntities() ) do
 		local vClass = v.classname
+		if vClass == nil then continue end
 		if class and string.match( vClass, class ) then
 			t[#t + 1] = v
 		end
@@ -174,9 +176,9 @@ function meta:FindByClass( class )
 	return t
 end
 
---- Returns a list of entity data, matching the model.
+--- Returns a list of BSPEntities, matching the model.
 --- @param model string
---- @return EntityObject[]
+--- @return BSPEntity[]
 function meta:FindByModel( model )
 	local t = {}
 
@@ -189,9 +191,9 @@ function meta:FindByModel( model )
 	return t
 end
 
---- Returns a list of entity data, matching the name ( targetname ).
+--- Returns a list of entity data, matching the targetname.
 --- @param name string
---- @return table
+--- @return BSPEntity[]
 function meta:FindByName( name )
 	local t = {}
 
@@ -207,10 +209,9 @@ end
 --- Returns a list of entity data, within the specified box. Note: This (I think) is slower than ents.FindInBox
 --- @param boxMins Vector
 --- @param boxMaxs Vector
---- @return table
+--- @return BSPEntity[]
 function meta:FindInBox( boxMins, boxMaxs )
 	local t = {}
-
 	for _, v in pairs( self:GetEntities() ) do
 		local origin = v.origin
 		if origin and v.origin:WithinAABox( boxMins, boxMaxs ) then
@@ -224,6 +225,7 @@ end
 --- Returns a list of entity data, within the specified sphere. Note: This (I think) is slower than ents.FindInSphere
 --- @param origin Vector
 --- @param radius number
+--- @return BSPEntity[]
 function meta:FindInSphere( origin, radius )
 	radius = radius ^ 2
 

@@ -3,7 +3,7 @@
 -- License: https://github.com/Nak2/NikNaks/blob/main/LICENSE
 
 NikNaks.DateTime = {}
-local localvars, os_time, os_date, rawget, tonumber, getmetatable = {}, os.time, os.date, rawget, tonumber, getmetatable
+local localvars, os_time, os_date, rawget, tonumber, getmetatable, abs = {}, os.time, os.date, rawget, tonumber, getmetatable, math.abs
 
 -- TimeZone / Date variables
 do
@@ -24,6 +24,9 @@ local function is_leap_year( year )
 	return year % 4 == 0 and ( year % 100 ~= 0 or year % 400 == 0 )
 end
 
+--- Returns true if the year is a leap year.
+---@param year number
+---@return boolean
 function NikNaks.DateTime.IsLeapYear( year )
 	return is_leap_year( year or NikNaks.DateTime.year )
 end
@@ -31,16 +34,28 @@ end
 do
 	local months = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
 
+	---Returns the number of days in the month.
+	---@param month number A number between 1 and 12.
+	---@param year number The year to check for leap year.
+	---@return number
 	function NikNaks.DateTime.DaysInMonth( month, year )
+		-- Ensure month is within range
+		month = math.Clamp( month, 1, 12 )
 		if month == 2 and is_leap_year( year or NikNaks.DateTime.year ) then
 			return 29
 		end
-
 		return months[month]
 	end
 
+	---A calender for the year.
+	---@param year number
+	---@return Calender
 	function NikNaks.DateTime.Calender( year )
 		year = year or NikNaks.DateTime.year
+
+		--- @class Calender
+		---@field year number The year
+		---@field month table<number, number> The days in each month
 		local c = {}
 		c.year = year
 		c.month = {}
@@ -59,7 +74,7 @@ end
 
 -- Date variables
 local function updatedate()
-	local date = string.Explode( ":", os_date( "%H:%M:%S:%d:%m:%Y" ) )
+	local date = string.Explode( ":", os_date( "%H:%M:%S:%d:%m:%Y" ) --[[ @as string ]])
 	NikNaks.DateTime.day = tonumber( date[4] )
 	NikNaks.DateTime.month = tonumber( date[5] )
 	NikNaks.DateTime.year = tonumber( date[6] )
@@ -127,7 +142,12 @@ do
 			end
 		end
 
-		function findDate( str )
+		---Tries to parse a given string for a date.
+		---@param str string
+		---@return number? Year The year
+		---@return number? Month The month
+		---@return number? Day The day
+		findDate = function( str )
 			-- The year number tent to mess with the rest, if found replace it if found.
 			local fy = true
 			local y = string.match( str, "(%d%d%d%d)" )
@@ -209,15 +229,21 @@ do
 			min = m or 0,
 			month = month or 1,
 			sec = tonumber( s ) or 0,
-			year = year
+			year = year --[[ @as number ]]
 		} ) + offsetH * 3600
 	end
 end
 
---- @class DateTime
+--- @class DateTime A fixed point in time
+--- @field unix number The unix time
 local datetime_obj = {}
 datetime_obj.__index = datetime_obj
 NikNaks.__metatables["DateTime"] = datetime_obj
+
+---Returns a DateTime object.
+---@param var string|number|DateTime|TimeDelta The time to convert. If number, then it is assumed to be a unix-time.
+---@param t_zone any
+---@return nil
 function NikNaks.DateTime.Get( var, t_zone )
 	if not var then
 		var = os_time()
@@ -233,6 +259,8 @@ function NikNaks.DateTime.Get( var, t_zone )
 			else -- Unknown
 				return nil
 			end
+		elseif _type ~= "number" then
+			return nil
 		end
 	end
 
@@ -247,12 +275,17 @@ function NikNaks.DateTime.Get( var, t_zone )
 	return setmetatable( t, datetime_obj )
 end
 
+--- Returns the unix-time.
+---@return number
 function datetime_obj:GetUnix()
 	return self.unix
 end
 
+---Calculates the time until the given time.
+---@param var string|number|DateTime|TimeDelta
+---@return unknown
 function datetime_obj:TimeUntil( var )
-	local unix
+	local unix = var
 	local _type = type( var )
 
 	if _type == "string" then
@@ -286,7 +319,7 @@ end
 --- @param format string
 --- @return string
 function datetime_obj:ToDate( format )
-	return os_date( format, self.unix )
+	return os_date( format, self.unix ) --[[ @as string ]]
 end
 datetime_obj.__tostring = function( self )
 	return os_date( nil, self.unix )

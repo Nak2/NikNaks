@@ -7,6 +7,8 @@ local format = string.format
 
 --- @class BSPObject
 local meta = NikNaks.__metatables["BSP"]
+
+--- @class BSPLeafObject
 local meta_leaf = NikNaks.__metatables["BSP Leaf"]
 
 --[[The data is stored as an array of bit-vectors; for each cluster, a list of which other clusters are visible 
@@ -44,7 +46,7 @@ end
 --- PVS ( Potentially Visible Set )
 do
 	--- @class PVSObject
-	--- @field __map BSPObject
+	---@field __map BSPObject
 	local meta_pvs = {}
 	meta_pvs.__index = meta_pvs
 	meta_pvs.__tostring = "BSP PVS"
@@ -53,7 +55,7 @@ do
 
 	local DVIS_PVS = 1
 
-	--- Creates a new empty PVS-object.
+	--- Creates a new empty PVS-object. Potentially Visible Set
 	--- @return PVSObject
 	function meta:CreatePVS()
 		local t = {}
@@ -63,8 +65,8 @@ do
 	end
 
 	--- Uses the given ( or creates a new PVS-object ) and adds the position to it.
-	--- @param position Vector
-	--- @param PVS PVSObject?
+	--- @param position Vector The position to add to the PVS
+	--- @param PVS PVSObject? The PVS to add the position to. If nil, a new PVS will be created.
 	--- @return PVSObject
 	function meta:PVSForOrigin( position, PVS )
 		PVS = PVS or self:CreatePVS()
@@ -82,8 +84,8 @@ do
 	end
 
 	--- Returns true if the two positions are in same PVS.
-	--- @param position Vector
-	--- @param position2 Vector
+	--- @param position Vector The first position
+	--- @param position2 Vector The second position
 	--- @return boolean
 	function meta:PVSCheck( position, position2 )
 		local PVS = self:PVSForOrigin( position )
@@ -93,41 +95,40 @@ do
 
 
 	--- Adds the position to PVS
-	--- @param position Vector
+	--- @param position Vector The position to add to the PVS
 	--- @return self
 	function meta_pvs:AddPVS( position )
 		self.__map:PVSForOrigin( position, self )
 		return self
 	end
 
-	--- Removes the position from PVS
-	--- @param position Vector
+	--- Removes the position from PVS. Note: This is a bit slow.
+	--- @param position Vector The position to remove from the PVS
 	--- @return self
 	function meta_pvs:RemovePVS( position )
 		for id in pairs( self.__map:PVSForOrigin( position ) ) do
 			if id ~= "__map" then self[id] = nil end
 		end
-
 		return self
 	end
 
 	--- Removes the leaf from PVS
-	--- @param leaf LeafObject
+	--- @param leaf BSPLeafObject The leaf to remove from the PVS
 	--- @return self PVSObject
 	function meta_pvs:RemoveLeaf( leaf )
 		self[leaf.cluster] = nil
 		return self
 	end
 
-	--- Returns true if the position is visible in the PVS
-	--- @param position Vector
+	--- Returns true if the PVS can see the position
+	--- @param position Vector The position to check
 	--- @return boolean
 	function meta_pvs:TestPosition( position )
 		local cluster = self.__map:ClusterFromPoint( position )
 		return self[cluster] or false
 	end
 
-	--- Create PVS from Leaf
+	--- Creates a PVS from the leaf.
 	--- @return PVSObject
 	function meta_leaf:CreatePVS()
 		local PVS = {}
@@ -144,6 +145,7 @@ do
 	end
 
 	--- Returns a list of leafs within this PVS. Note: This is a bit slow.
+	--- @return BSPLeafObject[]
 	function meta_pvs:GetLeafs()
 		local t = {}
 		local n = 1
@@ -163,7 +165,7 @@ do
 	end
 
 	--- Returns true if the PVS has the given leaf
-	--- @param leaf LeafObject
+	--- @param leaf BSPLeafObject The leaf to check
 	--- @return boolean
 	function meta_pvs:HasLeaf( leaf )
 		if leaf.cluster < 0 then return false end
@@ -174,6 +176,7 @@ end
 -- PAS
 do
 	---@class PASObject
+	---@field __map BSPObject
 	local meta_pas = {}
 	meta_pas.__index = meta_pas
 	meta_pas.__tostring = "BSP PAS"
@@ -181,16 +184,16 @@ do
 	NikNaks.__metatables["BSP PAS"] = meta_pas
 	local DVIS_PAS = 2
 
-	--- Creates a new empty PAS-object.
+	--- Creates a new empty PAS-object. Positional Audio System
 	--- @return PASObject
 	function meta:CreatePAS()
 		return setmetatable( {}, meta_pas )
 	end
 
-	--- Uses the given ( or creates a new PAS-object ) and adds the position to it.
-	--- @param position Vector
-	--- @param PAS PASObject?
-	--- @return PASObject?
+	--- Creates a new PAS-object and adds the position to it.
+	--- @param position Vector # The position to add to the PAS
+	--- @param PAS PASObject? # The PAS to add the position to. If nil, a new PAS will be created.
+	--- @return PASObject? # The PAS-object with the position added to it. If the position is invalid, nil is returned.
 	function meta:PASForOrigin( position, PAS )
 		PAS = PAS or self:CreatePAS()
 		PAS.__map = self
@@ -206,28 +209,28 @@ do
 		return PAS
 	end
 
-	--- Returns true if the two positions are in same PAS
-	--- @param position Vector
-	--- @param position2 Vector
+	--- Returns true if the two positions are in same PAS.
+	--- @param position Vector # The first position
+	--- @param position2 Vector # The second position
 	--- @return boolean
 	function meta:PASCheck( position, position2 )
-		local PAS = self:PASForOrigin( position )
+		local PAS = self:PASForOrigin( position ) or {}
 		return PAS[self:ClusterFromPoint( position2 )] or false
 	end
 
 	--- Adds the position to PAS
-	--- @param position Vector
-	--- @return PASObject self
+	--- @param position Vector # The position to add to the PAS
+	--- @return self
 	function meta_pas:AddPAS( position )
 		self.__map:PASForOrigin( position, self )
 		return self
 	end
 
-	--- Removes the position from PAS
-	--- @param position Vector
-	--- @return PASObject self
+	--- Removes the position from PAS ( This is a bit slow )
+	--- @param position Vector # The position to remove from the PAS
+	--- @return self
 	function meta_pas:RemovePAS( position )
-		for id in pairs( self.__map:PASForOrigin( position ) ) do
+		for id in pairs( self.__map:PASForOrigin( position ) or {} ) do
 			if id ~= "__map" then self[id] = nil end
 		end
 
@@ -235,23 +238,23 @@ do
 	end
 
 	--- Removes the leaf from PVS
-	--- @param leaf LeafObject
-	--- @return PASObject self
+	--- @param leaf BSPLeafObject # The leaf to remove from the PAS
+	--- @return self
 	function meta_pas:RemoveLeaf( leaf )
 		self[leaf.cluster] = nil
 		return self
 	end
 
-	--- Returns true if the position is visible in the PAS
-	--- @param position Vector
+	--- Returns true if the PAS can see the position
+	--- @param position Vector # The position to check
 	--- @return boolean
 	function meta_pas:TestPosition( position )
 		local cluster = self.__map:ClusterFromPoint( position )
 		return self[cluster] or false
 	end
 
-	--- Create PAS from Leaf
-	--- @return PASObject
+	--- Creates a PAS from the leaf.
+	--- @return PASObject 
 	function meta_leaf:CreatePAS()
 		local PAS = setmetatable( {}, meta_pas )
 		if self.cluster < 0 then return PAS end -- Leaf invalid. Return empty PVS.
@@ -265,7 +268,7 @@ do
 	end
 
 	--- Returns true if the PAS has the given leaf
-	--- @param leaf LeafObject
+	--- @param leaf BSPLeafObject # The leaf to check
 	--- @return boolean
 	function meta_pas:HasLeaf( leaf )
 		if leaf.cluster < 0 then return false end
