@@ -1,76 +1,7 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
 local NikNaks = NikNaks
-local tostring, tonumber, tobool, Angle, Vector, string_ToColor = tostring, tonumber, tobool, Angle, Vector, string.ToColor
-
-
--- Lua based type fix 
--- TODO: Note sure if it should be added
-if false then
-	NikNaks.oldType = type
-	function NikNaks.isnumber( var )
-		local mt = getmetatable( var )
-		if not mt or mt.MetaName ~= "number" then return false end
-		return true
-	end
-	function NikNaks.isstring( var )
-		local mt = getmetatable( var )
-		if not mt or mt.MetaName ~= "string" then return false end
-		return true
-	end
-	function NikNaks.istable( var )
-		if not getmetatable( var ) then return true end
-		return false
-	end
-	function NikNaks.isfunction( var )
-		local mt = getmetatable( var )
-		if not mt or mt.MetaName ~= "function" then return false end
-		return true
-	end
-	function NikNaks.isvector( var )
-		local mt = getmetatable( var )
-		if not mt or mt.MetaName ~= "Vector" then return false end
-		return true
-	end
-	function NikNaks.isangle( var )
-		local mt = getmetatable( var )
-		if not mt or mt.MetaName ~= "Angle" then return false end
-		return true
-	end
-	function NikNaks.isbool( var )
-		return var == true or var == false or false
-	end
-	function NikNaks.isplayer( var )
-		local mt = getmetatable( var )
-		if not mt or mt.MetaName ~= "Player" then return false end
-		return true
-	end
-	function NikNaks.isentity( var )
-		local mt = getmetatable( var )
-		if not mt or (mt.MetaName ~= "Player" and mt.MetaName ~= "Entity" ) then return false end
-		return true
-	end
-	local function PatchMetaName( var, str )
-		-- If it has a metatable.
-		local mt =  getmetatable(var)
-		if mt then -- Make sure the metatable has the metaname
-			mt.MetaName = str
-		else
-			local tab = {["MetaName"] = str}
-			debug.setmetatable(var, tab)
-		end
-	end
-	PatchMetaName("", "string")
-	PatchMetaName(1, "number")
-	PatchMetaName(function() end, "function")
-	PatchMetaName(coroutine.create(function() end), "thread")
-
-	function NikNaks.type( var )
-		local mt = getmetatable( var )
-		if mt and mt.MetaName then return mt.MetaName end
-		return "table"
-	end
-end
+local tostring, tonumber, tobool, Angle, Vector, string_ToColor, max = tostring, tonumber, tobool, Angle, Vector, string.ToColor, math.max
 
 --- Same as AccessorFunc, but will make 'Set' functions return self. Allowing you to chain-call.
 --- @param tab table
@@ -116,7 +47,7 @@ do
 	--- Returns a HULL_ENUM fitting the hull given.
 	--- @param vecMin Vector
 	--- @param vecMax Vector
-	--- @return number HULL_ENUM
+	--- @return HULL HULL_ENUM
 	function NikNaks.util.FindHull( vecMin, vecMax )
 		local wide = max(-vecMin.x, -vecMin.y, vecMax.x, vecMax.y)
 		local high = vecMax.z - vecMin.z
@@ -138,11 +69,16 @@ do
 	end
 
 	--- Returns a HULL_ENUM matching the entitys hull.
-	--- @param entity Entity
-	--- @return number HULL_ENUM
+	--- @param entity Entity|Player|NPC
+	--- @return HULL HULL_ENUM
 	function NikNaks.util.FindEntityHull( entity )
-		if entity.GetHull then return entity:GetHull() end
-		local mi, ma = entity:OBBMins(), entity:OBBMaxs()
-		return FindHull( mi, ma )
+		-- Players and NPCs have a hull function
+		local mi,ma
+		if entity.GetHull then
+			mi, ma = entity:GetHull()
+		else
+			mi, ma = entity:OBBMins(), entity:OBBMaxs()
+		end
+		return NikNaks.util.FindHull( mi, ma )
 	end
 end

@@ -5,7 +5,7 @@ do
 	local file_Open, file_Exists = file.Open, file.Exists
 	local cache = {}
 
-	--- Returns the model's hull size.
+	--- Returns the model's hull size. If the model is not found, it will return two zero vectors.
 	--- @param name string
 	--- @return Vector MinVec
 	--- @return Vector MaxVec
@@ -15,11 +15,15 @@ do
 		end
 
 		if not file_Exists( name, "GAME" ) then
-			cache[name] = { NikNaks.vector_zero, NikNaks.vector_zero }
+			cache[name] = { Vector(), Vector() }
 			return Vector( cache[name][1] ), Vector( cache[name][2] )
 		end
 
 		local f = file_Open( name, "r", "GAME" )
+		if f == nil then
+			cache[name] = { Vector(), Vector() }
+			return Vector( cache[name][1] ), Vector( cache[name][2] )
+		end
 
 		f:Seek( 104 )
 
@@ -40,7 +44,7 @@ do
 	--- @param name any
 	--- @param lod? number
 	--- @param bodygroupMask? number
-	--- @return table
+	--- @return IMaterial[]
 	function NikNaks.ModelMaterials( name, lod, bodygroupMask )
 		local data = util_GetModelMeshes( name, lod or 0, bodygroupMask or 0 )
 		if not data then return {} end
@@ -50,10 +54,9 @@ do
 			local mat = data[i]["material"]
 
 			if mat then
-				table.insert( t, Material( mat ) )
+				table.insert( t, (Material( mat )) )
 			end
 		end
-
 		return t
 	end
 end

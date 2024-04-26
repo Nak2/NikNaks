@@ -2,17 +2,15 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 -- License: https://github.com/Nak2/NikNaks/blob/main/LICENSE
 
-local NikNaks = NikNaks
 local s_char, s_byte, tostring = string.char, string.byte, tostring
 local band, brshift, blshift, bor, bswap = bit.band, bit.rshift, bit.lshift, bit.bor, bit.bswap
 local log, ldexp, frexp, floor, ceil, max, setmetatable, source = math.log, math.ldexp, math.frexp, math.floor, math.ceil, math.max, setmetatable, jit.util.funcinfo( NikNaks.AutoInclude )["source"]
 
 --- @class BitBufferModule
---- @operator call(string|table): BitBuffer
 NikNaks.BitBuffer = {}
 
 --- @class BitBuffer
---- @field _data table
+--- @field _data number[]
 --- @field _tell number
 --- @field _len number
 --- @field _little_endian boolean
@@ -65,11 +63,12 @@ end
 --- @return BitBuffer
 local function create( data, little_endian )
 	--- @type BitBuffer
-	local t = {}
-	t._data = {}
-	t._tell = 0
-	t._len = 0
-	t._little_endian = false
+	local t = {
+		_data = {},
+		_tell = 0,
+		_len = 0,
+		_little_endian = false
+	}
 	setmetatable( t, meta )
 
 	if not data then return t end
@@ -295,7 +294,7 @@ do
 		-- Write the data
 		if ebitPos <= 32 then
 			self._data[ i_word ] = bor( data, lshift( int, 32 - ebitPos ) )
-			return
+			return self
 		end
 
 		local overflow = ebitPos - 32 -- [[ 1, 31 ]]
@@ -606,7 +605,7 @@ do
 		end
 
 		-- Not tested, but I guess it is faster to write 1 32bit number, than 3x others.
-		self:WriteULong( bor( sign, lshift( band( ex, 0xFF ), 23 ), man ), 32 )
+		self:WriteULong( bor( sign, lshift( band( ex, 0xFF ), 23 ), man ) )
 
 		return self
 	end
@@ -730,7 +729,7 @@ do
 	end
 
 	--- Reads raw string-data. Default bytes are the length of the bitbuffer.
-	--- @param bytes number
+	--- @param bytes number? If not given, will read until the end of the bitbuffer.
 	--- @return string
 	function meta:Read( bytes )
 		bytes = bytes or math.ceil( ( self:Size() - self:Tell() ) / 8 )
@@ -889,8 +888,7 @@ do
 
 		self:WriteByte( id )
 
-		if id == 0 then return
-		elseif id == 1 then self:WriteByte( obj and 1 or 0 )
+		if id == 1 then self:WriteByte( obj and 1 or 0 )
 		elseif id == 2 then self:WriteDouble( obj )
 		elseif id == 4 then self:WriteString( obj )
 		elseif id == 5 then	self:WriteTable( obj )
@@ -927,7 +925,7 @@ do
 		elseif id == 9 then 	return Entity( self:ReadULong( ) )
 		elseif id == 10 then 	return self:ReadVector( )
 		elseif id == 11 then 	return self:ReadAngle( )
-		elseif id == 21 then 	return Material( self:ReadString( ) )
+		elseif id == 21 then 	return (Material( self:ReadString( ) ))
 		elseif id == 255 then 	return self:ReadColor( )
 		end
 	end
@@ -973,14 +971,14 @@ do
 	--- @param gamePath? string
 	--- @param lzma? boolean
 	--- @param little_endian? boolean
-	--- @return BitBuffer
+	--- @return BitBuffer?
 	function NikNaks.BitBuffer.OpenFile( fileName, gamePath, lzma, little_endian )
 		if gamePath == true then gamePath = "GAME" end
 		if gamePath == nil then gamePath = "DATA" end
 		if gamePath == false then gamePath = "DATA" end
 
 		local f = file.Open( fileName, "rb", gamePath )
-		if not f or not NikNaks._source:find( "niknak" ) then return end
+		if not f then return nil end
 
 		-- Data
 		local str = f:Read( f:Size() ) -- Is faster
@@ -1037,6 +1035,10 @@ do
 end
 
 -- Net functions
+
+--- Reads a bitbuffer from the net and returns self.
+--- @param bits number
+--- @return self
 function meta:ReadFromNet( bits )
 	for i = 1, bits / 32 do
 		self:WriteUInt( net.ReadUInt( 32 ), 32 )
@@ -1051,10 +1053,16 @@ function meta:ReadFromNet( bits )
 	return self
 end
 
+--- Creates and reads a bitbuffer from the net and returns it.
+--- @param bits number
+--- @return BitBuffer
 function NikNaks.BitBuffer.FromNet( bits )
 	return NikNaks.BitBuffer():ReadFromNet( bits )
 end
 
+
+--- Writes the bitbuffer to the net and returns the size.
+--- @return number # The size of the bitbuffer
 function meta:WriteToNet()
 	local tell = self:Tell()
 	self:Seek( 0 )
@@ -1073,182 +1081,9 @@ function meta:WriteToNet()
 	return l
 end
 
+--- Writes the bitbuffer to the net and returns the size.
+--- @param buf BitBuffer
+--- @return number # The size of the bitbuffer
 function NikNaks.BitBuffer.ToNet( buf )
 	return buf:WriteToNet()
 end
-
-
--- Debug BitBuffer
-if true then return end
-local function d_print( str, b )
-	print( str, b and '✓' or '✗', b and "" or "<- !!!" )
-end
-
-local function o_print( self, str, obj, ex )
-	local write = "Write" .. str
-	local read = "Read" .. str
-	self:Seek(0)
-	self[write](self, obj)
-	self:Seek(0)
-	local r = self[read]( self )
-	local p = r == obj
-	str = ex and ex .. str or str
-	if p then
-		d_print( str .. string.rep(" ", 8 - #str), true)
-	else
-		print( str, '✗', r, "~=", obj )
-	end
-end
-
-function NikNaks.BitBuffer.DebugTest()
-	local b = create()
-	print( "\n============= BitBuffer Test =============" )
-	print( "State" )
-		b:WriteInt(0, 8)
-		b:WriteInt(0, 16)
-		b:WriteInt(0x1234, 32)
-		b:WriteInt(0, 8)
-		d_print("	Tell", b._len == 8 + 16 + 32 + 8 )
-		b:Seek( 8 + 16 )
-		d_print("	Seek", b:ReadInt(32) == 0x1234 )
-		b:ReadInt( 8 )
-		d_print("	End", b:EndOfData())
-		b:Seek( 0 )
-	print("Boolean:")
-		for i = 1, 64 do
-			b:WriteBoolean( i % 3 == 0 )
-		end
-		b:Seek( 0 )
-		local q = true
-		for i = 1, 64 do
-			q = q and (b:ReadBoolean( ) == (i % 3 == 0) )
-		end
-		d_print("	64x w/r", q)
-		b:Seek( 0 )
-	print("Data:")
-		b:Seek(0)
-		b:Write("abcdefghijk!pq")
-		b:Seek(0)
-		d_print("	w/r", b:Read(14) == "abcdefghijk!pq")
-		b:Seek(0)
-		local q = b:Read(4) == "abcd" and b:Read(10) == "efghijk!pq"
-		d_print("	parts", q)
-		b:Seek(0)
-	print("UInt:")
-		b:WriteUInt(1,1)
-		b:WriteUInt(0,1)
-		b:Seek(0)
-		d_print("	Bit", b:ReadUInt(1) == 1 and b:ReadUInt(1) == 0)
-		b:Seek(0)
-
-		b:WriteUInt(0,32)
-		b:WriteUInt(4294967295,32)
-		b:Seek(0)
-		d_print("	Max/Min", b:ReadUInt(32) == 0 and b:ReadUInt(32) == 4294967295)
-		b:Seek(0)
-
-		b:WriteUInt(0x15555555,30)
-		b:WriteUInt(7,3)
-		b:WriteUInt(0,3)
-		b:Seek(0)
-		d_print("	Offset", b:ReadUInt(30) == 0x15555555 and b:ReadUInt(3) == 7 and b:ReadUInt(3) == 0 )
-		b:Seek(0)
-	print("Int:")
-		b:WriteInt(0x15555555,31)
-		b:Seek(0)
-		d_print("	Negative", b:ReadUInt(31) == 0x15555555)
-		b:Seek(0)
-		b:WriteInt(2147483647,32)
-		b:WriteInt(-2147483648,32)
-		b:Seek(0)
-		d_print("	Max/Min", b:ReadInt(32) == 2147483647 and b:ReadInt(32) == -2147483648)
-		b:Seek(0)
-	print("Float:")
-		b:WriteFloat(22.33)
-		b:WriteFloat(-3422.25)
-		b:WriteFloat(0)
-		b:WriteFloat(0 * -1)
-		b:Seek(0)
-		d_print( "	Num", math.Round( b:ReadFloat(), 2 ) == 22.33 and math.Round( b:ReadFloat(), 2 ) == -3422.25 and math.Round( b:ReadFloat(), 2) == 0 and math.Round( b:ReadFloat(), 2 ) == 0)
-		b:Seek( 0 )
-		b:WriteFloat( 1 / 0 )
-		b:WriteFloat( -1 / 0 )
-		b:Seek( 0 )
-		d_print("	INF", tostring(b:ReadFloat()) == "inf" and tostring(b:ReadFloat()) == "-inf")
-		b:Seek(0)
-		b:WriteFloat(0/0)
-		b:Seek(0)
-		d_print("	NAN", tostring(b:ReadFloat()) == "nan")
-		b:Seek( 0 )
-	print( "Double:" )
-		b:WriteDouble( 22.33 )
-		b:WriteDouble( -3422.25 )
-		b:WriteDouble( 233.25 )
-		b:WriteDouble( 22.33, true )
-		b:WriteDouble( 0)
-		b:WriteDouble( 4 )
-		b:WriteDouble( 0 / 0 )
-		b:Seek(0)
-		local f = math.Round(b:ReadDouble(), 2)
-		local a = f == 22.33
-		local g = math.Round(b:ReadDouble(), 2) == -3422.25
-		local c = math.Round(b:ReadDouble(), 2) == 233.25
-		local d = math.Round(b:ReadDouble(), 2) == 22.33
-		local e = math.Round(b:ReadDouble(), 2) == 0 and math.Round(b:ReadDouble( true), 2) == 4 and tostring(b:ReadDouble( true)) == "nan"
-
-		d_print("	Num", a and g and c and d and e )
-		b:Seek(0)
-		b:WriteDouble( 1 / 0 )
-		b:WriteDouble( -1 / 0 )
-		b:Seek(0)
-		d_print("	INF", tostring(b:ReadDouble()) == "inf" and tostring(b:ReadDouble()) == "-inf")
-		b:Seek(0)
-		b:WriteDouble( 0 / 0 )
-		b:Seek(0)
-		d_print("	NAN", tostring(b:ReadDouble()) == "nan")
-		b:Seek(0)
-	print("Signed:")
-	-- Signed Byte
-	o_print(b, "Long", -214748364, "\t")
-	-- Signed Byte
-	o_print(b, "Short",  -32768, "\t")
-	-- Signed Byte
-	o_print(b, "SignedByte", -128, "\t")
-	print("Unsigned:")
-	-- Signed Byte
-	o_print(b, "ULong", 4294967295, "\t" )
-	-- Signed Byte
-	o_print(b, "UShort", 0xF0F0, "\t")
-	-- Byte
-	o_print(b, "Byte", 255, "\t")
-	-- Signed Byte
-	o_print(b, "Nibble", 5, "\t")
-	-- Signed Byte
-	o_print(b, "Snort", 3, "\t")
-	print("Objects:")
-	-- string
-	o_print(b, "String", "abcdefghijklmnopqrstuvwxyz !abcdefghijklmnopqrstuvwxyz!abcdefghijklmnopqrstuvwxyz!", "\t")
-	-- stringnull
-	o_print(b, "StringNull", "abcdefghijklmnopqrstuvwxyz !abcdefghijklmnopqrstuvwxyz!abcdefghijklmnopqrstuvwxyz!", "\t")
-	-- vector
-	o_print(b, "Vector", Vector(123,321,101), "\t")
-	-- angle
-	o_print(b, "Angle", Angle(3,22,13213), "\t")
-	-- color
-	o_print(b, "Color", Color(255,0,127, 55), "\t")
-	-- HEX / BIT Display
-	print()
-	b = create()
-	b:WriteUInt(0x00FFFFFF, 32)
-	b:WriteUInt(0xFF00FFFF, 32)
-	b:WriteUInt(0xFFFF00FF, 32)
-	b:WriteUInt(0xFFFFFF00, 32)
-	for i = 1, 5 do
-		b:WriteUInt(1, 6)
-	end
-	b:WriteUInt(1,3)
-	b:WriteUInt(1,31)
-	b:Debug()
-end
-
-NikNaks.BitBuffer.DebugTest()

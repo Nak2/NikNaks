@@ -1,9 +1,10 @@
 -- Copyright © 2022-2072, Nak, https://steamcommunity.com/id/Nak2/
 -- All Rights Reserved. Not allowed to be reuploaded.
 
+---@class File
 local FILE = FindMetaTable( "File" )
 
--- File functions
+-- Exstra file functions
 
 	--- Returns true if the file is valid and can be written to.
 	--- @return boolean

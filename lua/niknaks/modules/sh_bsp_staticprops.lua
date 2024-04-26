@@ -2,6 +2,8 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 
 local band = bit.band
+
+--- @class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
 --- @class StaticProp
@@ -125,7 +127,7 @@ local version = {}
 --- @class StaticProp
 
 --- @param f BitBuffer
---- @param ver number
+--- @param ver number|string
 --- @return StaticProp, number
 local function CreateStaticProp( f, ver, m )
 	local obj = {}
@@ -138,14 +140,21 @@ local function CreateStaticProp( f, ver, m )
 	return setmetatable( obj, meta_staticprop ), sizeUsed
 end
 
---- Returns a list of staticprops.
+--- Returns a list of all static-props within the map.
 --- @return StaticProp[]
 function meta:GetStaticProps()
 	if self._staticprops then return self._staticprops end
 
 	local gameLump = self:GetGameLump( 1936749168 ) -- 1936749168 == "sprp"
-	local b = gameLump.buffer
+	if not gameLump then
+		self._staticprops = {}
+		self._staticprops_mdl = {}
+		return self._staticprops
+	end
+
+	--- @type number|string
 	local propVersion = gameLump.version
+	local b = gameLump.buffer	
 
 	if b:Size() < 1 or not NikNaks._Source:find( "niknak" ) then -- This map doesn't have staticprops, or doesn't support them.
 		self._staticprops = {}
@@ -213,7 +222,7 @@ function meta:GetStaticProps()
 	for i = 0, count - 1 do
 		-- This is to try and get as much valid data we can.
 		b:Seek( staticStart + staticSize * i )
-		local sObj, sizeused = CreateStaticProp( b, propVersion, self._staticprops_mdl, staticSize )
+		local sObj, sizeused = CreateStaticProp( b, propVersion, self._staticprops_mdl )
 		staticUsed = staticUsed or sizeused
 		sObj.Index = i
 		self._staticprops[i] = sObj
@@ -228,13 +237,13 @@ end
 
 --- Returns the static-prop object from said index.
 --- @param index number
---- @return StaticProp
+--- @return StaticProp?
 function meta:GetStaticProp( index )
 	return self:GetStaticProps()[index]
 end
 
---- Returns a list of all static-prop models used by the map.
---- @return string[]
+--- Returns a list of all static-prop models within the map.
+--- @return string[] # List of string paths to the models.
 function meta:GetStaticPropModels()
 	if self._staticprops_mdl then return self._staticprops_mdl end
 
@@ -242,9 +251,9 @@ function meta:GetStaticPropModels()
 	return self._staticprops_mdl
 end
 
---- Returns a list of all static-props matching the model.
---- @param model string
---- @return StaticProp[]
+--- Returns a list of all static-props, matching the model.
+--- @param model string # The model path to search for.
+--- @return StaticProp[] # List of static-props matching the model.
 function meta:FindStaticByModel( model )
 	local t = {}
 
@@ -258,8 +267,8 @@ function meta:FindStaticByModel( model )
 end
 
 --- Returns a list of all static-props, within the specified box.
---- @param boxMins Vector
---- @param boxMaxs Vector
+--- @param boxMins Vector # The minimum position of the box.
+--- @param boxMaxs Vector # The maximum position of the box.
 --- @return StaticProp[]
 function meta:FindStaticInBox( boxMins, boxMaxs )
 	local t = {}
@@ -275,8 +284,8 @@ function meta:FindStaticInBox( boxMins, boxMaxs )
 end
 
 --- Returns a list of all static-props, within the specified sphere.
---- @param origin Vector
---- @param radius number
+--- @param origin Vector # The origin of the sphere.
+--- @param radius number # The radius of the sphere.
 --- @return StaticProp[]
 function meta:FindStaticInSphere( origin, radius )
 	radius = radius ^ 2
@@ -292,58 +301,76 @@ function meta:FindStaticInSphere( origin, radius )
 	return t
 end
 
---- Returns the StaticProp index
+--- Returns the index of the static prop.
+---@return number 
 function meta_staticprop:GetIndex()
 	return self.Index
 end
 
---- Returns the origin
+--- Returns the position
+--- @return Vector
 function meta_staticprop:GetPos()
 	return self.Origin
 end
 
 --- Returns the angles
+--- @return Angle
 function meta_staticprop:GetAngles()
 	return self.Angles
 end
 
 --- Returns the model path
+--- @return string
 function meta_staticprop:GetModel()
 	return self.PropType
 end
 
 --- Returns the skin index
+--- @return number
 function meta_staticprop:GetSkin()
 	return self.Skin or 0
 end
 
+--- Returns the color of the static prop. If none is found, it will return white.
 --- @return Color
 function meta_staticprop:GetColor()
 	return self.DiffuseModulation or color_white
 end
 
+--- Returns the scale of the static prop. If none is found, it will return 1.
+--- @return number
 function meta_staticprop:GetScale()
 	return self.UniformScale or 1
 end
 meta_staticprop.GetModelScale = meta_staticprop.GetScale
 
---- Returns the solid enum. See: https://wiki.facepunch.com/gmod/Enums/SOLID
+--- Returns the solid enum.
+--- @return SOLID
 function meta_staticprop:GetSolid()
 	return self.Solid
 end
 
---- Returns the lighting origin
+--- Returns true if the static prop has said solid flag.
+--- @param SOLID SOLID
+--- @return boolean
+function meta_staticprop:HasSolid( SOLID )
+	return band( self:GetSolid(), SOLID ) ~= 0
+end
+
+--- Returns the lighting origin.
+--- @return Vector
 function meta_staticprop:GetLightingOrigin()
 	return self.LightingOrigin
 end
 
---- Returns the flags
+--- Returns the static prop flags.
+--- @return STATIC_PROP_FLAG # The flags of the static prop.
 function meta_staticprop:GetFlags()
 	return self.Flags
 end
 
---- Returns true if the staticprop has a flag.
---- @param flag number
+--- Returns true if the static prop has said flag.
+--- @param flag STATIC_PROP_FLAG # The flag to check for.
 --- @return boolean
 function meta_staticprop:HasFlag( flag )
 	return band( self:GetFlags(), flag ) ~= 0
@@ -355,9 +382,9 @@ function meta_staticprop:GetDisableX360()
 	return self.DisableX360 or false
 end
 
---- Returns the model bounds.
---- @return Vector
---- @return Vector
+--- Returns the model bounds of the static prop.
+--- @return Vector # The minimum bounds.
+--- @return Vector # The maximum bounds.
 function meta_staticprop:GetModelBounds()
 	local a, b = NikNaks.ModelSize( self:GetModel() )
 	local s = self:GetScale()
@@ -368,14 +395,20 @@ meta_staticprop.GetRenderBounds = meta_staticprop.GetModelBounds
 
 -- Fade Functions
 
+--- Returns the fade minimum distance.
+--- @return number
 function meta_staticprop:GetFadeMinDist()
 	return self.FadeMinDist
 end
 
+--- Returns the fade maximum distance.
+--- @return number
 function meta_staticprop:GetFadeMaxDist()
 	return self.FadeMaxDist
 end
 
+--- Returns the forced fade scale. If none is found, it will return 1.
+--- @return number
 function meta_staticprop:GetForceFadeScale()
 	return self.ForcedFadeScale or 1
 end
@@ -391,12 +424,17 @@ end
 	95 = DirectX 9+ ( 9.3 )
 	98 = DirectX 9Ex
 ]]
+--- Returns the minimum and maximum DXLevel to render the static prop.
+---@return number MinDXLevel # The minimum DXLevel
+---@return number MaxDXLevel # The maximum DXLevel
 function meta_staticprop:GetDXLevel()
 	return self.MinDXLevel or 0, self.MaxDXLevel or 0
 end
 
 if CLIENT then
-	-- Checks to see if the client has the directX level required to render the static prop.
+	
+	--- Returns true if the static prop has a DXLevel required to render.
+	--- @return boolean
 	function meta_staticprop:HasDXLevel()
 		local num = render.GetDXLevel()
 		if self.MinDXLevel ~= 0 and num < self.MinDXLevel then return false end
@@ -405,49 +443,58 @@ if CLIENT then
 	end
 end
 
---[[	There must be a list of CPU's and what level they are.
+--[[
 	CPU Level
 	0 = Ignore
 	1 = "Low"
 	2 = "Medium"
 	3 = "High"
 ]]
+--- Returns the minimum and maximum CPULevel to render the static prop.
+---@return number MinCPULevel # The minimum CPULevel
+---@return number MaxCPULevel # The maximum CPULevel
 function meta_staticprop:GetCPULevel()
 	return self.MinCPULevel or 0, self.MaxCPULevel or 0
 end
 
---[[	There must be a list of GPU's and what level they are.
+--[[
 	GPU Level
 	0 = Ignore
 	1 = "Low"
 	2 = "Medium"
 	3 = "High"
 ]]
+--- Returns the minimum and maximum GPULevel to render the static prop.
+---@return number MinGPULevel # The minimum GPULevel
+---@return number MaxGPULevel # The maximum GPULevel
 function meta_staticprop:GetGPULevel()
 	return self.MinGPULevel or 0, self.MaxGPULevel or 0
 end
 
 -- Allows to set the lightmap resolution for said static-prop.
 -- Checkout https://tf2maps.net/threads/guide-lightmap-optimization.33113/ for more info
+---@return number? ResolutionX # The X resolution of the lightmap
+---@return number? ResolutionY # The Y resolution of the lightmap
 function meta_staticprop:GetLightMapResolution()
 	return self.lightmapResolutionX, self.lightmapResolutionY
 end
 
---- Returns the "Further" BitFlags. Seems to be only used for the "STATIC_PROP_FLAGS_EX_DISABLE_CSM" flag.
---- @return number
+--- Returns the "Further" flags of the static prop.
+--- @return STATIC_PROP_FLAG_EX
 function meta_staticprop:GetFlagExs()
 	return self.FlagsEx or 0
 end
 
---- Returns true if the staticprop has an exflag.
---- @param flag number
+--- Returns true if the static prop has said flag.
+--- @param flag STATIC_PROP_FLAG_EX
 --- @return boolean
 function meta_staticprop:HasFlagEx( flag )
 	return band( self:GetFlagExs(), flag ) ~= 0
 end
 
---- Returns the version of the static props.
+--- Returns the version of the static prop.
 --- Note: version 7* will be returned as a string: "10A"
+---@return number|string
 function meta_staticprop:GetVersion()
 	return self.version
 end
