@@ -76,7 +76,6 @@ NikNaks._Source = "niknak"
 NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_linq_module.lua")
-NikNaks.AutoInclude("niknaks/modules/sh_time_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_file_extended.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_color_extended.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_model_extended.lua")
