@@ -107,18 +107,22 @@ return {
         {
             name = "Brighten / Darken",
             func = function()
-                local col = Color(255,255,255)
-                Should(col.IncreaseBrightness)
+                local col = Color(255,128,5)
+                Should(col.SetBrightness)
                     :Exist()
                     .And:BeOfType("function")
 
-                Should(col:IncreaseBrightness(-50))
+                Should(col:SetBrightness(55))
                     :BeOfType("table")
-                    .And:Be(Color(205,205,205))
+                    .And:Be(Color(109,54,0))
 
-                Should(col:IncreaseBrightness(50))
+                Should(col:SetBrightness(255))
                     :BeOfType("table")
                     .And:Be(Color(255,255,255))
+
+                Should(Color(0,55,255):SetBrightness(55))
+                    :BeOfType("table")
+                    .And:Be(Color(0,23,110))
             end
         },
         {
