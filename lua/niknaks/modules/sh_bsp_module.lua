@@ -79,7 +79,7 @@ local thisMapObject
 
 --- Reads the BSP file and returns it as an object.
 --- @param fileName string? # The file name of the map. If not provided, it will load the current map.
---- @return BSPObject? # Will be nill,if unable to load the map.
+--- @return BSPObject? # Will be nill, if unable to load the map.
 --- @return BSP_ERROR? # Error code if unable to load the map.
 --- **Note:** The current map will be cached and returned if the same map is loaded twice.
 ---
@@ -1170,8 +1170,8 @@ do
 		for i = 1, math.min( data:Size() / 448, MAX_MAP_FACES ) do
 			--- @class OriginalFace
 			--- @field styles number[]
-			--- @LightmapTextureMinsInLuxels number[]
-			--- @LightmapTextureSizeInLuxels number[]
+			--- @field LightmapTextureMinsInLuxels number[]
+			--- @field LightmapTextureSizeInLuxels number[]
 			local t = {}
 			t.plane 	= self:GetPlanes()[data:ReadUShort()]
 			t.side 		= data:ReadByte()
