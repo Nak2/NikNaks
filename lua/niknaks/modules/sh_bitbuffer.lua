@@ -1033,18 +1033,21 @@ do
 			data = util.Compress(data) or data
 			f:Write(data)
 		else
-			local n = rshift(s, 5) -- Amount of "chunks"
-			for i = 1, n do
-				f:WriteULong(self._data[i])
+			self:Seek(0)
+
+			local b_pos = math.floor(s / 32)
+			for i = 1, b_pos do
+				f:WriteULong(bswap(self._data[i]))
 			end
 
-			local p = lshift(n, 5)
-			local l = s - p -- How many bits left to write.
+			local bytesLeft = (s % 32) / 8
+			if bytesLeft > 0 then
+				self:Seek(b_pos * 32)
 
-			self:Seek(p)
-
-			for i = 1, math.ceil(l / 8) do
-				f:WriteByte(f:ReadByte())
+				for i = 1, bytesLeft do
+					local b = self:ReadByte()
+					f:WriteByte(b)
+				end
 			end
 		end
 
