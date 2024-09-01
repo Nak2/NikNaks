@@ -132,7 +132,6 @@ do
         if not fil then return 0 end
         -- Read the start of the header
         local header = fil:Read(4)
-        print(string.byte(header, 1, 4))
         if header == "RIFF" then
             return getWaveFileDuration(fil)
         elseif header == "OggS" then

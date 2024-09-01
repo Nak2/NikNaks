@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.50
+local version = 0.52
 if NikNaks and NikNaks.VERSION > version then return end
 
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
@@ -73,6 +73,7 @@ meta.MetaName = "BSP"
 NikNaks.__metatables["BSP"] = meta
 NikNaks._Source = "niknak"
 
+NikNaks.AutoInclude("niknaks/modules/sh_hooks.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_linq_module.lua")
@@ -89,6 +90,7 @@ NikNaks.AutoInclude("niknaks/modules/sh_bsp_pvspas.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_staticprops.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_trace.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_soundModule.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_datapackage.lua")
 
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
 
