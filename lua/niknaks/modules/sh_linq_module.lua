@@ -1,6 +1,5 @@
 
 ---@class LINQ
----@field protected tbl any[]
 local t = {}
 t.__index = t
 t.MetaName = "LINQ"

@@ -179,17 +179,62 @@ return {
             func = function()
                 local bb = NikNaks.BitBuffer()
                 bb:WriteFloat(123.456)
+                bb:WriteFloat(1)
+                bb:WriteFloat(2)
+                bb:WriteFloat(0 * -1)
                     :Seek(0)
-                Should(math.Round(bb:ReadFloat(), 2)):Be(123.46)
+
+                Should(math.Round(bb:ReadFloat(), 3)):Be(123.456)
+                Should(bb:ReadFloat()):Be(1)
+                Should(bb:ReadFloat()):Be(2)
+                Should(1 / bb:ReadFloat())
+                    :WithMessage("Expected negative 0")
+                    .And:Be(-math.huge)
             end
         },
         {
             name = "Double",
             func = function()
+                local max_double = 1.7976931348623157e+306
+                -- 01111111 10000100 01111010 11100001 01000111 10101110 00010100 01111010
+                local max_double_bytes = { 0x7F, 0x84, 0x7A, 0xE1, 0x47, 0xAE, 0x14, 0x7A }
+
                 local bb = NikNaks.BitBuffer()
+                bb:WriteDouble(max_double)
+                for i = 1, 8 do
+                    bb:WriteByte(max_double_bytes[i])
+                end
                 bb:WriteDouble(123.456)
-                    :Seek(0)
+                bb:WriteDouble(1)
+                bb:WriteDouble(2)
+                bb:WriteDouble(0 * -1)
+                bb:WriteDouble(max_double)
+                bb:WriteDouble(-max_double)
+                
+                bb:Seek(0)
+
+                -- Make sure double match max_double in bytes                
+                for i = 1, 8 do
+                    local rb = bb:ReadByte()
+                    Should(rb):WithMessage("Byte " .. i .. " is " .. rb .. " but should be " .. max_double_bytes[i])
+                        .And:Be(max_double_bytes[i])
+                end
+                Should(math.abs(bb:ReadDouble() - max_double))
+                    :WithMessage("Double encoding is not equal to max_double")
+                    .And:BeLessThan(1e-14)
+
                 Should(math.Round(bb:ReadDouble(), 3)):Be(123.456)
+                Should(bb:ReadDouble()):Be(1)
+                Should(bb:ReadDouble()):Be(2)
+                Should(1 / bb:ReadDouble())
+                    :WithMessage("Expected negative 0")
+                    .And:Be(-math.huge)
+
+                Should(math.abs(bb:ReadDouble() - max_double))
+                    .And:BeLessThan(1e-14)
+
+                Should(math.abs(bb:ReadDouble() + max_double))
+                    .And:BeLessThan(1e-14)
             end
         },
         {
@@ -204,7 +249,7 @@ return {
         {
             name = "String",
             func = function()
-                local bb = NikNaks.BitBuffer()--[[@as BitBuffer]]
+                local bb = NikNaks.BitBuffer() --[[@as BitBuffer]]
                 bb:WriteString("Hello, World!")
                     :Seek(0)
                 Should(bb:ReadString()):Be("Hello, World!")

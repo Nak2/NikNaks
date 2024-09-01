@@ -57,6 +57,7 @@ local string_format, string_sub = string.format, string.sub
 -- CMYK
 
 	---Converts a color into CMYK variables.
+	---@param color Color
 	---@return number c
 	---@return number m
 	---@return number y

@@ -2,11 +2,11 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 
 -- Load the current map
---- @type BSPObject
+--- @type BSPObject?
 local BSP, BSP_ERR = NikNaks.Map()
 local NikNaks = NikNaks
 
---- @type BSPObject
+--- @type BSPObject?
 NikNaks.CurrentMap = BSP
 
 if not BSP and BSP_ERR then

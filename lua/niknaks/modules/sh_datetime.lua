@@ -243,7 +243,7 @@ NikNaks.__metatables["DateTime"] = datetime_obj
 ---Returns a DateTime object.
 ---@param var string|number|DateTime|TimeDelta The time to convert. If number, then it is assumed to be a unix-time.
 ---@param t_zone any
----@return nil
+---@return DateTime?
 function NikNaks.DateTime.Get( var, t_zone )
 	if not var then
 		var = os_time()
