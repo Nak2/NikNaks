@@ -7,6 +7,7 @@ local NET_HEADER = 0
 local NET_DATA = 1
 
 local conMaxSize = CreateConVar( "niknaks_datapackage_maxsize", "63", FCVAR_ARCHIVE + FCVAR_REPLICATED, "The max size of a data packages in kb." , 1, 63 )
+local conMaxTime = CreateConVar( "niknaks_datapackage_maxtime", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "The max time inbetween packages." , 0.5, 5 )
 
 -- Net messages can max be 64kb in size. And a roughly 128kb/s limit. Max 1 package pr second.
 
@@ -36,7 +37,7 @@ if SERVER then
     local function onThink()
         -- Once pr second
         if nextSend >= CurTime() then return end
-        nextSend = CurTime() + 1
+        nextSend = CurTime() + conMaxTime:GetFloat()
 
         if #dataToSend == 0 then
             hook.Remove( "Think", "NikNaks.DataPackage" )
