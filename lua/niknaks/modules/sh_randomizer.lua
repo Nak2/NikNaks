@@ -51,20 +51,20 @@ function NikNaks.Randomizer.GetSecureNumber()
     return math.abs(seed % 0x7FFFFFFF)
 end
 
-lava = cookie.GetNumber("niknaks.lavalamp", NikNaks.Randomizer.SecureNumber())
+lava = cookie.GetNumber("niknaks.lavalamp", NikNaks.Randomizer.GetSecureNumber())
 
 ---Generates an int from min to max
 ---@param min integer
 ---@param max integer
 ---@return integer
 function NikNaks.Randomizer.GetInt(min, max)
-    return math.min(max, math.max(min, math.floor(NikNaks.Randomizer.SecureNumber() % (max - min + 1) + min)))
+    return math.min(max, math.max(min, math.floor(NikNaks.Randomizer.GetSecureNumber() % (max - min + 1) + min)))
 end
 
 ---Generates a float from 0 to 1
 ---@return number
 function NikNaks.Randomizer.GetFloat()
-    return NikNaks.Randomizer.SecureNumber() / 0x7FFFFFFF
+    return NikNaks.Randomizer.GetSecureNumber() / 0x7FFFFFFF
 end
 
 ---Generates a float from min to max
