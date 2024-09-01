@@ -16,8 +16,8 @@ meta_brush.MetaName = "BSP Brush"
 NikNaks.__metatables["BSP Brush"] = meta_brush
 
 local DIST_EPSILON = 0.03125
-local MAX_MAP_BRUSHES = 8192
-local MAX_MAP_BRUSHSIDES = 65536
+local MAX_MAP_BRUSHES = 16384
+local MAX_MAP_BRUSHSIDES = 163840
 
 --- Returns an array of the brush-data with brush-sides.
 --- @return BSPBrushObject[]
