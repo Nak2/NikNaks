@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.52
+local version = 0.53
 if NikNaks and NikNaks.VERSION > version then return end
 
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
@@ -76,6 +76,7 @@ NikNaks._Source = "niknak"
 NikNaks.AutoInclude("niknaks/modules/sh_hooks.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_randomizer.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_linq_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_file_extended.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_color_extended.lua")
