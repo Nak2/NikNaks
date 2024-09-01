@@ -154,9 +154,10 @@ else
             for i = 1, getMaxConSize() do
                 if #packageBuilder._data == packageBuilder._nsize then
                     -- Done
-                    local BitBuffer = NikNaks.BitBuffer.Create( packageBuilder._data )
-                    BitBuffer._len = packageBuilder._size
-                    hook.Run( NikNaks.Hooks.DataPackageDone, packageBuilder._id, BitBuffer )
+                    local bitBuffer = NikNaks.BitBuffer.Create( packageBuilder._data )
+                    bitBuffer._len = packageBuilder._size
+                    bitBuffer:Seek( 0 )
+                    hook.Run( NikNaks.Hooks.DataPackageDone, packageBuilder._id, bitBuffer )
                     packageBuilder = nil
                     return
                 end

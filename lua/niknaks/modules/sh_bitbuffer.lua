@@ -68,7 +68,7 @@ local function create(data, little_endian)
 		_data = {},
 		_tell = 0,
 		_len = 0,
-		_little_endian = false
+		_little_endian = little_endian == nil and true or little_endian or false
 	}
 	setmetatable(t, meta)
 
@@ -84,12 +84,6 @@ local function create(data, little_endian)
 			t._data[i] = data[i]
 		end
 		t._len = q * 32
-	end
-
-	if little_endian == nil then
-		t._little_endian = true
-	else
-		t._little_endian = little_endian
 	end
 
 	return t
@@ -218,7 +212,7 @@ do
 		local rep = string.rep("=", (32 - (#size + 6)) / 2)
 		print("BitBuff	" ..
 			rep .. " [" .. size .. "] " .. (self:IsLittleEndian() and "Le " or "Be ") .. rep .. "\t= 0xHX =")
-		for i = 1, #self._data do
+		for i = 1, math.min(#self._data, 10) do
 			print(i, toBits(self._data[i], 32), bit.tohex(self._data[i]):upper())
 		end
 	end
