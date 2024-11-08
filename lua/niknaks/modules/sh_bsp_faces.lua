@@ -745,7 +745,7 @@ if CLIENT then
 		render.SetMaterial( iMaterial or  self:GetMaterial() )
 		local verts = self:GenerateVertexTriangleData()
 		if not verts then return end
-		mesh.Begin(MATERIAL_TRIANGLES, #verts / 3 ) -- Begin writing to the dynamic mesh
+		mesh.Begin( MATERIAL_TRIANGLES, #verts / 3 ) -- Begin writing to the dynamic mesh
 		for i = 1, #verts do
 			local vert = verts[i]
 			mesh.Normal( vert.normal )
