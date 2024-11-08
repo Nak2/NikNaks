@@ -712,8 +712,12 @@ do
 			t.normal = data:ReadVector() -- Normal vector
 			t.dist = data:ReadFloat() -- distance form origin
 			t.type = data:ReadLong() -- plane axis indentifier
-			setmetatable(t, planeMeta)
+			setmetatable( t, planeMeta )
 			self._plane[i] = t
+		end
+
+		for i, t in pairs( self._plane ) do
+			t.back = self._plane[ bit.bxor( i, 1 ) ]
 		end
 
 		self:ClearLump( 1 )
