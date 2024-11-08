@@ -686,8 +686,9 @@ do
 
 	--- @class BSPPlane
 	--- @field normal Vector # Normal vector
-	--- @field dist number # distance form origin
-	--- @field type number # plane axis indentifier
+	--- @field dist number # Distance from origin
+	--- @field type number # Plane axis identifier
+	--- @field back BSPPlane # Back plane
 	local planeMeta = {}
 	planeMeta.__index = planeMeta
 	NikNaks.__metatables["BSP Plane"] = planeMeta
@@ -710,14 +711,14 @@ do
 			--- @class BSPPlane
 			local t = {}
 			t.normal = data:ReadVector() -- Normal vector
-			t.dist = data:ReadFloat() -- distance form origin
-			t.type = data:ReadLong() -- plane axis indentifier
+			t.dist = data:ReadFloat() -- Distance from origin
+			t.type = data:ReadLong() -- Plane axis identifier
 			setmetatable( t, planeMeta )
 			self._plane[i] = t
 		end
 
 		for i, t in pairs( self._plane ) do
-			t.back = self._plane[ bit.bxor( i, 1 ) ]
+			t.back = self._plane[ bit.bxor( i, 1 ) ] -- Back plane
 		end
 
 		self:ClearLump( 1 )
