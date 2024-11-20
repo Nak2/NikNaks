@@ -777,7 +777,7 @@ do
 	---Ignores little_endian or big_endian and writes the raw data
 	---@param str string 
 	---@return BitBuffer
-	function meta:WriteRawData(str)
+	function meta:WriteData(str)
 		local len = #str
 		local q = lshift(rshift(len, 2), 2)
 
@@ -799,7 +799,7 @@ do
 	---Ignores little_endian or big_endian and reads the raw data
 	---@param bytes number
 	---@return string
-	function meta:ReadRawData(bytes)
+	function meta:ReadData(bytes)
 		local ReadByte = meta.ReadByte
 		local c, s = lshift(rshift(bytes, 2), 2), ""
 
@@ -831,7 +831,7 @@ do
 		end
 
 		self:WriteUShort(l)
-		self:WriteRawData(str)
+		self:WriteData(str)
 
 		return self
 	end
@@ -839,7 +839,7 @@ do
 	--- Reads a string. Max string length: 65535
 	--- @return string
 	function meta:ReadString()
-		return self:ReadRawData(self:ReadUShort() or 0)
+		return self:ReadData(self:ReadUShort() or 0)
 	end
 
 	local z = '\0'
@@ -848,7 +848,7 @@ do
 	--- @param str string
 	--- @return BitBuffer self
 	function meta:WriteStringNull(str)
-		self:WriteRawData(string.gsub(str, z, '') .. z)
+		self:WriteData(string.gsub(str, z, '') .. z)
 		return self
 	end
 

@@ -15,7 +15,7 @@ return {
         {
             name = "Write / Read",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:Write("n")
                     :Write("ik")
                     :Write("skan")
@@ -28,36 +28,36 @@ return {
             func = function()
                 local bb = NikNaks.BitBuffer.Create();
                 bb:SetLittleEndian()
-                bb:WriteRawData("niknaks")
+                bb:WriteData("niknaks")
                 bb:SetBigEndian()
                 bb:Seek(0)
 
-                Should(bb:ReadRawData(7)):Be("niknaks")
+                Should(bb:ReadData(7)):Be("niknaks")
             end
         },
         {
             name = "Seek",
             func = function()
-                local bb = NikNaks.BitBuffer()
-                bb:WriteRawData("NikNaks World")
+                local bb = NikNaks.BitBuffer.Create()
+                bb:WriteData("NikNaks World")
                     :Seek(0)
-                Should(bb:ReadRawData(6)):Be("NikNak")
+                Should(bb:ReadData(6)):Be("NikNak")
             end
         },
         {
             name = "Skip",
             func = function()
-                local bb = NikNaks.BitBuffer()
-                bb:WriteRawData("NikNaks World")
+                local bb = NikNaks.BitBuffer.Create()
+                bb:WriteData("NikNaks World")
                     :Seek(0)
                     :Skip(6 * 8)
-                Should(bb:ReadRawData(6)):Be("s Worl")
+                Should(bb:ReadData(6)):Be("s Worl")
             end
         },
         {
             name = "Tell",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:Write("NikNaks World")
                     :Seek(0)
                 Should(bb:Tell()):Be(0)
@@ -68,7 +68,7 @@ return {
         {
             name = "Size",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:Write("NikNaks World")
                 Should(bb:Size()):Be(13 * 8)
             end
@@ -76,7 +76,7 @@ return {
         {
             name = "EndOfData",
             func = function()
-                local bb = NikNaks.BitBuffer() --[[@as BitBuffer]]
+                local bb = NikNaks.BitBuffer.Create()
                 bb:Write("NikNaks World")
                     :Seek(0)
                 Should(bb:EndOfData()):Be(false)
@@ -87,7 +87,7 @@ return {
         {
             name = "UInt",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteUInt(0x12345678, 32)
                     :WriteUInt(0x123, 15)
                     :WriteUInt(0x123, 17)
@@ -102,7 +102,7 @@ return {
         {
             name = "Int",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteInt(-12345678, 32)
                     :WriteInt(-0x123, 15)
                     :WriteInt(0x123, 17)
@@ -117,7 +117,7 @@ return {
         {
             name = "SetBigEndian / SetLittleEndian",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:SetBigEndian()
                 bb:WriteInt(0x12345678, 32)
                 bb:SetLittleEndian()
@@ -130,7 +130,7 @@ return {
         {
             name = "Snort",
             func = function()
-                local bb = NikNaks.BitBuffer() --[[@as BitBuffer]]
+                local bb = NikNaks.BitBuffer.Create() --[[@as BitBuffer]]
                 bb:WriteSnort(2)
                     :Seek(0)
                 Should(bb:ReadSnort()):Be(2)
@@ -139,7 +139,7 @@ return {
         {
             name = "Nibble",
             func = function()
-                local bb = NikNaks.BitBuffer() --[[@as BitBuffer]]
+                local bb = NikNaks.BitBuffer.Create() --[[@as BitBuffer]]
                 bb:WriteNibble(12)
                     :Seek(0)
                 Should(bb:ReadNibble()):Be(12)
@@ -148,7 +148,7 @@ return {
         {
             name = "Byte",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteByte(0x12)
                     :Seek(0)
                 Should(bb:ReadByte()):Be(0x12)
@@ -157,7 +157,7 @@ return {
         {
             name = "Signed Byte",
             func = function()
-                local bb = NikNaks.BitBuffer() --[[ @as BitBuffer ]]
+                local bb = NikNaks.BitBuffer.Create() --[[ @as BitBuffer ]]
                 bb:WriteSignedByte(-127)
                     :Seek(0)
                 Should(bb:ReadSignedByte()):Be(-127)
@@ -166,7 +166,7 @@ return {
         {
             name = "Short",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteShort(0x1234)
                     :Seek(0)
                 Should(bb:ReadShort()):Be(0x1234)
@@ -175,7 +175,7 @@ return {
         {
             name = "UShort",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteUShort(0x1234)
                     :Seek(0)
                 Should(bb:ReadUShort()):Be(0x1234)
@@ -184,7 +184,7 @@ return {
         {
             name = "Long",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteLong(0x12345678)
                     :Seek(0)
                 Should(bb:ReadLong()):Be(0x12345678)
@@ -193,7 +193,7 @@ return {
         {
             name = "ULong",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteULong(0x12345678)
                     :Seek(0)
                 Should(bb:ReadULong()):Be(0x12345678)
@@ -202,7 +202,7 @@ return {
         {
             name = "Float",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteFloat(123.456)
                 bb:WriteFloat(1)
                 bb:WriteFloat(2)
@@ -224,7 +224,7 @@ return {
                 -- 01111111 10000100 01111010 11100001 01000111 10101110 00010100 01111010
                 local max_double_bytes = { 0x7F, 0x84, 0x7A, 0xE1, 0x47, 0xAE, 0x14, 0x7A }
 
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:SetBigEndian()
                 bb:WriteDouble(max_double)
                 for i = 1, 8 do
@@ -266,7 +266,7 @@ return {
         {
             name = "Boolean",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteBoolean(true)
                     :Seek(0)
                 Should(bb:ReadBoolean()):Be(true)
@@ -275,7 +275,7 @@ return {
         {
             name = "String",
             func = function()
-                local bb = NikNaks.BitBuffer() --[[@as BitBuffer]]
+                local bb = NikNaks.BitBuffer.Create() --[[@as BitBuffer]]
                 bb:WriteString("Hello, World!")
                     :Seek(0)
                 Should(bb:ReadString()):Be("Hello, World!")
@@ -284,7 +284,7 @@ return {
         {
             name = "StringNull",
             func = function()
-                local bb = NikNaks.BitBuffer() --[[@as BitBuffer]]
+                local bb = NikNaks.BitBuffer.Create() --[[@as BitBuffer]]
                 bb:WriteStringNull("Hello, World!")
                     :Write("This is longer than the previous string")
                     :Seek(0)
@@ -294,7 +294,7 @@ return {
         {
             name = "Angle",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteAngle(Angle(1, 2, 3))
                     :Seek(0)
                 Should(bb:ReadAngle()):BeOfType("Angle")
@@ -305,7 +305,7 @@ return {
         {
             name = "Vector",
             func = function()
-                local bb = NikNaks.BitBuffer()
+                local bb = NikNaks.BitBuffer.Create()
                 bb:WriteVector(Vector(1, 2, 3))
                     :Seek(0)
                 Should(bb:ReadVector()):BeOfType("Vector")
@@ -316,7 +316,7 @@ return {
         {
             name = "Color",
             func = function()
-                local bb = NikNaks.BitBuffer() --[[@as BitBuffer]]
+                local bb = NikNaks.BitBuffer.Create() --[[@as BitBuffer]]
                 bb:WriteColor(Color(255, 0, 0, 255))
                     :Seek(0)
                 Should(bb:ReadColor()):BeOfType("table")
