@@ -697,22 +697,22 @@ if CLIENT then
 			return self._mesh
 		end
 
-		local meshData = self:GenerateVertexTriangleData()
-		if not meshData then return self._mesh end
+		local verts = self:GenerateVertexTriangleData()
+		if not verts then return self._mesh end
 
 		self._mesh = Mesh( self:GetMaterial() )
 
 		-- Vert
-		mesh.Begin( self._mesh, MATERIAL_TRIANGLES, #meshData )
-		for i = 1, #meshData do
-			local vert = meshData[i]
+		mesh.Begin( self._mesh, MATERIAL_TRIANGLES, #verts / 3 )
+		for i = 1, #verts do
+			local vert = verts[i]
 			-- > Mesh
 			mesh.Normal( vert.normal )
 			mesh.Position( vert.pos ) -- Set the position
 			mesh.Color(col.r, col.g, col.b, col.a)
 			mesh.TexCoord( 0, vert.u, vert.v ) -- Set the texture UV coordinates
-			mesh.TexCoord( 1, vert.lu, vert.lv ) -- Set the lightmap UV coordinates
-			mesh.TexCoord( 2, vert.lu, vert.lv  ) -- Set the lightmap UV coordinates
+			mesh.TexCoord( 1, vert.u1, vert.v1 ) -- Set the lightmap UV coordinates
+			mesh.TexCoord( 2, vert.u1, vert.v1 ) -- Set the lightmap UV coordinates
 			--mesh.TexCoord( 2, self.LightmapTextureSizeInLuxels[1], self.LightmapTextureSizeInLuxels[2] ) -- Set the texture UV coordinates
 			--mesh.TexCoord( 2, self.LightmapTextureMinsInLuxels[1], self.LightmapTextureMinsInLuxels[2] ) -- Set the texture UV coordinates
 			mesh.AdvanceVertex()
@@ -741,15 +741,21 @@ if CLIENT then
 	end
 
 	--- Generates a mesh for the face and renders it.
-	function meta_face:DebugRender( iMaterial)	
+	function meta_face:DebugRender( iMaterial )
 		render.SetMaterial( iMaterial or  self:GetMaterial() )
 		local verts = self:GenerateVertexTriangleData()
 		if not verts then return end
-		mesh.Begin(nil, MATERIAL_TRIANGLES, #verts / 3 ) -- Begin writing to the dynamic mesh
+		mesh.Begin( MATERIAL_TRIANGLES, #verts / 3 ) -- Begin writing to the dynamic mesh
 		for i = 1, #verts do
-			mesh.Position( verts[i].pos ) -- Set the position
-			mesh.TexCoord( 0, verts[i].u, verts[i].v ) -- Set the texture UV coordinates
-			mesh.TexCoord( 1, verts[i].u1, verts[i].v1 ) -- Set the light UV coordinates
+			local vert = verts[i]
+			mesh.Normal( vert.normal )
+			mesh.Position( vert.pos ) -- Set the position
+			mesh.Color( 255, 255, 255, 255 )
+			mesh.TexCoord( 0, vert.u, vert.v ) -- Set the texture UV coordinates
+			mesh.TexCoord( 1, vert.u1, vert.v1 ) -- Set the lightmap UV coordinates
+			mesh.TexCoord( 2, vert.u1, vert.v1 ) -- Set the lightmap UV coordinates
+			mesh.TangentS( 0, 0, 0 )
+			mesh.TangentT( 0, 0, 0 )
 			mesh.AdvanceVertex() -- Write the vertex
 		end
 		mesh.End() -- Finish writing the mesh and draw it
