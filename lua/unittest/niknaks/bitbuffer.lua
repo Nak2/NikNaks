@@ -18,28 +18,40 @@ return {
                 local bb = NikNaks.BitBuffer()
                 bb:Write("n")
                     :Write("ik")
-                    :Write("naks")
+                    :Write("skan")
                     :Seek(0)
                 Should(bb:Read()):Be("niknaks")
+            end
+        },
+        {
+            name = "WriteRawData / ReadRawData",
+            func = function()
+                local bb = NikNaks.BitBuffer.Create();
+                bb:SetLittleEndian()
+                bb:WriteRawData("niknaks")
+                bb:SetBigEndian()
+                bb:Seek(0)
+
+                Should(bb:ReadRawData(7)):Be("niknaks")
             end
         },
         {
             name = "Seek",
             func = function()
                 local bb = NikNaks.BitBuffer()
-                bb:Write("NikNaks World")
+                bb:WriteRawData("NikNaks World")
                     :Seek(0)
-                Should(bb:Read(6)):Be("NikNak")
+                Should(bb:ReadRawData(6)):Be("NikNak")
             end
         },
         {
             name = "Skip",
             func = function()
                 local bb = NikNaks.BitBuffer()
-                bb:Write("NikNaks World")
+                bb:WriteRawData("NikNaks World")
                     :Seek(0)
                     :Skip(6 * 8)
-                Should(bb:Read(6)):Be("s Worl")
+                Should(bb:ReadRawData(6)):Be("s Worl")
             end
         },
         {
@@ -100,6 +112,19 @@ return {
                 Should(bb:ReadInt(15)):Be(-0x123)
                 Should(bb:ReadInt(17)):Be(0x123)
                 Should(bb:ReadInt(3)):Be(-0x1)
+            end
+        },
+        {
+            name = "SetBigEndian / SetLittleEndian",
+            func = function()
+                local bb = NikNaks.BitBuffer()
+                bb:SetBigEndian()
+                bb:WriteInt(0x12345678, 32)
+                bb:SetLittleEndian()
+                bb:WriteInt(0x12345678, 32)
+                bb:Seek(0)
+                Should(bb:ReadInt(32)):Be(0x78563412)
+                Should(bb:ReadInt(32)):Be(0x12345678)
             end
         },
         {
@@ -200,6 +225,7 @@ return {
                 local max_double_bytes = { 0x7F, 0x84, 0x7A, 0xE1, 0x47, 0xAE, 0x14, 0x7A }
 
                 local bb = NikNaks.BitBuffer()
+                bb:SetBigEndian()
                 bb:WriteDouble(max_double)
                 for i = 1, 8 do
                     bb:WriteByte(max_double_bytes[i])
@@ -231,10 +257,10 @@ return {
                     .And:Be(-math.huge)
 
                 Should(math.abs(bb:ReadDouble() - max_double))
-                    .And:BeLessThan(1e-14)
+                    :BeLessThan(1e-14)
 
                 Should(math.abs(bb:ReadDouble() + max_double))
-                    .And:BeLessThan(1e-14)
+                    :BeLessThan(1e-14)
             end
         },
         {

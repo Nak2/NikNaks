@@ -11,15 +11,17 @@ local log, ldexp, frexp, floor, ceil, max, setmetatable, source = math.log, math
 NikNaks.BitBuffer = {}
 
 --- @class BitBuffer
---- @field _data number[]
---- @field _tell number
---- @field _len number
---- @field _little_endian boolean
+--- @field private _data number[]
+--- @field private _tell number
+--- @field private _len number
+--- @field private _little_endian boolean
 local meta = {}
 meta.__index = meta
 function meta:__tostring()
 	return "BitBuffer [" .. self:Size() .. "]"
 end
+
+---@diagnostic disable: invisible
 
 --- Fixes bit-shift errors
 --- @param int number
@@ -60,7 +62,8 @@ local function unsaferawdata(self, str)
 	self._len = max(self._len, lshift(len, 3))
 end
 
---- @param little_endian? boolean
+--- Creates a new BitBuffer.
+--- @param little_endian? boolean # Defaults to true
 --- @return BitBuffer
 local function create(data, little_endian)
 	--- @type BitBuffer
@@ -91,9 +94,9 @@ end
 
 NikNaks.BitBuffer.Create = create
 setmetatable(NikNaks.BitBuffer, {
-	--- Creates a new BitBuffer
+	--- Creates a new BitBuffer. 
 	--- @param data string|table
-	--- @param little_endian boolean?
+	--- @param little_endian boolean? # Defaults to true
 	--- @return BitBuffer
 	__call = function(_, data, little_endian) return create(data, little_endian) end
 })
@@ -212,8 +215,20 @@ do
 		local rep = string.rep("=", (32 - (#size + 6)) / 2)
 		print("BitBuff	" ..
 			rep .. " [" .. size .. "] " .. (self:IsLittleEndian() and "Le " or "Be ") .. rep .. "\t= 0xHX =")
-		for i = 1, math.min(#self._data, 10) do
-			print(i, toBits(self._data[i], 32), bit.tohex(self._data[i]):upper())
+		local lines = math.ceil(self._len / 32)
+		local foundData = nil
+		for i = 1, lines do
+			if not foundData then
+				if not self._data[i] then continue end
+				foundData = i
+			elseif i > foundData + 10 then
+				break
+			end
+			if not self._data[i] then
+				print(i * 4 - 4, "00000000000000000000000000000000", "00000000")
+			else
+				print(i * 4 - 4, toBits(self._data[i], 32), bit.tohex(self._data[i]):upper())
+			end
 		end
 	end
 
@@ -327,7 +342,6 @@ do
 		local over = ebitPos - 32 -- How many bits we're over
 		local data1 = lshift(band(self._data[i_word] or 0x0, rshift(b_mask, bitPos)), over)
 		local data2 = rshift(self._data[i_word + 1] or 0x0, 32 - over)
-
 		if self._little_endian and bits % 8 == 0 then
 			return swap(bor(data1, data2), bits)
 		end
@@ -759,6 +773,47 @@ do
 
 		return s
 	end
+
+	---Ignores little_endian or big_endian and writes the raw data
+	---@param str string 
+	---@return BitBuffer
+	function meta:WriteRawData(str)
+		local len = #str
+		local q = lshift(rshift(len, 2), 2)
+
+		for i = 1, q, 4 do
+			local a, b, c, d = s_byte(str, i, i + 3)
+			self:WriteByte(a)
+			self:WriteByte(b)
+			self:WriteByte(c)
+			self:WriteByte(d)
+		end
+
+		for i = q + 1, len do
+			self:WriteByte(s_byte(str, i))
+		end
+
+		return self
+	end
+
+	---Ignores little_endian or big_endian and reads the raw data
+	---@param bytes number
+	---@return string
+	function meta:ReadRawData(bytes)
+		local ReadByte = meta.ReadByte
+		local c, s = lshift(rshift(bytes, 2), 2), ""
+
+		for _ = 1, c, 4 do
+			s = s .. s_char(ReadByte(self), ReadByte(self), ReadByte(self), ReadByte(self))
+		end
+
+		for _ = c + 1, bytes do
+			s = s .. s_char(ReadByte(self))
+		end
+
+		return s
+	end
+
 end
 
 -- Special Types
@@ -776,7 +831,7 @@ do
 		end
 
 		self:WriteUShort(l)
-		Write(self, str)
+		self:WriteRawData(str)
 
 		return self
 	end
@@ -784,7 +839,7 @@ do
 	--- Reads a string. Max string length: 65535
 	--- @return string
 	function meta:ReadString()
-		return Read(self, self:ReadUShort() or 0)
+		return self:ReadRawData(self:ReadUShort() or 0)
 	end
 
 	local z = '\0'
@@ -793,7 +848,7 @@ do
 	--- @param str string
 	--- @return BitBuffer self
 	function meta:WriteStringNull(str)
-		Write(self, string.gsub(str, z, '') .. z)
+		self:WriteRawData(string.gsub(str, z, '') .. z)
 		return self
 	end
 
@@ -1104,3 +1159,5 @@ end
 function NikNaks.BitBuffer.ToNet(buf)
 	return buf:WriteToNet()
 end
+
+---@diagnostic enable: invisible
