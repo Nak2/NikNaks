@@ -90,7 +90,7 @@ NikNaks.AutoInclude("niknaks/modules/sh_bsp_brushes.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_pvspas.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_staticprops.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_trace.lua")
-NikNaks.AutoInclude("niknaks/modules/sh_soundModule.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_sound_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_datapackage.lua")
 
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
