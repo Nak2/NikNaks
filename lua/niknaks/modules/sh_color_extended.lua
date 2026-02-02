@@ -94,16 +94,6 @@ local string_format, string_sub = string.format, string.sub
 	end
 
 -- Color manipulation
-
-	---Brightens the color by [0-255]-amount.
-	---@param amount number
-	---@return Color
-	function COLOR:SetBrightness(amount)
-		local h,s,l = ColorToHSL(self)
-		l = math.Clamp(amount / 255, 0, 1)
-		return HSLToColor(h,s,l)
-	end
-
 	---Inverts the color.
 	---@return Color
 	function COLOR:Invert()
