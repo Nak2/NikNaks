@@ -30,29 +30,13 @@ local string_format, string_sub = string.format, string.sub
 	COLOR.ToLuminance = ColorToLuminance
 
 -- Hex
-	---Converts a color into a hex-string.
-	---@param color Color
-	---@return string
-	function NikNaks.ColorToHex(color)
-		return "#" .. string_format("%02X%02X%02X", color.r, color.g, color.b)
-	end
-	local ColorToHex = NikNaks.ColorToHex
-
-	---Converts a color into a hex-string.
-	---@return string
-	COLOR.ToHex = ColorToHex
-
-	---Converts a hex-stirng into a color.
-	---@param str string
-	---@return Color
-	function NikNaks.HexToColor(str)
-		str = string.gsub(str,"#","")
-		local r = tonumber( string_sub(str,1,2), 16)
-		local g = tonumber( string_sub(str,3,4), 16)
-		local b = tonumber( string_sub(str,5,6), 16)
-		if(r == nil or g == nil or b == nil) then return Color(255,255,255) end
-		return Color(round(r), round(g), round(b))
-	end
+	--- Old function kept for backwards compatibility
+	---@deprecated
+	NikNaks.ColorToHex = COLOR.ToHex
+	
+	--- Old function kept for backwards compatibility
+	--- @deprecated
+	NikNaks.HexToColor = HexToColor
 
 -- CMYK
 
