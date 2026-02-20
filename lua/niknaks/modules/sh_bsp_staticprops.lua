@@ -124,6 +124,13 @@ local version = {}
 		return q + 64
 	end
 
+	-- CSGO maps
+	version[12] = function( f, obj, m )
+		local q = version[11]( f, obj, m )
+		obj.Reserverd = f:ReadULong() -- Seems to be always 0, so probably just reserved for future use.
+		return q + 64
+	end
+
 --- @class StaticProp
 
 --- @param f BitBuffer
@@ -162,8 +169,8 @@ function meta:GetStaticProps()
 		return self._staticprops
 	end
 
-	if propVersion > 11 then
-		ErrorNoHalt( self._mapfile .. " has an unknown static-prop version!" )
+	if propVersion > 12 then
+		ErrorNoHalt( self._mapfile .. " has an unknown static-prop version (" .. propVersion .. ")!" )
 		self._staticprops = {}
 		self._staticprops_mdl = {}
 		return self._staticprops
