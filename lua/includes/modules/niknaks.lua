@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.55
+local version = 0.56
 if NikNaks and NikNaks.VERSION > version then return end
 
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
