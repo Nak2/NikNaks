@@ -512,7 +512,8 @@ local function GetDisplacementVertexs(self, faceVertexData )
 				v = textureUV.y,
 				u1 = lightmapUV.x,
 				v1 = lightmapUV.y,
-				userdata = { 0, 0, 0, 0 }
+				userdata = { 0, 0, 0, 0 },
+				color = Color( 0, 0, 0, vertex.alpha )
 			} )
 
 			index = index + 1
