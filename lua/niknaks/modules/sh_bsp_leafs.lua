@@ -573,7 +573,7 @@ local function locateLineLeaf(self, nodeIndex, startFraction, endFraction, start
 			side_id = 2
 
 			local inversed_distance  = 1 / ( start_dist - end_dist )
-			fraction_first = ( start_dist + FLT_EPSILON ) * inversed_distance
+			fraction_first = ( start_dist - FLT_EPSILON ) * inversed_distance
 			fraction_second = ( start_dist + FLT_EPSILON ) * inversed_distance
 		elseif( end_dist < start_dist ) then
 			side_id = 1
