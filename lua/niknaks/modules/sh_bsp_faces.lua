@@ -531,6 +531,51 @@ local function GetDisplacementVertexs(self, faceVertexData )
 		end
 	end
 
+	do
+		local accum = {}
+		for k = 1, #vertices do accum[k] = Vector( 0, 0, 0 ) end
+
+		local gridSize = power2 + 1
+		local baseNormal = baseVerts[1].normal
+
+		for row = 0, power2 - 1 do
+			for col = 0, power2 - 1 do
+				local i1 = row * gridSize + col + 1
+				local i2 = ( row + 1 ) * gridSize + col + 1
+				local i3 = ( row + 1 ) * gridSize + col + 2
+				local i4 = row * gridSize + col + 2
+				local p1, p2, p3, p4 = vertices[i1].pos, vertices[i2].pos, vertices[i3].pos, vertices[i4].pos
+
+				local na, nb
+				if ( row + col ) % 2 == 0 then
+					na = ( p2 - p1 ):Cross( p3 - p1 )
+					nb = ( p3 - p1 ):Cross( p4 - p1 )
+					accum[i1] = accum[i1] + na + nb
+					accum[i2] = accum[i2] + na
+					accum[i3] = accum[i3] + na + nb
+					accum[i4] = accum[i4] + nb
+				else
+					na = ( p2 - p1 ):Cross( p4 - p1 )
+					nb = ( p3 - p2 ):Cross( p4 - p2 )
+					accum[i1] = accum[i1] + na
+					accum[i2] = accum[i2] + na + nb
+					accum[i3] = accum[i3] + nb
+					accum[i4] = accum[i4] + na + nb
+				end
+			end
+		end
+
+		for k = 1, #vertices do
+			local n = accum[k]
+			if n:LengthSqr() > 0 then
+				n = n:GetNormalized()
+				-- Ensure the computed normal faces the same side as the base face.
+				if n:Dot( baseNormal ) < 0 then n = -n end
+				vertices[k].normal = n
+			end
+		end
+	end
+
 	--- Vertecies are in a grid, we need to convert them to triangles
 
 	return vertices
@@ -649,13 +694,21 @@ local function GridPolyChop(grid)
 			local i2 = i * width + j
 			local i3 = i * width + j + 1
 			local i4 = ( i - 1 ) * width + j + 1
-			local g1, g3 = grid[i1], grid[i3]
-			n = n + 1; triangles[n] = g1
-			n = n + 1; triangles[n] = grid[i2]
-			n = n + 1; triangles[n] = g3
-			n = n + 1; triangles[n] = g1
-			n = n + 1; triangles[n] = g3
-			n = n + 1; triangles[n] = grid[i4]
+			if ( i + j ) % 2 == 0 then
+				n = n + 1; triangles[n] = grid[i1]
+				n = n + 1; triangles[n] = grid[i2]
+				n = n + 1; triangles[n] = grid[i3]
+				n = n + 1; triangles[n] = grid[i1]
+				n = n + 1; triangles[n] = grid[i3]
+				n = n + 1; triangles[n] = grid[i4]
+			else
+				n = n + 1; triangles[n] = grid[i1]
+				n = n + 1; triangles[n] = grid[i2]
+				n = n + 1; triangles[n] = grid[i4]
+				n = n + 1; triangles[n] = grid[i2]
+				n = n + 1; triangles[n] = grid[i3]
+				n = n + 1; triangles[n] = grid[i4]
+			end
 		end
 	end
 
