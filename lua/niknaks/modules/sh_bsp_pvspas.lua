@@ -14,8 +14,11 @@ local meta_leaf = NikNaks.__metatables["BSP Leaf"]
 --[[The data is stored as an array of bit-vectors; for each cluster, a list of which other clusters are visible 
 	from it are stored as individual bits (1 if visible, 0 if occluded) in an array, with the nth bit position 
 	corresponding to the nth cluster. ]]
+local band = bit.band
+
 --- @param vis VisibilityInfo
 --- @param offset number
+--- @param PVS PVSObject|PASObject
 local function getClusters( vis, offset, PVS )
 	local c = 0
 	local v = offset
@@ -30,11 +33,11 @@ local function getClusters( vis, offset, PVS )
 			local b = 1
 
 			while b ~= 0 do
-				if bit.band( pvs_buffer[v], b ) ~= 0 then
+				if band( pvs_buffer[v], b ) ~= 0 then
 					PVS[c] = true
 				end
 
-				b = bit.band( b * 2, 0xFF )
+				b = band( b * 2, 0xFF )
 				c = c + 1
 			end
 		end
@@ -150,7 +153,7 @@ do
 		local t = {}
 		local n = 1
 		local leafs = self.__map:GetLeafs()
-
+		-- Source has a bug where the first leaf is unused.
 		for i = 1, #leafs do
 			local leaf = leafs[i]
 			local cluster = leaf.cluster
@@ -274,5 +277,25 @@ do
 	function meta_pas:HasLeaf( leaf )
 		if leaf.cluster < 0 then return false end
 		return self[leaf.cluster]
+	end
+
+	--- Returns a list of leafs within this PAS. Note: This is a bit slow.
+	--- @return BSPLeafObject[]
+	function meta_pas:GetLeafs()
+		local t = {}
+		local n = 1
+		local leafs = self.__map:GetLeafs()
+
+		for i = 1, #leafs do
+			local leaf = leafs[i]
+			local cluster = leaf.cluster
+
+			if cluster >= 0 and self[cluster] then
+				t[n] = leaf
+				n = n + 1
+			end
+		end
+
+		return t
 	end
 end

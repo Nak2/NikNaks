@@ -32,7 +32,7 @@ return {
                     .And:BeOfType("function")
 
                 Should(NikNaks.ColorToHex(Color(255, 255, 255)))
-                    :Be("#FFFFFF")
+                    :Be("#ffffff")
 
                 Should(NikNaks.ColorToHex(Color(0, 0, 0)))
                     :Be("#000000")

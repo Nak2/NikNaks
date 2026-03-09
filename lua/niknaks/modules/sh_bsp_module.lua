@@ -982,8 +982,9 @@ do
 		for i = 0, #leafs - 1 do
 			local leaf = leafs[i]
 			local cluster = leaf.cluster
-			if self._clusters[cluster] then
-				table.insert( self._clusters[cluster], leaf )
+			local arr = self._clusters[cluster]
+			if arr then
+				arr[#arr + 1] = leaf
 			else
 				self._clusters[cluster] = { leaf }
 			end
@@ -1060,16 +1061,17 @@ do
 		local dispInfoCount = data:Size() / m_Ddispinfo_t
 
 		local target = 0
+
+		local function verify( expectedBytes )
+			local here = data:Tell()
+			assert( here == target + ( expectedBytes * 8 ), ( here - target ) / 8 )
+		end
+
 		for i = 0, dispInfoCount - 1 do
 			target = i * m_Ddispinfo_t
 
 			if data:Tell() ~= target then
 				print( "ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell() )
-			end
-
-			local function verify( expectedBytes )
-				local here = data:Tell()
-				assert( here == target + ( expectedBytes * 8 ), ( here - target ) / 8 )
 			end
 
 			--- @class DispInfo
@@ -1303,13 +1305,10 @@ do
 	--- @return boolean
 	function meta:HasTexture( texture )
 		texture = lower( texture )
-
-		for _, v in pairs( self:GetTextures() ) do
-			if v and lower( v ) == texture then
-				return true
-			end
+		local data = self:GetTexdataStringData()
+		for i = 0, #data do
+			if lower(data[i])== texture then return true end
 		end
-
 		return false
 	end
 
@@ -1364,20 +1363,20 @@ do
 	function meta:GetSkyboxSize()
 		if self._skyboxmin and self._skyboxmaxs then return self._skyboxmin, self._skyboxmaxs end
 
+		local mmin, mmax = math.min, math.max
 		for _, leaf in ipairs( self:GetSkyboxLeafs() ) do
+			local lmins, lmaxs = leaf.mins, leaf.maxs
 			if not self._skyboxmin then
-				self._skyboxmin = Vector( leaf.mins )
+				self._skyboxmin  = Vector( lmins )
+				self._skyboxmaxs = Vector( lmaxs )
 			else
-				self._skyboxmin.x = math.min( self._skyboxmin.x, leaf.mins.x )
-				self._skyboxmin.y = math.min( self._skyboxmin.y, leaf.mins.y )
-				self._skyboxmin.z = math.min( self._skyboxmin.z, leaf.mins.z )
-			end
-			if not self._skyboxmaxs then
-				self._skyboxmaxs = Vector( leaf.maxs )
-			else
-				self._skyboxmaxs.x = math.max( self._skyboxmaxs.x, leaf.maxs.x )
-				self._skyboxmaxs.y = math.max( self._skyboxmaxs.y, leaf.maxs.y )
-				self._skyboxmaxs.z = math.max( self._skyboxmaxs.z, leaf.maxs.z )
+				local smin, smax = self._skyboxmin, self._skyboxmaxs
+				smin.x = mmin( smin.x, lmins.x )
+				smin.y = mmin( smin.y, lmins.y )
+				smin.z = mmin( smin.z, lmins.z )
+				smax.x = mmax( smax.x, lmaxs.x )
+				smax.y = mmax( smax.y, lmaxs.y )
+				smax.z = mmax( smax.z, lmaxs.z )
 			end
 		end
 

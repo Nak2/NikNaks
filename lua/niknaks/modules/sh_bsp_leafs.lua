@@ -650,3 +650,58 @@ end
 function meta_leaf:GetPos()
 	return (self.mins + self.maxs) / 2
 end
+
+--- Generates a triangle list for the leaf volume by carving a large box
+--- @return PolygonMeshVertex[]
+function meta_leaf:GenerateVertexData()
+	if self._vertData then return self._vertData end
+	local carveBox = NikNaks._carveBox
+
+	local boundary = self:GetBoundaryPlanes()
+	local planelist = {}
+	for _, plane in ipairs( boundary ) do
+		-- Negate: carveBox keeps dot(n,p) <= dist; boundary normal points in,
+		-- so we clip with -n and -dist to keep the interior.
+		local n = plane.normal
+		planelist[#planelist + 1] = { nx = -n.x, ny = -n.y, nz = -n.z, dist = -plane.dist }
+	end
+
+	self._vertData = carveBox( planelist )
+	return self._vertData
+end
+
+if CLIENT then
+	--- Builds and caches an IMesh for the leaf volume.
+	--- @param col Color? Tint color (default white)
+	--- @return IMesh|false
+	function meta_leaf:BuildMesh( col )
+		if self._mesh ~= nil then return self._mesh end
+		col = col or color_white
+		local verts = self:GenerateVertexData()
+		if not verts or #verts == 0 then self._mesh = false; return false end
+		local cr, cg, cb, ca = col.r, col.g, col.b, col.a
+		local nv = #verts
+		self._mesh = Mesh()
+		mesh.Begin( self._mesh, MATERIAL_TRIANGLES, nv / 3 )
+		for i = 1, nv do
+			local v = verts[i]
+			mesh.Position( v.pos )
+			mesh.Normal( v.normal )
+			mesh.Color( cr, cg, cb, ca )
+			mesh.TexCoord( 0, 0, 0 )
+			mesh.AdvanceVertex()
+		end
+		mesh.End()
+		table.insert( NIKNAKS_TABOMESH, self._mesh )
+		return self._mesh
+	end
+
+	--- Deletes the cached mesh.
+	--- @return self
+	function meta_leaf:DeleteMesh()
+		if self._mesh then self._mesh:Destroy() end
+		self._mesh     = nil
+		self._vertData = nil
+		return self
+	end
+end

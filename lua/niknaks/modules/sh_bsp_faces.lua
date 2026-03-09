@@ -117,16 +117,18 @@ local function __findEntityUsingBrush( self )
 	return self.__funcBrush
 end
 
---- Parses a Color object from the given BitBuffer
+--- Parses a Color object and exponent from the given BitBuffer
 --- @param data BitBuffer
 --- @return Color
+--- @return number exponent
 local function __readColorRGBExp32 ( data )
-	return NikNaks.ColorRGBExp32ToColor( {
+	local sample = {
 		r = data:ReadByte(),
 		g = data:ReadByte(),
 		b = data:ReadByte(),
 		exponent = data:ReadSignedByte()
-	} )
+	}
+	return NikNaks.ColorRGBExp32ToColor( sample ), sample.exponent
 end
 
 --- Returns the lightmap samples for the face.
@@ -170,9 +172,15 @@ function meta_face:GetLightmapSamples()
 	--  in reverse order from that given in the styles[] array."
 	local color, exponent
 	data:Seek( ( lightofs * 8 ) - ( 32 * lightstyle_count ) )
-	for _ = 1, lightstyle_count do
+	for i = 1, lightstyle_count do
 		color, exponent = __readColorRGBExp32( data )
-		table.insert( average, 1, { color = color, exponent = exponent } )
+		average[i] = { color = color, exponent = exponent }
+	end
+	-- BSP stores averages in reverse style order; reverse the array in-place.
+	local lo, hi = 1, lightstyle_count
+	while lo < hi do
+		average[lo], average[hi] = average[hi], average[lo]
+		lo = lo + 1;  hi = hi - 1
 	end
 
 	-- Get the full samples
@@ -285,7 +293,7 @@ function meta_face:IsDisplacement()
 end
 
 --- Returns the DisplacmentInfo for the face.
----@return DispInfo
+---@return DispInfo?
 function meta_face:GetDisplacementInfo()
 	local _, t = self.__map:GetDispInfo()
 	return t[self.__id]
@@ -373,7 +381,7 @@ function meta_face:CalculateSegmentIntersection( startPos, endPos )
 	local dot1 = plane:DistTo(startPos)
 	local dot2 = plane:DistTo(endPos)
 
-	if (dot1 > 0) ~= (dot2 > 0) or true then
+	if (dot1 > 0) ~= (dot2 > 0) then
 		local t = dot1 / ( dot1 - dot2 )
 
 		if t <= 0 or t >= 1 then return end
@@ -488,6 +496,9 @@ local function GetDisplacementVertexs(self, faceVertexData )
 		local vertex, t1, t2, baryVert, dispVert, trueVert, textureUV, lightmapUV
 		local normal = baseVerts[1].normal
 
+		local tangent = normal:Cross( vector_up ):Cross( normal ):GetNormalized()
+		local tangentUD = { tangent.x, tangent.y, tangent.z, 1 }
+
 		local index = 0
 		for v = vertStart, vertEnd - 1 do
 			vertex = dispVertices[v]
@@ -512,8 +523,8 @@ local function GetDisplacementVertexs(self, faceVertexData )
 				v = textureUV.y,
 				u1 = lightmapUV.x,
 				v1 = lightmapUV.y,
-				userdata = { 0, 0, 0, 0 },
-				color = Color( 0, 0, 0, vertex.alpha )
+				userdata = tangentUD,
+				color = Color( 255, 255, 255, vertex.alpha )
 			} )
 
 			index = index + 1
@@ -533,14 +544,29 @@ end
 function meta_face:GenerateVertexData()
 	--- @type PolygonMeshVertex[]
 	local t = {}
-	local tv = self:GetTexInfo().textureVects
-	local lv = self:GetTexInfo().lightmapVecs
+	local texinfo = self:GetTexInfo()
+	if not texinfo then return t end
+	local tv = texinfo.textureVects
+	local lv = texinfo.lightmapVecs
 	local texdata = self:GetTexData()
 	local mat_w, mat_h = 0, 0
 	if texdata ~= nil then
 		mat_w, mat_h = texdata.view_width, texdata.view_height
 	end
 	local n = self:GetNormal()
+
+	-- Cache UV transform rows as flat locals — avoids nested table lookups per vertex.
+	local tv00, tv01, tv02, tv03 = tv[0][0], tv[0][1], tv[0][2], tv[0][3]
+	local tv10, tv11, tv12, tv13 = tv[1][0], tv[1][1], tv[1][2], tv[1][3]
+	local lv00, lv01, lv02, lv03 = lv[0][0], lv[0][1], lv[0][2], lv[0][3]
+	local lv10, lv11, lv12, lv13 = lv[1][0], lv[1][1], lv[1][2], lv[1][3]
+	local lm1 = self.LightmapTextureMinsInLuxels[1]
+	local lm2 = self.LightmapTextureMinsInLuxels[2]
+
+	-- Tangent/binormal are constant for the face (normal is uniform).
+	local tangent  = n:Cross( vector_up ):Cross( n ):GetNormalized()
+	local binormal = n:Cross( tangent )
+	local tangentUD = { tangent.x, tangent.y, tangent.z, 0 }
 
 	-- Move the faces to match func_brushes (If any)
 	local bNum = self.__bmodel
@@ -557,28 +583,30 @@ function meta_face:GenerateVertexData()
 	local luxelW = self.LightmapTextureSizeInLuxels[1] + 1
 	local luxelH = self.LightmapTextureSizeInLuxels[2] + 1
 
+	-- Cache brush-offset helpers outside the loop to avoid recreating zero
+	-- Angle/Vector on every iteration when the face belongs to a brush entity.
+	local zeroAngle  = Angle( 0, 0, 0 )
+	local zeroVector = Vector( 0, 0, 0 )
+
 	for i = 0, self.numedges - 1 do
 		--- @class PolygonMeshVertex
 		local vert = {}
 		local a = self.__map:GetSurfEdgesIndex( self.firstedge + i )
 		vert.pos = a
 		if bNum > 0 then -- WorldPos -> Entity Brush
-			a = WorldToLocal( a, Angle(0,0,0), Vector(0,0,0), exAng )
-			vert.pos = a + exPos
+			local localA = WorldToLocal( a, zeroAngle, zeroVector, exAng )
+			vert.pos = localA + exPos
 		end
-		vert.normal = n
+		vert.normal   = n
+		vert.tangent  = tangent
+		vert.binormal = binormal
 		-- UV & LV
-		vert.u = ( tv[0][0] * a.x + tv[0][1] * a.y + tv[0][2] * a.z + tv[0][3] ) / mat_w
-		vert.v = ( tv[1][0] * a.x + tv[1][1] * a.y + tv[1][2] * a.z + tv[1][3] ) / mat_h
+		vert.u  = ( tv00 * a.x + tv01 * a.y + tv02 * a.z + tv03 ) / mat_w
+		vert.v  = ( tv10 * a.x + tv11 * a.y + tv12 * a.z + tv13 ) / mat_h
+		vert.u1 = ( lv00 * a.x + lv01 * a.y + lv02 * a.z + lv03 - lm1 ) / luxelW
+		vert.v1 = ( lv10 * a.x + lv11 * a.y + lv12 * a.z + lv13 - lm2 ) / luxelH
 
-		vert.u1 = ( ( lv[0][0] * a.x + lv[0][1] * a.y + lv[0][2] * a.z + lv[0][3] ) - self.LightmapTextureMinsInLuxels[1] ) / luxelW
-		vert.v1 = ( ( lv[1][0] * a.x + lv[1][1] * a.y + lv[1][2] * a.z + lv[1][3] ) - self.LightmapTextureMinsInLuxels[2] ) / luxelH
-
-		local biangent = vert.normal:Cross(vector_up)
-		vert.tangent = biangent:Cross(vert.normal):GetNormalized()
-		vert.binormal = vert.normal:Cross(vert.tangent)
-
-		vert.userdata = { vert.tangent.x, vert.tangent.y, vert.tangent.z, 0 } -- Todo: Calculate this?
+		vert.userdata = tangentUD
 		t[i + 1] = vert
 	end
 
@@ -610,28 +638,28 @@ end
 ---@param grid PolygonMeshVertex
 ---@return PolygonMeshVertex[]
 local function GridPolyChop(grid)
-	local width = math.sqrt(#grid)
+	local width  = math.sqrt( #grid )
 	local height = #grid / width
-    local triangles = {}
+	local triangles = {}
+	local n = 0
 
 	for i = 1, height - 1 do
-        for j = 1, width - 1 do
-            local index1 = (i - 1) * width + j
-            local index2 = i * width + j
-            local index3 = i * width + j + 1
+		for j = 1, width - 1 do
+			local i1 = ( i - 1 ) * width + j
+			local i2 = i * width + j
+			local i3 = i * width + j + 1
+			local i4 = ( i - 1 ) * width + j + 1
+			local g1, g3 = grid[i1], grid[i3]
+			n = n + 1; triangles[n] = g1
+			n = n + 1; triangles[n] = grid[i2]
+			n = n + 1; triangles[n] = g3
+			n = n + 1; triangles[n] = g1
+			n = n + 1; triangles[n] = g3
+			n = n + 1; triangles[n] = grid[i4]
+		end
+	end
 
-            table.insert(triangles, grid[index1])
-			table.insert(triangles, grid[index2])
-			table.insert(triangles, grid[index3])
-
-            local index4 = (i - 1) * width + j + 1
-            table.insert(triangles, grid[index1])
-			table.insert(triangles,grid[index3])
-			table.insert(triangles,grid[index4])
-        end
-    end
-
-    return triangles
+	return triangles
 end
 
 
@@ -704,18 +732,18 @@ if CLIENT then
 		self._mesh = Mesh( self:GetMaterial() )
 
 		-- Vert
-		mesh.Begin( self._mesh, MATERIAL_TRIANGLES, #verts / 3 )
-		for i = 1, #verts do
+		local vertCount = #verts
+		local cr, cg, cb, ca = col.r, col.g, col.b, col.a
+		mesh.Begin( self._mesh, MATERIAL_TRIANGLES, vertCount / 3 )
+		for i = 1, vertCount do
 			local vert = verts[i]
 			-- > Mesh
 			mesh.Normal( vert.normal )
-			mesh.Position( vert.pos ) -- Set the position
-			mesh.Color(col.r, col.g, col.b, col.a)
-			mesh.TexCoord( 0, vert.u, vert.v ) -- Set the texture UV coordinates
-			mesh.TexCoord( 1, vert.u1, vert.v1 ) -- Set the lightmap UV coordinates
-			mesh.TexCoord( 2, vert.u1, vert.v1 ) -- Set the lightmap UV coordinates
-			--mesh.TexCoord( 2, self.LightmapTextureSizeInLuxels[1], self.LightmapTextureSizeInLuxels[2] ) -- Set the texture UV coordinates
-			--mesh.TexCoord( 2, self.LightmapTextureMinsInLuxels[1], self.LightmapTextureMinsInLuxels[2] ) -- Set the texture UV coordinates
+			mesh.Position( vert.pos )
+			mesh.Color( cr, cg, cb, ca )
+			mesh.TexCoord( 0, vert.u, vert.v )   -- texture UV
+			mesh.TexCoord( 1, vert.u1, vert.v1 ) -- lightmap UV
+			mesh.TexCoord( 2, vert.u1, vert.v1 )
 			mesh.AdvanceVertex()
 		end
 
