@@ -624,9 +624,9 @@ do
 		-- Load TexdataStringTable		
 		self:GetTextures()
 		local b = self:GetLump( 2 )
-		local count = b:Size() / 256 + 1
+		local count = b:Size() / 256
 
-		for i = 0, count - 1 do
+		for i = 0, count do
 			--- @class BSPTextureData
 			--- @field reflectivity Vector
 			--- @field nameStringTableID string

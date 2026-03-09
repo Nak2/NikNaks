@@ -49,7 +49,7 @@ do
 	---@field __map BSPObject
 	local meta_pvs = {}
 	meta_pvs.__index = meta_pvs
-	meta_pvs.__tostring = "BSP PVS"
+	meta_pvs.__tostring = function() return "BSP PVS" end
 	meta_pvs.MetaName = "BSP PVS"
 	NikNaks.__metatables["BSP PVS"] = meta_pvs
 
@@ -179,15 +179,15 @@ do
 	---@field __map BSPObject
 	local meta_pas = {}
 	meta_pas.__index = meta_pas
-	meta_pas.__tostring = "BSP PAS"
+	meta_pas.__tostring = function() return "BSP PAS" end
 	meta_pas.MetaName = "BSP PAS"
 	NikNaks.__metatables["BSP PAS"] = meta_pas
-	local DVIS_PAS = 2
-
 	--- Creates a new empty PAS-object. Positional Audio System
 	--- @return PASObject
 	function meta:CreatePAS()
-		return setmetatable( {}, meta_pas )
+		local t = {}
+		t.__map = self
+		return setmetatable( t, meta_pas )
 	end
 
 	--- Creates a new PAS-object and adds the position to it.
@@ -254,13 +254,14 @@ do
 	end
 
 	--- Creates a PAS from the leaf.
-	--- @return PASObject 
+	--- @return PASObject
 	function meta_leaf:CreatePAS()
 		local PAS = setmetatable( {}, meta_pas )
-		if self.cluster < 0 then return PAS end -- Leaf invalid. Return empty PVS.
+		PAS.__map = self.__map
+		if self.cluster < 0 then return PAS end -- Leaf invalid. Return empty PAS.
 
 		local vis = self.__map:GetVisibility()
-		local visofs = vis[ self.cluster ][ DVIS_PAS ]
+		local visofs = vis.VisData[ self.cluster ].PAS
 
 		getClusters( vis, visofs, PAS )
 
