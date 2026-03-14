@@ -10,15 +10,15 @@ local format = string.format
 local meta = NikNaks.__metatables["BSP"]
 
 --- @return File?
-local function openFile( self )
+local function openFile(self)
 	if self._mapfile == nil then return end
-	return file.Open( self._mapfile, "rb", "GAME" )
+	return file.Open(self._mapfile, "rb", "GAME")
 end
 
 --- Reads the lump header.
 --- @param self BSPObject
 --- @param f BitBuffer|File
-local function read_lump_h( self, f )
+local function read_lump_h(self, f)
 	-- "How do we stop people loading L4D2 maps in other games?"
 	-- "I got it, we scrample the header."
 
@@ -38,11 +38,11 @@ local function read_lump_h( self, f )
 		t.fileofs = f:ReadLong()
 		t.filelen = f:ReadLong()
 		t.fourCC = f:ReadLong()
-	elseif NikNaks._Source:find( "niknak" ) then -- Try and figure it out
-		local fileofs = f:ReadLong() -- Version
-		local filelen = f:ReadLong() -- fileofs
-		local version = f:ReadLong() -- filelen
-		t.fourCC  = f:ReadLong()
+	elseif NikNaks._Source:find("niknak") then -- Try and figure it out
+		local fileofs = f:ReadLong()          -- Version
+		local filelen = f:ReadLong()          -- fileofs
+		local version = f:ReadLong()          -- filelen
+		t.fourCC      = f:ReadLong()
 		if fileofs <= 8 then
 			self._isL4D2 = true
 			t.version = fileofs
@@ -62,16 +62,16 @@ end
 --- Parse LZMA. These are for gamelumps, entities, PAK files and staticprops .. ect from TF2
 --- @param str string
 --- @return string
-local function LZMADecompress( str )
-	if str:sub( 0, 4 ) ~= "LZMA" then return str end
+local function LZMADecompress(str)
+	if str:sub(0, 4) ~= "LZMA" then return str end
 
-	local actualSize = str:sub( 5, 8 )
-	local lzmaSize 	= NikNaks.BitBuffer.StringToInt( str:sub( 9, 12 ) )
+	local actualSize = str:sub(5, 8)
+	local lzmaSize   = NikNaks.BitBuffer.StringToInt(str:sub(9, 12))
 	if lzmaSize <= 0 then return "" end -- Invalid length
 
-	local t = str:sub( 13, 17 )
-	local data = str:sub( 18, 18 + lzmaSize ) -- Why not just read all of it? What data is after this? Tell me your secrets Valve.
-	return util.Decompress( t .. actualSize .. "\0\0\0\0" .. data ) or str
+	local t = str:sub(13, 17)
+	local data = str:sub(18, 18 + lzmaSize) -- Why not just read all of it? What data is after this? Tell me your secrets Valve.
+	return util.Decompress(t .. actualSize .. "\0\0\0\0" .. data) or str
 end
 
 local thisMap = "maps/" .. game.GetMap() .. ".bsp"
@@ -88,31 +88,31 @@ local thisMapObject
 --- - `NikNaks.BSP_ERROR_FILECANTOPEN` - Unable to open file
 --- - `NikNaks.BSP_ERROR_NOT_BSP` - Not a BSP file
 --- - `NikNaks.BSP_ERROR_TOO_NEW` - Map is too new
-function NikNaks.Map( fileName )
+function NikNaks.Map(fileName)
 	-- Handle filename
 	if not fileName then
 		if thisMapObject then return thisMapObject end -- This is for optimization, so we don't have to load the same map twice.
 		fileName = thisMap
 	else
-		if not string.match( fileName, ".bsp$" ) then fileName = fileName .. ".bsp" end -- Add file header
-		if not string.match( fileName, "^maps/" ) and not file.Exists( fileName, "GAME" ) then -- Map doesn't exists and no folder indecated.
-			fileName = "maps/" .. fileName	-- Add "maps" folder
+		if not string.match(fileName, ".bsp$") then fileName = fileName .. ".bsp" end    -- Add file header
+		if not string.match(fileName, "^maps/") and not file.Exists(fileName, "GAME") then -- Map doesn't exists and no folder indecated.
+			fileName = "maps/" .. fileName                                               -- Add "maps" folder
 		end
 	end
 
-	if not file.Exists( fileName, "GAME" ) then
+	if not file.Exists(fileName, "GAME") then
 		-- File not found
 		return nil, NikNaks.BSP_ERROR_FILENOTFOUND
 	end
 
-	local f = file.Open( fileName, "rb", "GAME" )
+	local f = file.Open(fileName, "rb", "GAME")
 	if not f then
 		-- Unable to open file
 		return nil, NikNaks.BSP_ERROR_FILECANTOPEN
 	end
 
 	-- Read the header
-	if f:Read( 4 ) ~= "VBSP" then
+	if f:Read(4) ~= "VBSP" then
 		f:Close()
 		return nil, NikNaks.BSP_ERROR_NOT_BSP
 	end
@@ -120,11 +120,11 @@ function NikNaks.Map( fileName )
 	-- Create BSP object
 	--- @class BSPObject
 	--- @field __map BSPObject
-	local BSP = setmetatable( {}, meta )
+	local BSP    = setmetatable({}, meta)
 	BSP._mapfile = fileName
-	BSP._size	 = f:Size()
-	BSP._mapname = string.GetFileFromFilename( fileName )
-	BSP._mapname = string.match( BSP._mapname, "(.+).bsp$" ) or BSP._mapname
+	BSP._size    = f:Size()
+	BSP._mapname = string.GetFileFromFilename(fileName)
+	BSP._mapname = string.match(BSP._mapname, "(.+).bsp$") or BSP._mapname
 	BSP._version = f:ReadLong()
 	BSP._fileobj = f
 
@@ -137,7 +137,7 @@ function NikNaks.Map( fileName )
 	--- @type BSPLumpHeader[]
 	BSP._lumpheader = {}
 	for i = 0, 63 do
-		BSP._lumpheader[i] = read_lump_h( BSP, f )
+		BSP._lumpheader[i] = read_lump_h(BSP, f)
 	end
 
 	--- @type BitBuffer[]
@@ -187,7 +187,7 @@ do
 		---@param lump_id number # The lump ID
 		---@return boolean
 		---@server
-		function meta:HasLumpFile( lump_id )
+		function meta:HasLumpFile(lump_id)
 			if self._lumpfile and self._lumpfile[lump_id] ~= nil then
 				return self._lumpfile[lump_id]
 			end
@@ -200,76 +200,76 @@ do
 	--- Returns the data lump as a ByteBuffer. This will also be cached onto the BSP object.
 	--- @param lump_id number # The lump ID to read. This is a number between 0 and 63.
 	--- @return BitBuffer
-	function meta:GetLump( lump_id )
+	function meta:GetLump(lump_id)
 		local lumpStream = self._lumpstream[lump_id]
 		if lumpStream then
-			lumpStream:Seek( 0 ) -- Reset the read position
+			lumpStream:Seek(0) -- Reset the read position
 			return lumpStream
 		end
 
 		local lump_h = self._lumpheader[lump_id]
-		assert( lump_h, "Tried to read invalid lumpheader!" )
+		assert(lump_h, "Tried to read invalid lumpheader!")
 
 		-- The raw lump data
 		local data = ""
 
 		-- Check for LUMPs
 		local lumpPath = "maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp"
-		if file.Exists( lumpPath, "GAME" ) then -- L4D has _s_ and _h_ files too. Depending on the gamemode.
-			data = file.Read( lumpPath, "GAME" ) or ""
+		if file.Exists(lumpPath, "GAME") then -- L4D has _s_ and _h_ files too. Depending on the gamemode.
+			data = file.Read(lumpPath, "GAME") or ""
 		elseif lump_h.filelen > 0 then
-			local f = openFile( self )
+			local f = openFile(self)
 			if (f ~= nil) then
-				f:Seek( lump_h.fileofs )
-				data = f:Read( lump_h.filelen )
+				f:Seek(lump_h.fileofs)
+				data = f:Read(lump_h.filelen)
 				f:Close()
 			end
 		end
 
 		-- TF2 have some maps that are LZMA compressed.
-		data = LZMADecompress( data )
+		data = LZMADecompress(data)
 
 		-- Create bytebuffer object with the data and return it
-		self._lumpstream[lump_id] = NikNaks.BitBuffer( data or "" )
+		self._lumpstream[lump_id] = NikNaks.BitBuffer(data or "")
 
 		return self._lumpstream[lump_id]
 	end
 
 	--- Deletes the lump from the cache. This frees up memory.
 	--- @param lump_id number
-	function meta:ClearLump( lump_id )
+	function meta:ClearLump(lump_id)
 		self._lumpstream[lump_id] = nil
 	end
 
 	--- Returns the lump version.
 	--- @return number
-	function meta:GetLumpVersion( lump_id )
-		return self._lumpheader[ lump_id ].version
+	function meta:GetLumpVersion(lump_id)
+		return self._lumpheader[lump_id].version
 	end
 
 	--- Reads the lump as a string. This will not be cached or saved, but it is faster than to parse the data into a bytebuffer and useful to read the raw data.
 	--- @param lump_id number # The lump ID to read. This is a number between 0 and 63.
 	--- @return string # The raw data of the lump.
-	function meta:GetLumpString( lump_id )
+	function meta:GetLumpString(lump_id)
 		local lump_h = self._lumpheader[lump_id]
-		assert( lump_h, "Tried to read invalid lumpheader!" )
+		assert(lump_h, "Tried to read invalid lumpheader!")
 
 		-- The raw lump data
 		local data = ""
 		local lumpPath = "maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp"
-		if file.Exists( lumpPath, "GAME" ) then
-			data = file.Read( lumpPath, "GAME" ) or ""
+		if file.Exists(lumpPath, "GAME") then
+			data = file.Read(lumpPath, "GAME") or ""
 		elseif lump_h.filelen > 0 then
-			local f = openFile( self )
-			if(f ~= nil) then
-				f:Seek( lump_h.fileofs )
-				data = f:Read( lump_h.filelen )
+			local f = openFile(self)
+			if (f ~= nil) then
+				f:Seek(lump_h.fileofs)
+				data = f:Read(lump_h.filelen)
 				f:Close()
 			end
 		end
 
 		-- TF2 have some maps that are LZMA compressed.
-		data = LZMADecompress( data )
+		data = LZMADecompress(data)
 		return data
 	end
 
@@ -279,8 +279,8 @@ do
 		if self._gamelump then return self._gamelump end
 		self._gamelump = {}
 
-		local lump = self:GetLump( 35 )
-		for i = 0, math.min( 63, lump:ReadLong() ) do
+		local lump = self:GetLump(35)
+		for i = 0, math.min(63, lump:ReadLong()) do
 			--- @class BSPGameLumpHeader
 			--- @field id number # ID of the lump
 			--- @field flags number # Flags of the lump
@@ -297,15 +297,15 @@ do
 			self._gamelump[i] = t
 		end
 
-		self:ClearLump( 35 )
+		self:ClearLump(35)
 		return self._gamelump
 	end
 
 	--- Returns the gamelump header matching the ID.
 	--- @param GameLumpID number
 	--- @return BSPGameLumpHeader?
-	function meta:FindGameLump( GameLumpID )
-		for _, v in pairs( self:GetGameLumpHeaders() ) do
+	function meta:FindGameLump(GameLumpID)
+		for _, v in pairs(self:GetGameLumpHeaders()) do
 			if v.id == GameLumpID then
 				return v
 			end
@@ -320,16 +320,16 @@ do
 	--- Returns the game lump as a bytebuffer. This will also be cached on the BSP object.
 	--- @param gameLumpID any
 	---	@return BSPGameLump?
-	function meta:GetGameLump( gameLumpID )
+	function meta:GetGameLump(gameLumpID)
 		--- @type BSPGameLump?
 		local gameLump = self._gamelumps[gameLumpID]
 		if gameLump then
-			gameLump.buffer:Seek( 0 )
+			gameLump.buffer:Seek(0)
 			return gameLump
 		end
 
 		-- Locate the gamelump.
-		local t = self:FindGameLump( gameLumpID )
+		local t = self:FindGameLump(gameLumpID)
 
 		-- No data found, or lump has no data.
 		if not t or t.filelen <= 0 then
@@ -344,13 +344,13 @@ do
 			self._gamelumps[gameLumpID] = gameLump
 			return gameLump
 		else
-			local f = openFile( self )
+			local f = openFile(self)
 			if f ~= nil then
-				f:Seek( t.fileofs )
+				f:Seek(t.fileofs)
 				gameLump = {
 					flags = t.flags,
 					version = t.version,
-					buffer = NikNaks.BitBuffer.Create( LZMADecompress( f:Read( t.filelen ) ) ),
+					buffer = NikNaks.BitBuffer.Create(LZMADecompress(f:Read(t.filelen))),
 				}
 				self._gamelumps[gameLumpID] = gameLump
 				return gameLump
@@ -373,7 +373,7 @@ do
 	--- Returns true if the map is a cold world. ( Flag set in the BSP ) This was added in Day of Defeat: Source.
 	--- @return boolean
 	function meta:IsColdWorld()
-		local wEnt = self:GetEntity( 0 )
+		local wEnt = self:GetEntity(0)
 		return wEnt and wEnt.coldworld == 1 or false
 	end
 
@@ -382,13 +382,13 @@ do
 	function meta:WorldMin()
 		if self._wmin then return self._wmin end
 
-		local wEnt = self:GetEntity( 0 )
+		local wEnt = self:GetEntity(0)
 		if not wEnt then
 			self._wmin = NikNaks.vector_zero
 			return self._wmin
 		end
 
-		self._wmin = util.StringToType( wEnt.world_mins or "0 0 0", "Vector" ) or NikNaks.vector_zero
+		self._wmin = util.StringToType(wEnt.world_mins or "0 0 0", "Vector") or NikNaks.vector_zero
 		return self._wmin
 	end
 
@@ -397,13 +397,13 @@ do
 	function meta:WorldMax()
 		if self._wmax then return self._wmax end
 
-		local wEnt = self:GetEntity( 0 )
+		local wEnt = self:GetEntity(0)
 		if not wEnt then
 			self._wmax = NikNaks.vector_zero
 			return self._wmax
 		end
 
-		self._wmax = util.StringToType( wEnt.world_maxs or "0 0 0", "Vector" ) or NikNaks.vector_zero
+		self._wmax = util.StringToType(wEnt.world_maxs or "0 0 0", "Vector") or NikNaks.vector_zero
 		return self._wmax
 	end
 
@@ -419,7 +419,7 @@ do
 	function meta:GetSkyBoxPos()
 		if self._skyCamPos then return self._skyCamPos end
 
-		local t = self:FindByClass( "sky_camera" )
+		local t = self:FindByClass("sky_camera")
 		if #t < 1 then
 			self._skyCamPos = NikNaks.vector_zero
 		else
@@ -434,7 +434,7 @@ do
 	function meta:GetSkyBoxScale()
 		if self._skyCamScale then return self._skyCamScale end
 
-		local t = self:FindByClass( "sky_camera" )
+		local t = self:FindByClass("sky_camera")
 		if #t < 1 then
 			self._skyCamScale = 1
 		else
@@ -448,22 +448,22 @@ do
 	--- @return boolean
 	function meta:HasSkyBox()
 		if self._skyCam ~= nil then return self._skyCam end
-		self._skyCam = #self:FindByClass( "sky_camera" ) > 0
+		self._skyCam = #self:FindByClass("sky_camera") > 0
 		return self._skyCam
 	end
 
 	--- Returns a position in the skybox that matches the one in the world.
 	--- @param vec Vector
 	--- @return Vector
-	function meta:WorldToSkyBox( vec )
+	function meta:WorldToSkyBox(vec)
 		return vec / self:GetSkyBoxScale() + self:GetSkyBoxPos()
 	end
 
 	--- Returns a position in the world that matches the one in the skybox.
 	--- @param vec Vector
 	--- @return Vector
-	function meta:SkyBoxToWorld( vec )
-		return ( vec - self:GetSkyBoxPos() ) * self:GetSkyBoxScale()
+	function meta:SkyBoxToWorld(vec)
+		return (vec - self:GetSkyBoxPos()) * self:GetSkyBoxScale()
 	end
 end
 
@@ -476,8 +476,9 @@ do
 	--- @field id number
 	local cubemeta = {}
 	cubemeta.__index = cubemeta
-	cubemeta.__tostring = function( self ) return
-		format( obj_tostring, "Cubemap", "Index: " .. self:GetIndex() )
+	cubemeta.__tostring = function(self)
+		return
+			format(obj_tostring, "Cubemap", "Index: " .. self:GetIndex())
 	end
 
 	--- Returns the position of the cubemap.
@@ -501,19 +502,20 @@ do
 	function meta:GetCubemaps()
 		if self._cubemaps then return self._cubemaps end
 
-		local b = self:GetLump( 42 )
+		local b = self:GetLump(42)
 		local len = b:Size()
 
 		--- @type BSPCubeMap[]
 		self._cubemaps = {}
-		for _ = 1, math.min( 1024, len / 128 ) do
+		for _ = 1, math.min(1024, len / 128) do
 			--- @class BSPCubeMap
-			local t = setmetatable( {}, cubemeta )
-			t.origin = Vector( b:ReadLong(), b:ReadLong(), b:ReadLong() )
+			local t = setmetatable({}, cubemeta)
+			t.origin = Vector(b:ReadLong(), b:ReadLong(), b:ReadLong())
 			t.size = b:ReadLong()
 			t.texture = ""
 
-			local texturePath = "maps/" .. self:GetMapName() .. "/c" .. t.origin.x .. "_" .. t.origin.y .. "_" .. t.origin.z
+			local texturePath = "maps/" ..
+			self:GetMapName() .. "/c" .. t.origin.x .. "_" .. t.origin.y .. "_" .. t.origin.z
 			t.texturePath = texturePath
 			if self:GetVersion() > 19 then
 				t.texturePath = texturePath .. ".hdr"
@@ -523,20 +525,20 @@ do
 				t.size = 32
 			end
 
-			t.id = table.insert( self._cubemaps, t ) - 1
+			t.id = table.insert(self._cubemaps, t) - 1
 		end
 
-		self:ClearLump( 42 )
+		self:ClearLump(42)
 		return self._cubemaps
 	end
 
 	--- Returns the nearest cubemap to the given position.
 	--- @param pos Vector # The position to check from
 	--- @return BSPCubeMap?
-	function meta:FindNearestCubemap( pos )
+	function meta:FindNearestCubemap(pos)
 		local lr, lc
-		for _, v in ipairs( self:GetCubemaps() ) do
-			local cd = v:GetPos():DistToSqr( pos )
+		for _, v in ipairs(self:GetCubemaps()) do
+			local cd = v:GetPos():DistToSqr(pos)
 
 			if not lc then
 				lc = v
@@ -551,6 +553,157 @@ do
 	end
 end
 
+-- Overlays (lump 45, doverlay_t)
+do
+	local OVERLAY_MAX_FACES = 64 -- OVERLAY_BSP_FACE_COUNT
+
+	--- @class BSPOverlay
+	--- @field id number
+	--- @field texinfo number
+	--- @field faceCount number
+	--- @field renderOrder number   # 0-3, controls draw order relative to other overlays.
+	--- @field faces number[]
+	--- @field uMin number
+	--- @field uMax number
+	--- @field vMin number
+	--- @field vMax number
+	--- @field uvPoints Vector[]
+	--- @field origin Vector
+	--- @field basisNormal Vector
+	--- @field __map BSPObject
+	--- @field fadeDistMinSq number? # Squared minimum fade distance (lump 60), nil if absent.
+	--- @field fadeDistMaxSq number? # Squared maximum fade distance (lump 60), nil if absent.
+	local ovmeta = {}
+	ovmeta.__index = ovmeta
+	ovmeta.__tostring = function(self)
+		return format(obj_tostring, "Overlay", "Id: " .. self.id)
+	end
+	NikNaks.__metatables["BSP Overlay"] = ovmeta
+
+	--- Returns the texture info for this overlay.
+	--- @return TextureInfo?
+	function ovmeta:GetTexInfo()
+		return self.__map:GetTexInfo()[self.texinfo]
+	end
+
+	--- Returns the material used by this overlay.
+	--- @return IMaterial
+	function ovmeta:GetMaterial()
+		if self._mat then return self._mat end
+		local texinfo = self:GetTexInfo()
+		local texdata = texinfo and self.__map:GetTexData()[texinfo.texdata]
+		self._mat = Material(texdata and texdata.nameStringTableID or "__error")
+		return self._mat
+	end
+
+	--- Returns the four corner positions of the overlay quad in world space.
+	--- @return Vector[]
+	function ovmeta:GetUVPoints() return self.uvPoints end
+
+	--- Returns the origin of the overlay.
+	--- @return Vector
+	function ovmeta:GetOrigin() return self.origin end
+
+	--- Returns the basis normal of the overlay.
+	--- @return Vector
+	function ovmeta:GetBasisNormal() return self.basisNormal end
+
+	--- Returns the render order (0-3).
+	--- @return number
+	function ovmeta:GetRenderOrder() return self.renderOrder end
+
+	--- Returns the BSP face s
+	--- @return BSPFaceObject[]
+	function ovmeta:GetFaces()
+		local faces = {}
+		for i = 1, self.faceCount do
+			local faceIndex = self.faces[i]
+			if faceIndex then
+				faces[#faces + 1] = self.__map:GetFaces()[faceIndex]
+			end
+		end
+		return faces
+	end
+
+	--- Returns the UV extents: uMin, uMax, vMin, vMax.
+	--- @return number, number, number, number
+	function ovmeta:GetUVExtents()
+		return self.uMin, self.uMax, self.vMin, self.vMax
+	end
+
+	--- Returns all overlays in the map.
+	--- @return BSPOverlay[]
+	function meta:GetOverlays()
+		if self._overlays then return self._overlays end
+
+		local data = self:GetLump(45)
+		local count = data:Size() / (352 * 8) -- 352 bytes each
+
+		--- @type BSPOverlay[]
+		self._overlays = {}
+
+		for _ = 1, count do
+			--- @class BSPOverlay
+			local t                 = setmetatable({}, ovmeta)
+			t.__map                 = self
+
+			t.id                    = data:ReadLong()
+			t.texinfo               = data:ReadShort()
+
+			local faceCountAndOrder = data:ReadUShort()
+			t.faceCount             = bit.band(faceCountAndOrder, 0x3FFF)
+			t.renderOrder           = bit.rshift(faceCountAndOrder, 14)
+
+			-- 64 face indices (unused slots are -1)
+			t.faces                 = {}
+			for i = 1, OVERLAY_MAX_FACES do
+				local idx = data:ReadLong()
+				if i <= t.faceCount then
+					t.faces[i] = idx
+				end
+			end
+
+			t.uMin = data:ReadFloat(); t.uMax = data:ReadFloat()
+			t.vMin = data:ReadFloat(); t.vMax = data:ReadFloat()
+
+			-- Four corner UV points (Vector, but only x/y used as U/V)
+			t.uvPoints = {}
+			for i = 1, 4 do
+				t.uvPoints[i] = data:ReadVector()
+			end
+
+			t.origin                            = data:ReadVector()
+			t.basisNormal                       = data:ReadVector()
+
+			self._overlays[#self._overlays + 1] = t
+		end
+
+		self:ClearLump(45)
+
+		-- Attach fade distances from lump 60 (doverlayfade_t) if present.
+		-- One entry per overlay: flFadeDistMinSq (float) + flFadeDistMaxSq (float) = 8 bytes = 64 bits.
+		local fadeData = self:GetLump( 60 )
+		if fadeData:Size() > 0 then
+			for i = 1, #self._overlays do
+				local ov = self._overlays[i]
+				ov.fadeDistMinSq = fadeData:ReadFloat()
+				ov.fadeDistMaxSq = fadeData:ReadFloat()
+			end
+		end
+		self:ClearLump( 60 )
+
+		return self._overlays
+	end
+
+	--- Returns the minimum squared fade distance for the overlay, or nil if not present.
+	--- @return number?
+	function ovmeta:GetFadeDistMinSq() return self.fadeDistMinSq end
+
+	--- Returns the maximum squared fade distance for the overlay, or nil if not present.
+	--- @return number?
+	function ovmeta:GetFadeDistMaxSq() return self.fadeDistMaxSq end
+end
+
 -- Textures and materials
 do
 	-- local max_data = 256000
@@ -562,12 +715,12 @@ do
 
 		self._texstab = {}
 
-		local data = self:GetLump( 44 )
+		local data = self:GetLump(44)
 		for i = 0, data:Size() / 32 - 1 do
 			self._texstab[i] = data:ReadLong()
 		end
 
-		self:ClearLump( 44 )
+		self:ClearLump(44)
 		return self._texstab
 	end
 
@@ -582,7 +735,7 @@ do
 		--- @type string[]
 		self._texstr.id = {}
 
-		local data = self:GetLump( 43 )
+		local data = self:GetLump(43)
 		for i = 0, data:Size() / 8 - 1 do
 			local _id = data:Tell() / 8
 			local str = data:ReadStringNull()
@@ -590,10 +743,10 @@ do
 
 			if #str == 0 then break end
 
-			self._texstr[i] = string.lower( str )
+			self._texstr[i] = string.lower(str)
 		end
 
-		self:ClearLump( 43 )
+		self:ClearLump(43)
 		return self._texstr
 	end
 
@@ -608,7 +761,7 @@ do
 		return c
 	end
 
-	local function getTexByID( self, id )
+	local function getTexByID(self, id)
 		id = self:GetTexdataStringTable()[id]
 		return self:GetTexdataStringData().id[id]
 	end
@@ -623,7 +776,7 @@ do
 
 		-- Load TexdataStringTable		
 		self:GetTextures()
-		local b = self:GetLump( 2 )
+		local b = self:GetLump(2)
 		local count = b:Size() / 256
 
 		for i = 0, count do
@@ -637,7 +790,7 @@ do
 			local t = {}
 			t.reflectivity = b:ReadVector()
 			local n = b:ReadLong()
-			t.nameStringTableID = getTexByID( self, n ) or tostring( n )
+			t.nameStringTableID = getTexByID(self, n) or tostring(n)
 			t.width = b:ReadLong()
 			t.height = b:ReadLong()
 			t.view_width = b:ReadLong()
@@ -645,7 +798,7 @@ do
 			self._tdata[i] = t
 		end
 
-		self:ClearLump( 2 )
+		self:ClearLump(2)
 		return self._tdata
 	end
 
@@ -655,7 +808,7 @@ do
 		if self._tinfo then return self._tinfo end
 
 		self._tinfo = {}
-		local data = self:GetLump( 6 )
+		local data = self:GetLump(6)
 
 		for i = 0, data:Size() / 576 - 1 do
 			--- @class TextureInfo
@@ -663,19 +816,19 @@ do
 			--- @field lightmapVecs table<number, number[]>
 			--- @field flags number # Surface flags of the texture (SURF_*)
 			--- @field texdata number # Index of the texture data
-			local t = {}
-			t.textureVects	= {}
+			local t           = {}
+			t.textureVects    = {}
 			t.textureVects[0] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
 			t.textureVects[1] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
-			t.lightmapVecs	= {}
+			t.lightmapVecs    = {}
 			t.lightmapVecs[0] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
 			t.lightmapVecs[1] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
-			t.flags			= data:ReadLong()
-			t.texdata 		= data:ReadLong()
-			self._tinfo[i] = t
+			t.flags           = data:ReadLong()
+			t.texdata         = data:ReadLong()
+			self._tinfo[i]    = t
 		end
 
-		self:ClearLump( 6 )
+		self:ClearLump(6)
 		return self._tinfo
 	end
 end
@@ -696,8 +849,8 @@ do
 	--- Calculates the plane dist
 	--- @param vec Vector
 	--- @return number
-	function planeMeta:DistTo( vec )
-		return dot(self.normal, vec ) - self.dist
+	function planeMeta:DistTo(vec)
+		return dot(self.normal, vec) - self.dist
 	end
 
 	--- Returns a list of all planes
@@ -706,22 +859,22 @@ do
 		if self._plane then return self._plane end
 
 		self._plane = {}
-		local data = self:GetLump( 1 )
+		local data = self:GetLump(1)
 		for i = 0, data:Size() / 160 - 1 do
 			--- @class BSPPlane
 			local t = {}
 			t.normal = data:ReadVector() -- Normal vector
 			t.dist = data:ReadFloat() -- Distance from origin
 			t.type = data:ReadLong() -- Plane axis identifier
-			setmetatable( t, planeMeta )
+			setmetatable(t, planeMeta)
 			self._plane[i] = t
 		end
 
-		for i, t in pairs( self._plane ) do
-			t.back = self._plane[ bit.bxor( i, 1 ) ] -- Back plane
+		for i, t in pairs(self._plane) do
+			t.back = self._plane[bit.bxor(i, 1)] -- Back plane
 		end
 
-		self:ClearLump( 1 )
+		self:ClearLump(1)
 		return self._plane
 	end
 
@@ -734,13 +887,13 @@ do
 
 		--- @type Vector[]
 		self._vertex = {}
-		local data = self:GetLump( 3 )
+		local data = self:GetLump(3)
 
-		for i = 0, math.min( data:Size() / 96, MAX_MAP_VERTEXS ) - 1 do
+		for i = 0, math.min(data:Size() / 96, MAX_MAP_VERTEXS) - 1 do
 			self._vertex[i] = data:ReadVector()
 		end
 
-		self:ClearLump( 3 )
+		self:ClearLump(3)
 		return self._vertex
 	end
 
@@ -754,14 +907,14 @@ do
 
 		-- @type table<number, Vector[]>
 		self._edge = {}
-		local data = self:GetLump( 12 )
+		local data = self:GetLump(12)
 
 		local v = self:GetVertex()
-		for i = 0, math.min( data:Size() / 32, MAX_MAP_EDGES ) -1 do
+		for i = 0, math.min(data:Size() / 32, MAX_MAP_EDGES) - 1 do
 			self._edge[i] = { v[data:ReadUShort()], v[data:ReadUShort()] }
 		end
 
-		self:ClearLump( 12 )
+		self:ClearLump(12)
 		return self._edge
 	end
 
@@ -774,13 +927,13 @@ do
 
 		--- @type number[]
 		self._surfedge = {}
-		local data = self:GetLump( 13 )
+		local data = self:GetLump(13)
 
-		for i = 0, math.min( data:Size() / 32, MAX_MAP_SURFEDGES ) -1 do
+		for i = 0, math.min(data:Size() / 32, MAX_MAP_SURFEDGES) - 1 do
 			self._surfedge[i] = data:ReadLong()
 		end
 
-		self:ClearLump( 13 )
+		self:ClearLump(13)
 		return self._surfedge
 	end
 
@@ -789,9 +942,9 @@ do
 	--- Returns the two edge-positions using surf index
 	--- @param num number
 	--- @return Vector, Vector
-	function meta:GetSurfEdgesIndex( num )
+	function meta:GetSurfEdgesIndex(num)
 		local surf = self:GetSurfEdges()[num]
-		local edge = self:GetEdges()[abs( surf )]
+		local edge = self:GetEdges()[abs(surf)]
 
 		if surf >= 0 then
 			return edge[1], edge[2]
@@ -808,12 +961,12 @@ do
 	function meta:GetVisibility()
 		if self._vis then return self._vis end
 
-		local data = self:GetLump( 4 )
+		local data = self:GetLump(4)
 		local num_clusters = data:ReadLong()
 
 		-- Check to see if the num_clusters match
 		if num_clusters ~= self:GetLeafsNumClusters() then
-			error( "Invalid NumClusters!" )
+			error("Invalid NumClusters!")
 		end
 
 		--- @class VisibilityInfo
@@ -833,10 +986,10 @@ do
 			visData[i] = v
 		end
 
-		data:Seek( 0 )
+		data:Seek(0)
 
 		local bytebuff = {}
-		for i = 0, bit.rshift( data:Size() - data:Tell(), 3 ) - 1 do
+		for i = 0, bit.rshift(data:Size() - data:Tell(), 3) - 1 do
 			bytebuff[i] = data:ReadByte()
 		end
 
@@ -844,72 +997,75 @@ do
 		t.num_clusters = num_clusters
 		self._vis = t
 
-		self:ClearLump( 4 )
+		self:ClearLump(4)
 		return t
 	end
 
-	local TEST_EPSILON			= 0.1
-	local dot = Vector().Dot
+	local TEST_EPSILON = 0.1
+	local dot          = Vector().Dot
 
 	--- Returns the leaf the point is within. Use 0 If unsure about iNode.
 	--- @param iNode number
 	--- @param point Vector
 	--- @return BSPLeafObject
-	function meta:PointInLeaf( iNode, point )
-		if iNode < 0 then
-			return self:GetLeafs()[-1 -iNode]
-		end
+	function meta:PointInLeaf(iNode, point)
+		local nodes  = self:GetNodes()
+		local planes = self:GetPlanes()
+		local leafs  = self:GetLeafs()
 
-		local node = self:GetNodes()[iNode]
-		local plane = self:GetPlanes()[node.planenum]
-		local dist = dot(point, plane.normal ) - plane.dist
+		while iNode >= 0 do
+			local node  = nodes[iNode]
+			local plane = planes[node.planenum]
+			local d     = dot(point, plane.normal) - plane.dist
 
-		if dist > TEST_EPSILON then
-			return self:PointInLeaf( node.children[1], point )
-		elseif dist < -TEST_EPSILON then
-			return self:PointInLeaf( node.children[2], point )
-		else
-			local pTest = self:PointInLeaf( node.children[1], point )
-			if pTest.cluster ~= -1 then
-				return pTest
+			if d > TEST_EPSILON then
+				iNode = node.children[1]
+			elseif d < -TEST_EPSILON then
+				iNode = node.children[2]
+			else
+				-- Point lies exactly on the splitting plane — try both sides.
+				-- This is rare; short recursive calls are fine here.
+				local pTest = self:PointInLeaf(node.children[1], point)
+				if pTest.cluster ~= -1 then return pTest end
+				return self:PointInLeaf(node.children[2], point)
 			end
-
-			return self:PointInLeaf( node.children[2], point )
 		end
+
+		return leafs[-1 - iNode]
 	end
 
 	--- Returns the contents of the point.
 	--- @param point Vector
 	--- @return CONTENTS # Contents of the point
-	function meta:PointContents( point )
-		local leaf = self:PointInLeaf( 0, point )
+	function meta:PointContents(point)
+		local leaf = self:PointInLeaf(0, point)
 		return leaf.contents
 	end
 
-	--- Returns the leaf the point is within, but allows caching by feeding the old VisLeaf. 
+	--- Returns the leaf the point is within, but allows caching by feeding the old VisLeaf.
 	--- Will also return a boolean indicating if the leaf is new.
 	--- @param iNode number
 	--- @param point Vector
 	--- @param lastVis BSPLeafObject?
 	--- @return BSPLeafObject
 	--- @return boolean newLeaf
-	function meta:PointInLeafCache( iNode, point, lastVis )
-		if not lastVis then return self:PointInLeaf( iNode, point ), true end
-		if point:WithinAABox( lastVis.mins, lastVis.maxs ) then return lastVis, false end
-		return self:PointInLeaf( iNode, point ), true
+	function meta:PointInLeafCache(iNode, point, lastVis)
+		if not lastVis then return self:PointInLeaf(iNode, point), true end
+		if point:WithinAABox(lastVis.mins, lastVis.maxs) then return lastVis, false end
+		return self:PointInLeaf(iNode, point), true
 	end
 
 	--- Returns the vis-cluster from said point.
 	--- @param position Vector
 	--- @return number
-	function meta:ClusterFromPoint( position )
-		return self:PointInLeaf( 0, position ).cluster or -1
+	function meta:ClusterFromPoint(position)
+		return self:PointInLeaf(0, position).cluster or -1
 	end
 
 	--- Computes the leaf-id the detail is within. -1 for none.
 	--- @param position Vector
 	--- @return number
-	function meta:ComputeDetailLeaf( position )
+	function meta:ComputeDetailLeaf(position)
 		local node = 0
 		local nodes = self:GetNodes()
 		local planes = self:GetPlanes()
@@ -920,14 +1076,14 @@ do
 			--- @type BSPPlane
 			local p = planes[n.planenum]
 
-			if dot(position, p.normal ) < p.dist then
+			if dot(position, p.normal) < p.dist then
 				node = n.children[2]
 			else
 				node = n.children[1]
 			end
 		end
 
-		return - node - 1
+		return -node - 1
 	end
 
 	local MAX_MAP_LEAFFACES = 65536
@@ -940,13 +1096,13 @@ do
 
 		--- @type number[]
 		self._leaffaces = {}
-		local data = self:GetLump( 16 )
+		local data = self:GetLump(16)
 
-		for i = 1, math.min( data:Size() / 16, MAX_MAP_LEAFFACES ) do
+		for i = 1, math.min(data:Size() / 16, MAX_MAP_LEAFFACES) do
 			self._leaffaces[i] = data:ReadUShort()
 		end
 
-		self:ClearLump( 16 )
+		self:ClearLump(16)
 		return self._leaffaces
 	end
 
@@ -959,14 +1115,14 @@ do
 
 		--- @type BSPBrushObject[]
 		self._leafbrush = {}
-		local data = self:GetLump( 17 )
+		local data = self:GetLump(17)
 		local brushes = self:GetBrushes()
 
-		for i = 1, math.min( data:Size() / 16, MAX_MAP_LEAFBRUSHES ) do
+		for i = 1, math.min(data:Size() / 16, MAX_MAP_LEAFBRUSHES) do
 			self._leafbrush[i] = brushes[data:ReadUShort()]
 		end
 
-		self:ClearLump( 17 )
+		self:ClearLump(17)
 		return self._leafbrush
 	end
 
@@ -992,7 +1148,6 @@ do
 
 		return self._clusters
 	end
-
 end
 
 -- Faces and Displacments
@@ -1004,7 +1159,7 @@ do
 
 		--- @type DispVert[]
 		self._dispVert = {}
-		local data = self:GetLump( 33 )
+		local data = self:GetLump(33)
 
 		for i = 0, data:Size() / 160 - 1 do
 			--- @class DispVert
@@ -1020,7 +1175,7 @@ do
 			self._dispVert[i] = t
 		end
 
-		self:ClearLump( 33 )
+		self:ClearLump(33)
 		return self._dispVert
 	end
 
@@ -1032,13 +1187,13 @@ do
 
 		--- @type number[]
 		self._dispTris = {}
-		local data = self:GetLump( 48 )
+		local data = self:GetLump(48)
 
 		for i = 0, data:Size() / 16 - 1 do
 			self._dispTris[i] = data:ReadUShort()
 		end
 
-		self:ClearLump( 48 )
+		self:ClearLump(48)
 		return self._dispTris
 	end
 
@@ -1057,21 +1212,21 @@ do
 		--- @type DispInfo[]
 		self._dispinfo_byface = {}
 
-		local data = self:GetLump( 26 )
+		local data = self:GetLump(26)
 		local dispInfoCount = data:Size() / m_Ddispinfo_t
 
 		local target = 0
 
-		local function verify( expectedBytes )
+		local function verify(expectedBytes)
 			local here = data:Tell()
-			assert( here == target + ( expectedBytes * 8 ), ( here - target ) / 8 )
+			assert(here == target + (expectedBytes * 8), (here - target) / 8)
 		end
 
 		for i = 0, dispInfoCount - 1 do
 			target = i * m_Ddispinfo_t
 
 			if data:Tell() ~= target then
-				print( "ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell() )
+				print("ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell())
 			end
 
 			--- @class DispInfo
@@ -1089,68 +1244,68 @@ do
 
 			-- 4 bytes * 3 = 12 bytes
 			q.startPosition = data:ReadVector()
-			verify( 12 )
+			verify(12)
 
 			-- 4 bytes
 			q.DispVertStart = data:ReadLong()
-			verify( 16 )
+			verify(16)
 
 			-- 4 bytes
 			q.DispTriStart = data:ReadLong()
-			verify( 20 )
+			verify(20)
 
 			-- 4 bytes
 			q.power = data:ReadLong()
-			assert( q.power >= 2, q.power )
-			assert( q.power <= 4, q.power )
-			verify( 24 )
+			assert(q.power >= 2, q.power)
+			assert(q.power <= 4, q.power)
+			verify(24)
 
 			-- 2 bytes
 			q.flags = data:ReadUShort()
-			verify( 26 )
+			verify(26)
 
 			-- 2 bytes
 			q.minTess = data:ReadShort()
-			verify( 28 )
+			verify(28)
 
 			-- 4 bytes
 			q.smoothingAngle = data:ReadFloat()
-			verify( 32 )
+			verify(32)
 
 			-- 4 bytes
 			q.contents = data:ReadLong()
-			verify( 36 )
+			verify(36)
 
 			-- 2 bytes
 			q.MapFace = data:ReadUShort()
-			verify( 38 )
+			verify(38)
 
-			-- 4 bytes 
+			-- 4 bytes
 			q.LightmapAlphaStart = data:ReadLong()
-			verify( 42 )
+			verify(42)
 
 			-- 4 bytes
 			q.LightmapSamplePositionStart = data:ReadLong()
-			verify( 46 )
+			verify(46)
 
-			data:Skip( 88 * 8 )
+			data:Skip(88 * 8)
 			-- -- 48 bytes
 			-- q.EdgeNeighbors = CDispNeighbor( data )
 			-- verify( 94 )
 
 			-- -- 40 bytes
 			-- q.CornerNeighbors = CDispCornerNeighbors( data )
-			verify( 134 )
+			verify(134)
 
 			-- 4 bytes * 10 = 40 bytes
 			q.allowedVerts = {}
 			for v = 0, m_AllowedVerts - 1 do
 				q.allowedVerts[v] = data:ReadLong()
 			end
-			assert( table.Count( q.allowedVerts ) == 10, table.Count( q.allowedVerts ) )
-			verify( 174 )
+			assert(table.Count(q.allowedVerts) == 10, table.Count(q.allowedVerts))
+			verify(174)
 
-			data:Skip( 8 * 2 )
+			data:Skip(8 * 2)
 
 			local offset = i * m_Ddispinfo_t
 			q.offset = offset
@@ -1159,7 +1314,7 @@ do
 			self._dispinfo_byface[q.MapFace] = q
 		end
 
-		self:ClearLump( 26 )
+		self:ClearLump(26)
 		return self._dispinfo, self._dispinfo_byface
 	end
 
@@ -1172,37 +1327,37 @@ do
 
 		--- @class OriginalFace[]
 		self._originalfaces = {}
-		local data = self:GetLump( 27 )
+		local data = self:GetLump(27)
 
-		for i = 1, math.min( data:Size() / 448, MAX_MAP_FACES ) do
+		for i = 1, math.min(data:Size() / 448, MAX_MAP_FACES) do
 			--- @class OriginalFace
 			--- @field styles number[]
 			--- @field LightmapTextureMinsInLuxels number[]
 			--- @field LightmapTextureSizeInLuxels number[]
-			local t = {}
-			t.plane 	= self:GetPlanes()[data:ReadUShort()]
-			t.side 		= data:ReadByte()
-			t.onNode 	= data:ReadByte()
-			t.firstedge = data:ReadLong()
-			t.numedges 	= data:ReadShort()
-			t.texinfo 	= data:ReadShort()
-			t.dispinfo				= data:ReadShort()
-			t.surfaceFogVolumeID	= data:ReadShort()
-			t.styles				= { data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte() }
-			t.lightofs				= data:ReadLong()
-			t.area					= data:ReadFloat()
-			t.LightmapTextureMinsInLuxels	= { data:ReadLong(), data:ReadLong() }
-			t.LightmapTextureSizeInLuxels	= { data:ReadLong(), data:ReadLong() }
-			t.origFace			= data:ReadLong()
-			t.numPrims			= data:ReadUShort()
-			t.firstPrimID		= data:ReadUShort()
-			t.smoothingGroups	= data:ReadULong()
-			t.__map = self
-			t.__id = i
-			self._originalfaces[i] = t
+			local t                       = {}
+			t.plane                       = self:GetPlanes()[data:ReadUShort()]
+			t.side                        = data:ReadByte()
+			t.onNode                      = data:ReadByte()
+			t.firstedge                   = data:ReadLong()
+			t.numedges                    = data:ReadShort()
+			t.texinfo                     = data:ReadShort()
+			t.dispinfo                    = data:ReadShort()
+			t.surfaceFogVolumeID          = data:ReadShort()
+			t.styles                      = { data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte() }
+			t.lightofs                    = data:ReadLong()
+			t.area                        = data:ReadFloat()
+			t.LightmapTextureMinsInLuxels = { data:ReadLong(), data:ReadLong() }
+			t.LightmapTextureSizeInLuxels = { data:ReadLong(), data:ReadLong() }
+			t.origFace                    = data:ReadLong()
+			t.numPrims                    = data:ReadUShort()
+			t.firstPrimID                 = data:ReadUShort()
+			t.smoothingGroups             = data:ReadULong()
+			t.__map                       = self
+			t.__id                        = i
+			self._originalfaces[i]        = t
 		end
 
-		self:ClearLump( 27 )
+		self:ClearLump(27)
 		return self._originalfaces
 	end
 end
@@ -1218,7 +1373,7 @@ do
 	function meta:GetBModels()
 		if self._bmodel then return self._bmodel end
 		self._bmodel = {}
-		local data = self:GetLump( 14 )
+		local data = self:GetLump(14)
 		for i = 0, data:Size() / 384 - 1 do
 			--- @class BModel
 			local t = {}
@@ -1229,11 +1384,11 @@ do
 			t.firstface = data:ReadLong()
 			t.numfaces = data:ReadLong()
 			t.__map = self
-			setmetatable( t, meta_bmodel )
+			setmetatable(t, meta_bmodel)
 			self._bmodel[i] = t
 		end
 
-		self:ClearLump( 14 )
+		self:ClearLump(14)
 		return self._bmodel
 	end
 
@@ -1255,7 +1410,7 @@ do
 	--- Locates the BModelIndex for the said faceIndex
 	--- @param faceId number
 	--- @return number
-	function meta:FindBModelIDByFaceIndex( faceId )
+	function meta:FindBModelIDByFaceIndex(faceId)
 		local bModels = self:GetBModels()
 
 		for i = 0, #bModels do
@@ -1276,8 +1431,8 @@ do
 	--- Returns true if the position is outside the map
 	--- @param position Vector
 	--- @return boolean
-	function meta:IsOutsideMap( position )
-		local leaf = self:PointInLeaf( 0, position )
+	function meta:IsOutsideMap(position)
+		local leaf = self:PointInLeaf(0, position)
 		if not leaf then return true end -- No leaf? Shouldn't be possible.
 		return leaf:IsOutsideMap()
 	end
@@ -1285,15 +1440,15 @@ do
 	--- Returns a list of all materials used by the map.
 	--- @return IMaterial[]
 	function meta:GetMaterials()
-		if self._materials then	return self._materials end
+		if self._materials then return self._materials end
 
 		--- @type IMaterial[]
 		self._materials = {}
 
-		for _, v in pairs( self:GetTextures() ) do
+		for _, v in pairs(self:GetTextures()) do
 			if v then
-				local m = Material( v )
-				if m then table.insert( self._materials, m ) end
+				local m = Material(v)
+				if m then table.insert(self._materials, m) end
 			end
 		end
 
@@ -1303,11 +1458,11 @@ do
 	--- Returns true if the texture is used by the map.
 	--- @param texture string
 	--- @return boolean
-	function meta:HasTexture( texture )
-		texture = lower( texture )
+	function meta:HasTexture(texture)
+		texture = lower(texture)
 		local data = self:GetTexdataStringData()
 		for i = 0, #data do
-			if lower(data[i])== texture then return true end
+			if lower(data[i]) == texture then return true end
 		end
 		return false
 	end
@@ -1315,15 +1470,15 @@ do
 	--- Returns true if the material is used by the map.
 	--- @param material IMaterial
 	--- @return boolean
-	function meta:HasMaterial( material )
-		return self:HasTexture( material:GetName() )
+	function meta:HasMaterial(material)
+		return self:HasTexture(material:GetName())
 	end
 
 	--- Returns true if the skybox is rendering at this position.
 	--- Note: Seems to be broken in EP2 and beyond, where the skybox is rendered at all times regardless of position.
 	--- @return boolean
-	function meta:IsRenderingSkyboxAtPosition( position )
-		local leaf = self:PointInLeaf( 0, position )
+	function meta:IsRenderingSkyboxAtPosition(position)
+		local leaf = self:PointInLeaf(0, position)
 		if not leaf then return false end -- No leaf? Shouldn't be possible
 		return leaf:HasSkyboxInPVS()
 	end
@@ -1336,18 +1491,18 @@ do
 		--- @type BSPLeafObject[]
 		self._skyboxleafs = {}
 
-		local t = self:FindByClass( "sky_camera" )
+		local t = self:FindByClass("sky_camera")
 		if #t < 1 then return self._skyboxleafs end -- Unable to locate skybox leafs
 
 		local p = t[1].origin
 		if not p then return self._skyboxleafs end
-		local leaf = self:PointInLeaf( 0, p )
+		local leaf = self:PointInLeaf(0, p)
 		if not leaf then return self._skyboxleafs end
 
 		local area = leaf.area
 
 		local i = 1
-		for _, l in ipairs( self:GetLeafs() ) do
+		for _, l in ipairs(self:GetLeafs()) do
 			if l.area == area then
 				self._skyboxleafs[i] = l
 				i = i + 1
@@ -1364,22 +1519,143 @@ do
 		if self._skyboxmin and self._skyboxmaxs then return self._skyboxmin, self._skyboxmaxs end
 
 		local mmin, mmax = math.min, math.max
-		for _, leaf in ipairs( self:GetSkyboxLeafs() ) do
+		for _, leaf in ipairs(self:GetSkyboxLeafs()) do
 			local lmins, lmaxs = leaf.mins, leaf.maxs
 			if not self._skyboxmin then
-				self._skyboxmin  = Vector( lmins )
-				self._skyboxmaxs = Vector( lmaxs )
+				self._skyboxmin  = Vector(lmins)
+				self._skyboxmaxs = Vector(lmaxs)
 			else
 				local smin, smax = self._skyboxmin, self._skyboxmaxs
-				smin.x = mmin( smin.x, lmins.x )
-				smin.y = mmin( smin.y, lmins.y )
-				smin.z = mmin( smin.z, lmins.z )
-				smax.x = mmax( smax.x, lmaxs.x )
-				smax.y = mmax( smax.y, lmaxs.y )
-				smax.z = mmax( smax.z, lmaxs.z )
+				smin.x = mmin(smin.x, lmins.x)
+				smin.y = mmin(smin.y, lmins.y)
+				smin.z = mmin(smin.z, lmins.z)
+				smax.x = mmax(smax.x, lmaxs.x)
+				smax.y = mmax(smax.y, lmaxs.y)
+				smax.z = mmax(smax.z, lmaxs.z)
 			end
 		end
 
 		return self._skyboxmin, self._skyboxmaxs
+	end
+end
+
+-- Map flags (lump 59) --------------------------------------------------------
+do
+	--- Returns the map-level flags stored in lump 59.
+	--- Known flags:
+	---   0x01 = LVLFLAGS_BAKED_STATIC_PROP_LIGHTING_NONHDR
+	---   0x02 = LVLFLAGS_BAKED_STATIC_PROP_LIGHTING_HDR
+	--- @return number
+	function meta:GetMapFlags()
+		if self._mapflags ~= nil then return self._mapflags end
+
+		local data = self:GetLump( 59 )
+		if data:Size() < 32 then
+			self._mapflags = 0
+		else
+			self._mapflags = data:ReadULong()
+		end
+
+		self:ClearLump( 59 )
+		return self._mapflags
+	end
+
+	--- Returns true if the map has static prop lighting baked without HDR.
+	--- @return boolean
+	function meta:HasBakedNonHDRStaticPropLighting()
+		return bit.band( self:GetMapFlags(), 0x01 ) ~= 0
+	end
+
+	--- Returns true if the map has static prop lighting baked with HDR.
+	--- @return boolean
+	function meta:HasBakedHDRStaticPropLighting()
+		return bit.band( self:GetMapFlags(), 0x02 ) ~= 0
+	end
+end
+
+-- Areas and Area Portals (lumps 20 / 21) ------------------------------------
+do
+	--- @class BSPArea
+	--- @field numareaportals number  # Number of area portals belonging to this area
+	--- @field firstareaportal number # Index of the first area portal in the area-portal array
+
+	--- Returns the area table (lump 20). One entry per map area.
+	--- @return BSPArea[]
+	function meta:GetAreas()
+		if self._areas then return self._areas end
+
+		local data = self:GetLump( 20 )
+		self._areas = {}
+
+		for i = 0, data:Size() / 64 - 1 do
+			--- @class BSPArea
+			local t = {}
+			t.numareaportals  = data:ReadLong()
+			t.firstareaportal = data:ReadLong()
+			self._areas[i]    = t
+		end
+
+		self:ClearLump( 20 )
+		return self._areas
+	end
+
+	--- @class BSPAreaPortal
+	--- @field portalKey number          # Unique key matching the func_areaportal entity
+	--- @field otherArea number          # Index of the area on the other side of this portal
+	--- @field firstClipPortalVert number # First clip-portal vertex index (lump 41)
+	--- @field numClipPortalVerts number  # Number of clip-portal vertices
+	--- @field planenum number            # Splitting plane index
+
+	--- Returns the area-portal table (lump 21). Area portals define the
+	--- boundaries between indoor and outdoor (or between any two areas).
+	--- @return BSPAreaPortal[]
+	function meta:GetAreaPortals()
+		if self._areaportals then return self._areaportals end
+
+		local data = self:GetLump( 21 )
+		self._areaportals = {}
+
+		-- dareaportal_t: 2+2+2+2+4 = 12 bytes = 96 bits
+		for i = 0, data:Size() / 96 - 1 do
+			--- @class BSPAreaPortal
+			local t = {}
+			t.portalKey           = data:ReadUShort()
+			t.otherArea           = data:ReadUShort()
+			t.firstClipPortalVert = data:ReadUShort()
+			t.numClipPortalVerts  = data:ReadUShort()
+			t.planenum            = data:ReadLong()
+			self._areaportals[i]  = t
+		end
+
+		self:ClearLump( 21 )
+		return self._areaportals
+	end
+
+	--- Returns the clip-portal vertex positions used by area portals (lump 41).
+	--- @return Vector[]
+	function meta:GetClipPortalVerts()
+		if self._clipPortalVerts then return self._clipPortalVerts end
+
+		local data = self:GetLump( 41 )
+		self._clipPortalVerts = {}
+
+		for i = 0, data:Size() / 96 - 1 do
+			self._clipPortalVerts[i] = data:ReadVector()
+		end
+
+		self:ClearLump( 41 )
+		return self._clipPortalVerts
+	end
+
+	--- Returns the clip-portal vertices that make up the given area portal.
+	--- @param portal BSPAreaPortal
+	--- @return Vector[]
+	function meta:GetAreaPortalVerts( portal )
+		local verts = self:GetClipPortalVerts()
+		local t     = {}
+		for i = 0, portal.numClipPortalVerts - 1 do
+			t[i + 1] = verts[portal.firstClipPortalVert + i]
+		end
+		return t
 	end
 end

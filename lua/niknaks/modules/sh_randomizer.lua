@@ -152,5 +152,5 @@ end
 ---@return PRNGObject
 function meta_prng:CreateNew()
     local rndVal = bit.bxor(self:Random(), bit.lshift(self:Random(), 16))
-    return NikNaks.Randomizer.new(rndVal)
+    return NikNaks.Randomizer.CreatePRNG(rndVal)
 end

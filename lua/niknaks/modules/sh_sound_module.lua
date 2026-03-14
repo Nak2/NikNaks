@@ -21,6 +21,7 @@ do
                 continue
             elseif headerId == "data" then
                 fil:Close()
+                if bitRate == 0 then return 0 end
                 return dataSize / bitRate
             else
                 -- Check if headerId contains a-z characters. Could be a custom chunk
@@ -30,7 +31,9 @@ do
         end
         -- Fallback to file size
         if bitRate > 0 then
-            return (fil:Size() - 28) / bitRate
+            local result = (fil:Size() - 28) / bitRate
+            fil:Close()
+            return result
         end
         fil:Close()
         return 0
@@ -66,6 +69,8 @@ do
 
         fil:Skip(5)
         local rate = fil:ReadLong()
+        fil:Close()
+        if rate == 0 then return 0 end
         return granulePos / rate
     end
 

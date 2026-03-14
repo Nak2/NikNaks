@@ -31,7 +31,6 @@ if SERVER then
     util.AddNetworkString( NET )
     ---@type DataPackage[]
     local dataToSend = {}
-    DEBUGDATASEND = dataToSend
 
     local nextSend = 0
     local function onThink()

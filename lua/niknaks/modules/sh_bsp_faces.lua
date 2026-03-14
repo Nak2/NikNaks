@@ -213,13 +213,17 @@ end
 --- Returns the texture data for the face.
 --- @return BSPTextureData?
 function meta_face:GetTexData()
-	return self.__map:GetTexData()[ self:GetTexInfo().texdata ]
+	local texinfo = self:GetTexInfo()
+	if not texinfo then return nil end
+	return self.__map:GetTexData()[ texinfo.texdata ]
 end
 
 --- Returns the texture for the face.
---- @return string
+--- @return string?
 function meta_face:GetTexture()
-	return self:GetTexData().nameStringTableID
+	local texdata = self:GetTexData()
+	if not texdata then return nil end
+	return texdata.nameStringTableID
 end
 
 --- Returns the material the face use. Note: Materials within the BSP won't be loaded.
@@ -241,28 +245,32 @@ end
 --- Returns true if the face-texture is translucent
 --- @return boolean
 function meta_face:IsTranslucent()
-	local texinfo = self:GetTexInfo() or 0
+	local texinfo = self:GetTexInfo()
+	if not texinfo then return false end
 	return bit.band( texinfo.flags, 0x10 ) ~= 0
 end
 
 --- Returns true if the face is part of 2D skybox.
 --- @return boolean
 function meta_face:IsSkyBox()
-	local texinfo = self:GetTexInfo() or 0
+	local texinfo = self:GetTexInfo()
+	if not texinfo then return false end
 	return bit.band( texinfo.flags, 0x2 ) ~= 0
 end
 
 --- Returns true if the face is part of 3D skybox.
 --- @return boolean
 function meta_face:IsSkyBox3D()
-	local texinfo = self:GetTexInfo() or 0
+	local texinfo = self:GetTexInfo()
+	if not texinfo then return false end
 	return bit.band( texinfo.flags, 0x4 ) ~= 0
 end
 
 --- Returns true if the face's texinfo has said flag.
 --- @return boolean
 function meta_face:HasTexInfoFlag( flag )
-	local texinfo = self:GetTexInfo() or 0
+	local texinfo = self:GetTexInfo()
+	if not texinfo then return false end
 	return bit.band( texinfo.flags, flag  ) ~= 0
 end
 

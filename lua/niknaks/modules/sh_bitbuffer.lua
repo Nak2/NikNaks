@@ -856,7 +856,7 @@ do
 	--- @param maxLength? number
 	--- @return string
 	function meta:ReadStringNull(maxLength)
-		maxLength = maxLength or ceil(self:Size() - self:Tell()) / 8
+		maxLength = maxLength or ceil((self:Size() - self:Tell()) / 8)
 
 		local str = ""
 		if maxLength < 1 then return str end

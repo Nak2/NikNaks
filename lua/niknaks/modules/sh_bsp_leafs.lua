@@ -100,9 +100,7 @@ function meta:GetLeafs()
 		size = size + 192 -- byte r, byte g,  byte b +  char expo
 	end
 
-	if self._version <= 19 or true then
-		size = size + 16
-	end
+	size = size + 16
 
 	local n = 0
 	for i = 0, data:Size() / size - 1 do
@@ -182,6 +180,23 @@ function meta:GetLeafWaterData()
 	return self._pLeafWaterData
 end
 
+--- Returns the leaf minimum distance-to-water table (lump 46).
+--- One unsigned short per leaf (0-indexed); 0 means the leaf is underwater.
+--- @return number[]
+function meta:GetLeafMinDistToWater()
+	if self._leafMinDistToWater then return self._leafMinDistToWater end
+
+	local data = self:GetLump( 46 )
+	self._leafMinDistToWater = {}
+
+	for i = 0, data:Size() / 16 - 1 do
+		self._leafMinDistToWater[i] = data:ReadUShort()
+	end
+
+	self:ClearLump( 46 )
+	return self._leafMinDistToWater
+end
+
 --- Returns the number of leaf-clusters
 --- @return number
 function meta:GetLeafsNumClusters()
@@ -199,7 +214,7 @@ function meta_leaf:GetBrushes()
 	local brush = self.__map:GetBrushes()
 	local leafBrushes = self.__map:GetLeafBrushes()
 	local c = self.firstleafbrush
-	for i = 0, self.numleafbrushes do
+	for i = 0, self.numleafbrushes - 1 do
 		local f_id = leafBrushes[ i + c ]
 		self._brushes[i + 1] = f_id
 	end
@@ -280,7 +295,7 @@ function meta_leaf:GetFaces(includeDisplacment)
 	local leafFace = self.__map:GetLeafFaces()
 	local c = self.firstleafface
 
-	for i = 0, self.numleaffaces do
+	for i = 0, self.numleaffaces - 1 do
 		local f_id = leafFace[ i + c ]
 		self._faces[i + 1] = faces[f_id]
 	end
@@ -330,6 +345,14 @@ end
 --- @return number?
 function meta_leaf:GetWaterMaxZ()
 	return self.leafWaterData and self.leafWaterData.surfaceZ
+end
+
+--- Returns the minimum distance from this leaf to any water surface (lump 46).
+--- Returns 0 if the leaf is underwater. Returns nil if lump data is unavailable.
+--- @return number?
+function meta_leaf:GetMinDistToWater()
+	local t = self.__map:GetLeafMinDistToWater()
+	return t[self.__id]
 end
 
 --- Returns the water MinZ within the leaf.
@@ -669,6 +692,206 @@ function meta_leaf:GenerateVertexData()
 	self._vertData = carveBox( planelist )
 	return self._vertData
 end
+
+--- @param self BSPObject
+--- @param lumpIdx number
+--- @param cacheKey string
+--- @return { ambientSampleCount: number, firstAmbientSample: number }[]
+local function parseAmbientIndex(self, lumpIdx, cacheKey)
+	if self[cacheKey] then return self[cacheKey] end
+	local data = self:GetLump(lumpIdx)
+	self[cacheKey] = {}
+	for i = 0, data:Size() / 32 - 1 do
+		self[cacheKey][i] = {
+			ambientSampleCount = data:ReadUShort(),
+			firstAmbientSample = data:ReadUShort(),
+		}
+	end
+	self:ClearLump(lumpIdx)
+	return self[cacheKey]
+end
+
+--- @param self BSPObject
+--- @param lumpIdx number
+--- @param cacheKey string
+--- @return BSPAmbientSample[]
+local function parseAmbientLighting(self, lumpIdx, cacheKey)
+	if self[cacheKey] then return self[cacheKey] end
+	local data = self:GetLump(lumpIdx)
+	self[cacheKey] = {}
+	for i = 0, data:Size() / 224 - 1 do
+		--- @class BSPAmbientSample
+		--- @field cube BSPColorRGBExp32[]  # 6 directional ambient colors (+X,-X,+Y,-Y,+Z,-Z)
+		--- @field x number                  # Sub-leaf X position (0-255 fraction of leaf bounds)
+		--- @field y number
+		--- @field z number
+		local sample = {}
+		--- @type BSPColorRGBExp32[]
+		local cube = {}
+		for f = 1, 6 do
+			--- @class BSPColorRGBExp32
+			--- @field r number        # 0-255
+			--- @field g number        # 0-255
+			--- @field b number        # 0-255
+			--- @field exponent number # signed exponent; actual intensity = channel * 2^exponent
+			cube[f] = {
+				r        = data:ReadByte(),
+				g        = data:ReadByte(),
+				b        = data:ReadByte(),
+				exponent = data:ReadSignedByte(),
+			}
+		end
+		sample.cube = cube
+		sample.x    = data:ReadByte()
+		sample.y    = data:ReadByte()
+		sample.z    = data:ReadByte()
+		data:Skip(8) -- 1-byte pad
+		self[cacheKey][i] = sample
+	end
+	self:ClearLump(lumpIdx)
+	return self[cacheKey]
+end
+
+--- Returns the LDR leaf ambient lighting index table (lump 52).
+--- One entry per leaf, indexed by leaf ID.
+--- @return { ambientSampleCount: number, firstAmbientSample: number }[]
+function meta:GetLeafAmbientIndex()
+	return parseAmbientIndex(self, 52, "_leafAmbientIdx")
+end
+
+--- Returns the HDR leaf ambient lighting index table (lump 51).
+--- One entry per leaf, indexed by leaf ID.
+--- @return { ambientSampleCount: number, firstAmbientSample: number }[]
+function meta:GetLeafAmbientIndexHDR()
+	return parseAmbientIndex(self, 51, "_leafAmbientIdxHDR")
+end
+
+--- Returns the LDR leaf ambient lighting data (lump 56).
+--- @return BSPAmbientSample[]
+function meta:GetLeafAmbientLighting()
+	return parseAmbientLighting(self, 56, "_leafAmbientLighting")
+end
+
+--- Returns the HDR leaf ambient lighting data (lump 55).
+--- @return BSPAmbientSample[]
+function meta:GetLeafAmbientLightingHDR()
+	return parseAmbientLighting(self, 55, "_leafAmbientLightingHDR")
+end
+
+--- Returns the ambient lighting samples for this leaf.
+--- Each sample has a 6-directional color cube and a sub-leaf position (x, y, z: 0–255).
+--- Cube face order: 1=+X, 2=-X, 3=+Y, 4=-Y, 5=+Z, 6=-Z.
+--- Colors use BSPColorRGBExp32: actual value = channel * 2^exp.
+--- @param hdr boolean? # If true, uses HDR data (lump 55). Default is LDR (lump 56).
+--- @return BSPAmbientSample[]
+function meta_leaf:GetAmbientLighting(hdr)
+	local indexTable = hdr and self.__map:GetLeafAmbientIndexHDR() or self.__map:GetLeafAmbientIndex()
+	local lightTable = hdr and self.__map:GetLeafAmbientLightingHDR() or self.__map:GetLeafAmbientLighting()
+	local entry = indexTable[self.__id]
+	if not entry or entry.ambientSampleCount == 0 then return {} end
+	local result = {}
+	local base = entry.firstAmbientSample
+	for i = 0, entry.ambientSampleCount - 1 do
+		result[i + 1] = lightTable[base + i]
+	end
+	return result
+end
+
+--- Calculates the ambient color at a given world position by finding the containing leaf.
+--- @param position Vector # The world position to sample.
+--- @param hdr boolean? # If true, uses HDR data. Default is LDR.
+--- @return Color
+function meta:CalculateAmbientColor( position, hdr )
+	local leaf = self:PointInLeaf( 0, position )
+	if not leaf then return Color( 0, 0, 0 ) end
+	return leaf:CalculateAmbientColor( position, hdr )
+end
+
+function meta:CalculateAmbientLight( position, hdr)
+	local leaf = self:PointInLeaf( 0, position )
+	if not leaf then return Color( 0, 0, 0 ) end
+
+	local samples = leaf:GetAmbientLighting( hdr )
+	if not samples or #samples == 0 then
+		return Color( 0, 0, 0 )
+	end
+
+	-- Average all cube faces and samples together, ignoring sub-leaf position.
+	local r, g, b = 0, 0, 0
+	for _, sample in ipairs( samples ) do
+		for f = 1, 6 do
+			local c = NikNaks.ColorRGBExp32ToColor( sample.cube[f] )
+			r = r + c.r
+			g = g + c.g
+			b = b + c.b
+		end
+	end
+	local numColors = #samples * 6
+	return Color( r / numColors, g / numColors, b / numColors )
+end
+
+function meta_leaf:CalculateAmbientColor( position, hdr )
+	local samples = self:GetAmbientLighting( hdr )
+	if not samples or #samples == 0 then
+		return Color( 0, 0, 0 )
+	end
+
+	-- Convert position to 0-255 sub-leaf coordinates
+	local leafMins = self.mins
+	local leafMaxs = self.maxs
+	local sizeX = leafMaxs.x - leafMins.x
+	local sizeY = leafMaxs.y - leafMins.y
+	local sizeZ = leafMaxs.z - leafMins.z
+
+	local px = sizeX > 0 and clamp( ( position.x - leafMins.x ) / sizeX, 0, 1 ) * 255 or 0
+	local py = sizeY > 0 and clamp( ( position.y - leafMins.y ) / sizeY, 0, 1 ) * 255 or 0
+	local pz = sizeZ > 0 and clamp( ( position.z - leafMins.z ) / sizeZ, 0, 1 ) * 255 or 0
+
+	-- Helper: convert a 6-face ambient cube to a single averaged Color using proper linear->sRGB.
+	local function cubeToColor( cube )
+		local r, g, b = 0, 0, 0
+		for f = 1, 6 do
+			local c = NikNaks.ColorRGBExp32ToColor( cube[f] )
+			r = r + c.r
+			g = g + c.g
+			b = b + c.b
+		end
+		return r / 6, g / 6, b / 6
+	end
+
+	-- Single sample: no interpolation needed
+	if #samples == 1 then
+		local r, g, b = cubeToColor( samples[1].cube )
+		return Color( clamp( r, 0, 255 ), clamp( g, 0, 255 ), clamp( b, 0, 255 ) )
+	end
+	-- Multiple samples: inverse-distance-squared weighting
+	local totalWeight = 0
+	local rr, gg, bb = 0, 0, 0
+
+	for _, sample in ipairs( samples ) do
+		local dx = px - sample.x
+		local dy = py - sample.y
+		local dz = pz - sample.z
+		local distSqr = dx * dx + dy * dy + dz * dz
+		local weight = 1 / ( distSqr + 1 )
+
+		local r, g, b = cubeToColor( sample.cube )
+		rr = rr + r * weight
+		gg = gg + g * weight
+		bb = bb + b * weight
+		totalWeight = totalWeight + weight
+	end
+
+	if totalWeight > 0 then
+		rr = rr / totalWeight
+		gg = gg / totalWeight
+		bb = bb / totalWeight
+	end
+
+	return Color( clamp( rr, 0, 255 ), clamp( gg, 0, 255 ), clamp( bb, 0, 255 ) )
+end
+
+
 
 if CLIENT then
 	--- Builds and caches an IMesh for the leaf volume.

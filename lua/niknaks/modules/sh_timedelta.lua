@@ -270,11 +270,11 @@ do
 
 	--- @param b TimeDelta
 	function meta:__lt( b )
-		return a.time < b.time
+		return self.time < b.time
 	end
 
 	--- @param b TimeDelta
-	function meta.__le( b )
-		return a.time <= b.time
+	function meta:__le( b )
+		return self.time <= b.time
 	end
 end

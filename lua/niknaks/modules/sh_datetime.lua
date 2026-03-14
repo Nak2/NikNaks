@@ -202,7 +202,7 @@ do
 
 		if #str ~= 4 then
 			local n = string.match( str, "%d+" )
-			if #n == #str then return tonumber( n ) end
+			if n and #n == #str then return tonumber( n ) end
 		end
 
 		--[[

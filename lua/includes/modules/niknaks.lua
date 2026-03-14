@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.56
+local version = 0.62
 if NikNaks and NikNaks.VERSION > version then return end
 
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
@@ -19,9 +19,8 @@ do
 	---A simply Msg function for NikNaks
 	---@param ... any
 	function NikNaks.Msg( ... )
-		local a = {...}
-		if #a < 1 then return end
-		MsgC(NikNaks.REALM_COLOR,"[NN] ", unpack(a), "\n")
+		MsgC(NikNaks.REALM_COLOR, "[NN] ", ...)
+		MsgN()
 	end
 end
 
@@ -40,7 +39,7 @@ function NikNaks.AutoInclude( str )
 		_type = "sh_"
 	end
 	if SERVER then
-		if _type == "cl_" or _type == "sh_" then
+		if _type == "cl_" or _type == "sh_" then		
 			AddCSLuaFile(str)
 		end
 		if _type ~= "cl_" then
@@ -73,6 +72,7 @@ meta.MetaName = "BSP"
 NikNaks.__metatables["BSP"] = meta
 NikNaks._Source = "niknak"
 
+NikNaks.AutoInclude("niknaks/modules/sh_bignumber.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_hooks.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")
@@ -89,10 +89,12 @@ NikNaks.AutoInclude("niknaks/modules/sh_bsp_leafs.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_brushes.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_pvspas.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_staticprops.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_bsp_worldlights.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_trace.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_sound_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_datapackage.lua")
-
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
+
+NikNaks.Msg(Color(0, 255, 100), "NikNaks ", Color(255, 255, 255), NikNaks.VERSION, Color(0, 255, 100), " loaded.")
 
 return NikNaks -- Doesn't work for require	:C

@@ -98,7 +98,7 @@ function meta_face:LineSegmentIntersection( startPos, endPos )
 	local dot1 = plane:DistTo(startPos)
 	local dot2 = plane:DistTo(endPos)
 
-	if (dot1 > 0) ~= (dot2 > 0) or true then
+	if (dot1 > 0) ~= (dot2 > 0) then
 		local t = dot1 / ( dot1 - dot2 )
 
 		if t <= 0 or t >= 1 then return end
@@ -217,7 +217,7 @@ local function rayCastFace( face, trace )
 	local dot1 = plane:DistTo(startPos)
 	local dot2 = plane:DistTo(endPos)
 
-	if (dot1 > 0) ~= (dot2 > 0) or true then
+	if (dot1 > 0) ~= (dot2 > 0) then
 
 		if math.abs(dot1 - dot2) < DIST_EPSILON then return false end
 
@@ -304,7 +304,7 @@ do
 
 			if start_dist < end_dist then
 				side_id = 2
-				fraction_first = (start_dist + FLT_EPSILON) * inversed_distance
+				fraction_first = (start_dist - FLT_EPSILON) * inversed_distance
 				fraction_second = (start_dist + FLT_EPSILON) * inversed_distance
 			elseif end_dist < start_dist then
 				side_id = 1

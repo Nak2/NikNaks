@@ -81,14 +81,14 @@ local string_format, string_sub = string.format, string.sub
 	---Inverts the color.
 	---@return Color
 	function COLOR:Invert()
-		return Color(255 - self.r,255 - self.g,255 - self.b)
+		return Color(255 - self.r,255 - self.g,255 - self.b,self.a)
 	end
 
 	---Turns the color into a gray-scale.
 	---@return Color
 	function COLOR:ToGrayscale()
 		local n = math.Clamp(math.Round(self.r * .299 + self.g * .587 + self.b * .114), 0, 255)
-		return Color(n,n,n)
+		return Color(n,n,n,self.a)
 	end
 
 	---Cartoonify the color.

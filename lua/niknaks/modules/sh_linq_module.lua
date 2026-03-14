@@ -442,7 +442,7 @@ end
 ---@return self
 function t:TakeLast(n)
     local tbl = {}
-    for i = #self.tbl - n + 1, #self.tbl do
+    for i = math.max(1, #self.tbl - n + 1), #self.tbl do
         table.insert(tbl, self.tbl[i])
     end
     self.tbl = tbl
