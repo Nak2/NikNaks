@@ -646,7 +646,7 @@ function meta_face:GenerateVertexData()
 		local vert = {}
 		local a = self.__map:GetSurfEdgesIndex( self.firstedge + i )
 		vert.pos = a
-		if bNum > 0 then -- WorldPos -> Entity Brush
+		if bNum > 0 and exAng and exPos then -- WorldPos -> Entity Brush
 			local localA = WorldToLocal( a, zeroAngle, zeroVector, exAng )
 			vert.pos = localA + exPos
 		end
