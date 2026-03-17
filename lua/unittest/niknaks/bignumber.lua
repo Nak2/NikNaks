@@ -28,7 +28,7 @@ return {
         require("niknaks")
 
         Should(NikNaks.BigNumber):Exist()
-            .And:BeOfType("function")
+            .And:BeOfType("table")
 
         BN = NikNaks.BigNumber
     end,
