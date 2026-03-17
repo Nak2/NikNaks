@@ -177,7 +177,7 @@ function meta:__bnot()
 end
 
 --- '&' operator
----@param b any
+---@param b BigNumber
 ---@return BigNumber
 function meta:__band(b)
 	local res = {
@@ -192,17 +192,17 @@ function meta:__band(b)
 end
 
 --- '|' operator
----@param b any
----@return table
+---@param b BigNumber
+---@return BigNumber
 function meta:__bor(b)
 	local res = { x = bit.bor(self.x, b.x), y = bit.bor(self.y, b.y), z = bit.bor(self.z, b.z), w = bit.bor(self.w, b.w) }
 	setmetatable(res, meta)
 	return res
 end
 
---- '^' operator
----@param b any
----@return table
+--- '^' operator (bitwise XOR)
+---@param b BigNumber
+---@return BigNumber
 function meta:__bxor(b)
 	local res = {
 		x = bit.bxor(self.x, b.x),
@@ -260,6 +260,9 @@ function meta:__add(bNumber)
 	return add(self, bNumber)
 end
 
+--- '-' operator
+---@param bNumber BigNumber|number
+---@return BigNumber
 function meta:__sub(bNumber)
 	return sub(self, bNumber)
 end
@@ -618,6 +621,25 @@ local function BigNumber(number32Bit)
 		local minus = str:sub(1, 1) == "-"
 		local start = minus and 2 or 1
 
+		-- Hex string: "0x..." / "0X..." / "-0x..."
+		local prefix = str:sub(start, start + 1)
+		if prefix == "0x" or prefix == "0X" then
+			local hex = str:sub(start + 2)
+			hex = string.rep("0", math.max(0, 32 - #hex)) .. hex
+			local function h2i(s)
+				local v = tonumber(s, 16) or 0
+				if v >= 0x80000000 then v = v - 0x100000000 end
+				return v
+			end
+			local ww = magW(h2i(hex:sub(#hex - 31, #hex - 24))) -- bits 96-126 (bit 31 reserved for sign)
+			local wz = h2i(hex:sub(#hex - 23, #hex - 16))       -- bits 64-95
+			local wy = h2i(hex:sub(#hex - 15, #hex - 8))        -- bits 32-63
+			local wx = h2i(hex:sub(#hex - 7,  #hex))            -- bits 0-31
+			if minus then ww = bor(ww, SIGN_BIT) end
+			return setmetatable({ x = wx, y = wy, z = wz, w = ww }, meta)
+		end
+
+		-- Decimal string
 		local t = setmetatable({ x = 0, y = 0, z = 0, w = 0 }, meta)
 		local ten = setmetatable({ x = 10, y = 0, z = 0, w = 0 }, meta)
 
@@ -678,44 +700,112 @@ function NikNaks.BigNumber.ReadFromNET()
 end
 
 -- Helper meta functions
+
+--- Adds a number to this BigNumber. Accepts BigNumber, number, or decimal/hex string.
+---@param number BigNumber|number|string
+---@return BigNumber
 function meta:Add(number)
 	if (isstring(number)) then
 		number = NikNaks.BigNumber(number)
 	end
-	return self:__add(number)
+	return self:__add(number --[[@as BigNumber|number]])
 end
 
+--- Subtracts a number from this BigNumber. Accepts BigNumber, number, or decimal/hex string.
+---@param number BigNumber|number|string
+---@return BigNumber
 function meta:Sub(number)
 	if (isstring(number)) then
 		number = NikNaks.BigNumber(number)
 	end
-	return self:__sub(number)
+	return self:__sub(number --[[@as BigNumber|number]])
 end
 
+--- Multiplies this BigNumber by a number. Result is truncated to 128 bits. Accepts BigNumber, number, or decimal/hex string.
+---@param number BigNumber|number|string
+---@return BigNumber
 function meta:Mul(number)
 	if (isstring(number)) then
 		number = NikNaks.BigNumber(number)
 	end
-	return self:__mul(number)
+	return self:__mul(number --[[@as BigNumber|number]])
 end
 
+--- Divides this BigNumber by a number (integer floor division). Accepts BigNumber, number, or decimal/hex string.
+---@param number BigNumber|number|string
+---@return BigNumber
 function meta:Div(number)
 	if (isstring(number)) then
 		number = NikNaks.BigNumber(number)
 	end
-	return self:__div(number)
+	return self:__div(number --[[@as BigNumber|number]])
 end
 
+--- Raises this BigNumber to a power. Result is truncated to 128 bits. Accepts BigNumber, number, or decimal/hex string.
+---@param number BigNumber|number|string
+---@return BigNumber
 function meta:Pow(number)
 	if (isstring(number)) then
 		number = NikNaks.BigNumber(number)
 	end
-	return self:__pow(number)
+	return self:__pow(number --[[@as BigNumber|number]])
 end
 
+--- Returns the remainder after dividing by a number (sign follows dividend). Accepts BigNumber, number, or decimal/hex string.
+---@param number BigNumber|number|string
+---@return BigNumber
 function meta:Mod(number)
 	if (isstring(number)) then
 		number = NikNaks.BigNumber(number)
 	end
-	return self:__mod(number)
+	return self:__mod(number --[[@as BigNumber|number]])
+end
+
+--- Returns the lowest 32 bits as a signed Lua integer.
+--- Values outside the 32-bit range are clamped to [-2147483648, 2147483647].
+---@return integer
+function meta:To32Bit()
+	local neg = isNeg(self)
+	if self.y ~= 0 or self.z ~= 0 or magW(self.w) ~= 0 then
+		return neg and -2147483648 or 2147483647
+	end
+	if neg then
+		return (self.x < 0) and -2147483648 or -self.x
+	end
+	return (self.x < 0) and 2147483647 or self.x
+end
+
+--- Returns the value as a hexadecimal string, e.g. "0x000000000000000000000000000000FF".
+---@return string
+function meta:ToHex()
+	local wx = self.x % 0x100000000
+	local wy = self.y % 0x100000000
+	local wz = self.z % 0x100000000
+	local ww = magW(self.w)
+	local sign = isNeg(self) and "-" or ""
+	return string.format("%s0x%08X%08X%08X%08X", sign, ww, wz, wy, wx)
+end
+
+--- Returns true if the value equals zero.
+---@return boolean
+function meta:IsZero()
+	return self.x == 0 and self.y == 0 and self.z == 0 and magW(self.w) == 0
+end
+
+--- Returns true if the value is negative.
+---@return boolean
+function meta:IsNegative()
+	return isNeg(self)
+end
+
+--- Returns a new BigNumber with the absolute value.
+---@return BigNumber
+function meta:Abs()
+	return setmetatable({ x = self.x, y = self.y, z = self.z, w = magW(self.w) }, meta)
+end
+
+--- Returns a copy of this BigNumber.
+---@return BigNumber
+function meta:Copy()
+	return setmetatable({ x = self.x, y = self.y, z = self.z, w = self.w }, meta)
 end
