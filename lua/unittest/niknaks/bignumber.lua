@@ -626,5 +626,40 @@ return {
                 Should(r.w):Be(-2147483648)  -- 0x80000000, i.e. 2^127
             end
         },
+
+        -- ────────────────────────────────────────────────────────────────
+        -- __div  (integer division)
+        -- ────────────────────────────────────────────────────────────────
+
+        {
+            name = "div: 100 / 7 = 14",
+            func = function()
+                Should( tostring( BN(100) / BN(7) ) ):Be("14")
+            end
+        },
+        {
+            name = "div: negative dividend (-100 / 7 = -14)",
+            func = function()
+                Should( tostring( BN(-100) / BN(7) ) ):Be("-14")
+            end
+        },
+        {
+            name = "div: negative divisor (100 / -7 = -14)",
+            func = function()
+                Should( tostring( BN(100) / BN(-7) ) ):Be("-14")
+            end
+        },
+        {
+            name = "div: both negative (-100 / -7 = 14)",
+            func = function()
+                Should( tostring( BN(-100) / BN(-7) ) ):Be("14")
+            end
+        },
+        {
+            name = "div: large number (2^64 / 2^32 = 2^32)",
+            func = function()
+                Should( tostring( bn(0, 0, 1) / bn(0, 1) ) ):Be("4294967296")
+            end
+        },
     }
 }

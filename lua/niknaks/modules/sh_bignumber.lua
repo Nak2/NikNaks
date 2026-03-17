@@ -397,7 +397,7 @@ local function ult(a, b)
 	return (a.x % 0x100000000) < (b.x % 0x100000000)
 end
 
---- Unsigned 128-bit division. Returns quotient, remainder.
+--- Unsigned 128-bit division using Knuth's Algorithm D (base 2^16).
 ---@param a BigNumber
 ---@param b BigNumber
 ---@return BigNumber, BigNumber
@@ -408,26 +408,128 @@ local function divmod(a, b)
 	end
 
 	-- Strip sign: division works on unsigned magnitudes; callers apply sign afterwards.
-	a               = stripSign(a)
-	b               = stripSign(b)
+	a = stripSign(a)
+	b = stripSign(b)
 
-	local quotient  = setmetatable({ x = 0, y = 0, z = 0, w = 0 }, meta)
-	local remainder = setmetatable({ x = 0, y = 0, z = 0, w = 0 }, meta)
-	local one       = setmetatable({ x = 1, y = 0, z = 0, w = 0 }, meta)
+	-- Quick exit: a < b → quotient = 0, remainder = a.
+	if ult(a, b) then
+		return setmetatable({ x = 0, y = 0, z = 0, w = 0 }, meta),
+		       setmetatable({ x = a.x, y = a.y, z = a.z, w = a.w }, meta)
+	end
 
-	for i = 127, 0, -1 do
-		-- Shift remainder left by 1 and bring in bit i of a as the new low bit.
-		remainder = remainder:__shl(1)
-		remainder = remainder:__bor(a:__shr(i):__band(one))
+	local floor = math.floor
+	local B     = 65536 -- 2^16
 
-		-- If remainder >= b (unsigned), subtract and record the quotient bit.
-		if not ult(remainder, b) then
-			remainder = sub(remainder, b)
-			quotient  = quotient:__bor(one:__shl(i))
+	local function unpack16(bn)
+		local wx = bn.x % 0x100000000
+		local wy = bn.y % 0x100000000
+		local wz = bn.z % 0x100000000
+		local ww = magW(bn.w)
+		return {
+			[0] = wx % B,        [1] = floor(wx / B),
+			[2] = wy % B,        [3] = floor(wy / B),
+			[4] = wz % B,        [5] = floor(wz / B),
+			[6] = ww % B,        [7] = floor(ww / B),
+		}
+	end
+
+	local function pack16(d)
+		local wx = d[0] + d[1] * B
+		local wy = d[2] + d[3] * B
+		local wz = d[4] + d[5] * B
+		local ww = d[6] + d[7] * B
+		if wx >= 0x80000000 then wx = wx - 0x100000000 end
+		if wy >= 0x80000000 then wy = wy - 0x100000000 end
+		if wz >= 0x80000000 then wz = wz - 0x100000000 end
+		return setmetatable({ x = wx, y = wy, z = wz, w = ww }, meta)
+	end
+
+	local vraw = unpack16(b)
+	local n = 8
+	while n > 1 and vraw[n - 1] == 0 do n = n - 1 end
+
+	local vd = {}
+	for i = 0, n - 1 do vd[i] = vraw[i] end
+
+	local m = 8 - n -- a has m+n = 8 digits; quotient has m+1 digits.
+
+	local d_norm = floor(B / (vd[n - 1] + 1))
+	if d_norm > 1 then
+		local carry = 0
+		for i = 0, n - 1 do
+			local p = vd[i] * d_norm + carry
+			vd[i]   = p % B
+			carry   = floor(p / B)
 		end
 	end
 
-	return quotient, remainder
+	local u = unpack16(a)
+	u[8] = 0 -- u[m+n]
+	if d_norm > 1 then
+		local carry = 0
+		for i = 0, 8 do
+			local p = u[i] * d_norm + carry
+			u[i]    = p % B
+			carry   = floor(p / B)
+		end
+	end
+
+	local q = {}
+	for j = m, 0, -1 do
+		local u_hi2 = u[j + n] * B + u[j + n - 1]
+		local q_hat = floor(u_hi2 / vd[n - 1])
+		local r_hat = u_hi2 % vd[n - 1]
+
+		local vn2  = n >= 2 and vd[n - 2] or 0
+		local ujn2 = j + n - 2 >= 0 and u[j + n - 2] or 0
+		while q_hat >= B or q_hat * vn2 > B * r_hat + ujn2 do
+			q_hat   = q_hat - 1
+			r_hat   = r_hat + vd[n - 1]
+			if r_hat >= B then break end
+		end
+
+		local borrow = 0
+		for k = 0, n - 1 do
+			local p    = q_hat * vd[k] + borrow
+			local diff = u[j + k] - p % B
+			if diff < 0 then
+				u[j + k] = diff + B
+				borrow    = floor(p / B) + 1
+			else
+				u[j + k] = diff
+				borrow    = floor(p / B)
+			end
+		end
+		u[j + n] = u[j + n] - borrow
+		q[j] = q_hat
+
+		if u[j + n] < 0 then
+			q[j]        = q[j] - 1
+			local carry = 0
+			for k = 0, n - 1 do
+				local s  = u[j + k] + vd[k] + carry
+				u[j + k] = s % B
+				carry     = floor(s / B)
+			end
+			u[j + n] = u[j + n] + carry
+		end
+	end
+
+	local rd = {}
+	if d_norm > 1 then
+		local r = 0
+		for i = n - 1, 0, -1 do
+			local t = r * B + u[i]
+			rd[i]   = floor(t / d_norm)
+			r       = t % d_norm
+		end
+	else
+		for i = 0, n - 1 do rd[i] = u[i] end
+	end
+	for i = n, 7 do rd[i] = 0 end
+	for i = m + 1, 7 do q[i] = 0 end
+
+	return pack16(q), pack16(rd)
 end
 
 --- '/' operator — integer (floor) division.
@@ -510,7 +612,7 @@ end
 --- Creates a 128 bit bignumber
 --- @param number32Bit number|string
 --- @return BigNumber
-function NikNaks.BigNumber(number32Bit)
+local function BigNumber(number32Bit)
 	if isstring(number32Bit) then
 		local str = number32Bit --[[@as string]]
 		local minus = str:sub(1, 1) == "-"
@@ -542,6 +644,37 @@ function NikNaks.BigNumber(number32Bit)
 	}
 	setmetatable(t, meta)
 	return t
+end
+
+NikNaks.BigNumber = setmetatable({}, {
+	__call = function(_, ...) return BigNumber(...) end,
+})
+
+--- Writes the 128bit number to net
+---@return BigNumber
+function meta:WriteToNET()
+	net.WriteUInt(self.x, 32)
+	net.WriteUInt(self.y, 32)
+	net.WriteUInt(self.z, 32)
+	net.WriteUInt(self.w, 32)
+	return self
+end
+
+--- Reads the 128bit number from net
+---@return BigNumber
+function NikNaks.BigNumber.ReadFromNET()
+	local t = {
+		x = net.ReadUInt(32),
+		y = net.ReadUInt(32),
+		z = net.ReadUInt(32),
+		w = net.ReadUInt(32),
+	}
+	-- Convert unsigned 32-bit reads to signed int32 (matching the internal storage format).
+	if t.x >= 0x80000000 then t.x = t.x - 0x100000000 end
+	if t.y >= 0x80000000 then t.y = t.y - 0x100000000 end
+	if t.z >= 0x80000000 then t.z = t.z - 0x100000000 end
+	if t.w >= 0x80000000 then t.w = t.w - 0x100000000 end
+	return setmetatable(t, meta)
 end
 
 -- Helper meta functions
