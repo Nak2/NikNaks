@@ -300,6 +300,7 @@ do
 		elseif b.time then
 			return NikNaks.TimeDelta( b.time + self.time )
 		end
+		error("attempt to perform arithmetic on a table value")
 	end
 
 	--- Subtracts seconds or a DateTime from this delta. `timedelta - number` returns a new TimeDelta.
@@ -312,7 +313,7 @@ do
 		elseif b.time then
 			return NikNaks.TimeDelta( b.time - self.time )
 		end
-		return self
+		error("attempt to perform arithmetic on a table value")
 	end
 
 	--- Scales the duration by a multiplier.

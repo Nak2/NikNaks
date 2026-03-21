@@ -5,32 +5,33 @@
 ---Returns a DateTime object.
 ---@overload fun(var: string|number|DateTime|TimeDelta, t_zone:number?) : DateTime?
 NikNaks.DateTime = {}
-local localvars, os_time, os_date, rawget, tonumber, getmetatable, abs = {}, os.time, os.date, rawget, tonumber, getmetatable, math.abs
+local localvars, os_time, os_date, rawget, tonumber, getmetatable, abs = {}, os.time, os.date, rawget, tonumber,
+	getmetatable, math.abs
 
 -- TimeZone / Date variables
 do
-	local UTC_DAY = os_date( "%d", 0 ) - os_date( "!%d", 0 )
-	local UTC_Timezone = tonumber( os_date( "%H", 0 ) ) - tonumber( os_date( "!%H", 0 ) )
+	local UTC_DAY = os_date("%d", 0) - os_date("!%d", 0)
+	local UTC_Timezone = tonumber(os_date("%H", 0)) - tonumber(os_date("!%H", 0))
 	if UTC_DAY == 30 then
 		UTC_Timezone = UTC_Timezone - 24
 	end
 
-	local UTC_Timezone_dst = tonumber( os_date( "%z" ) ) / 100
+	local UTC_Timezone_dst = tonumber(os_date("%z")) / 100
 	local DaylightsSaving = UTC_Timezone_dst - UTC_Timezone
 	NikNaks.DateTime.dst = DaylightsSaving
 	NikNaks.DateTime.timezone = UTC_Timezone
 	NikNaks.DateTime.timezone_dst = UTC_Timezone_dst
 end
 
-local function is_leap_year( year )
-	return year % 4 == 0 and ( year % 100 ~= 0 or year % 400 == 0 )
+local function is_leap_year(year)
+	return year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0)
 end
 
 --- Returns true if the year is a leap year.
 ---@param year number
 ---@return boolean
-function NikNaks.DateTime.IsLeapYear( year )
-	return is_leap_year( year or NikNaks.DateTime.year )
+function NikNaks.DateTime.IsLeapYear(year)
+	return is_leap_year(year or NikNaks.DateTime.year)
 end
 
 do
@@ -40,10 +41,10 @@ do
 	---@param month number Month index between 1 and 12.
 	---@param year number Year used to determine if February has 29 days.
 	---@return number
-	function NikNaks.DateTime.DaysInMonth( month, year )
+	function NikNaks.DateTime.DaysInMonth(month, year)
 		-- Ensure month is within range
-		month = math.Clamp( month, 1, 12 )
-		if month == 2 and is_leap_year( year or NikNaks.DateTime.year ) then
+		month = math.Clamp(month, 1, 12)
+		if month == 2 and is_leap_year(year or NikNaks.DateTime.year) then
 			return 29
 		end
 		return months[month]
@@ -52,7 +53,7 @@ do
 	--- Builds a Calendar table with the number of days per month for the given year.
 	---@param year number
 	---@return Calendar
-	function NikNaks.DateTime.Calendar( year )
+	function NikNaks.DateTime.Calendar(year)
 		year = year or NikNaks.DateTime.year
 
 		---@class Calendar
@@ -63,7 +64,7 @@ do
 		c.month = {}
 
 		for i = 1, 12 do
-			if i == 2 and is_leap_year( year ) then
+			if i == 2 and is_leap_year(year) then
 				c.month[i] = 29
 			else
 				c.month[i] = months[i]
@@ -76,43 +77,43 @@ end
 
 -- Date variables
 local function updatedate()
-	local date = string.Explode( ":", os_date( "%H:%M:%S:%d:%m:%Y" ) --[[ @as string ]])
-	NikNaks.DateTime.day = tonumber( date[4] )
-	NikNaks.DateTime.month = tonumber( date[5] )
-	NikNaks.DateTime.year = tonumber( date[6] )
+	local date = string.Explode(":", os_date("%H:%M:%S:%d:%m:%Y") --[[ @as string ]])
+	NikNaks.DateTime.day = tonumber(date[4])
+	NikNaks.DateTime.month = tonumber(date[5])
+	NikNaks.DateTime.year = tonumber(date[6])
 
 	-- Calculates next cycle
-	local t_seconds = tonumber( date[1] ) * 3600 + tonumber( date[2] ) * 60 + tonumber( date[3] )
+	local t_seconds = tonumber(date[1]) * 3600 + tonumber(date[2]) * 60 + tonumber(date[3])
 	local nextUpdate = 86400 - t_seconds
-	timer.Create( "NikNaks_DateUpdate", math.max( nextUpdate, 1 ), 1, updatedate )
+	timer.Create("NikNaks_DateUpdate", math.max(nextUpdate, 1), 1, updatedate)
 end
 updatedate()
 
 -- Branch metatable
-setmetatable( NikNaks.DateTime, {
-	__index = function( _, v )
-		local l = rawget( localvars, v )
-		return rawget( NikNaks.DateTime, v ) or l and l()
+setmetatable(NikNaks.DateTime, {
+	__index = function(_, v)
+		local l = rawget(localvars, v)
+		return rawget(NikNaks.DateTime, v) or l and l()
 	end,
-	__call = function( _, var )
-		return NikNaks.DateTime.Get( var )
+	__call = function(_, var)
+		return NikNaks.DateTime.Get(var)
 	end
-} )
+})
 
 local string_to_var
 do
 	-- Tries to parse hour, minute and seconds
-	local function findTime( str )
-		local h, m, s, ampm = string.match( str:upper(), "([01]?%d):(%d%d?):?(%d*)%s*([AP][M])" )
+	local function findTime(str)
+		local h, m, s, ampm = string.match(str:upper(), "([01]?%d):(%d%d?):?(%d*)%s*([AP][M])")
 
 		if not h then
-			h, m, s = string.match( str, "(%d%d?):(%d%d?):?(%d*)" )
+			h, m, s = string.match(str, "(%d%d?):(%d%d?):?(%d*)")
 		end
 
 		if not h then return nil end
-		h = tonumber( h )
-		m = tonumber( m )
-		s = tonumber( s )
+		h = tonumber(h)
+		m = tonumber(m)
+		s = tonumber(s)
 
 		if ampm then
 			if ampm == "AM" then
@@ -133,13 +134,13 @@ do
 		}
 
 		local date_pattern = "[JFMASOND][AEPUCO][NBRYLGPTVC]"
-		local function findMonthNameAndDate( str )
-			if not string.match( str, date_pattern ) then return nil end
+		local function findMonthNameAndDate(str)
+			if not string.match(str, date_pattern) then return nil end
 
-			for m_id, date in ipairs( date_tab ) do
-				if string.match( str, date ) then
-					local d = string.match( str, date .. "%a*%s?(%d%d?)" ) or string.match( str, "(%d%d?)%s?" .. date )
-					return m_id, d and tonumber( d ) or 1
+			for m_id, date in ipairs(date_tab) do
+				if string.match(str, date) then
+					local d = string.match(str, date .. "%a*%s?(%d%d?)") or string.match(str, "(%d%d?)%s?" .. date)
+					return m_id, d and tonumber(d) or 1
 				end
 			end
 		end
@@ -149,33 +150,33 @@ do
 		---@return number? Year The year
 		---@return number? Month The month
 		---@return number? Day The day
-		findDate = function( str )
+		findDate = function(str)
 			-- The year number tent to mess with the rest, if found replace it if found.
 			local fy = true
-			local y = string.match( str, "(%d%d%d%d)" )
+			local y = string.match(str, "(%d%d%d%d)")
 			local m, d
 			if y then
-				str = string.gsub( str, "%d%d%d%d", "", 1 )
-				y = tonumber( y )
+				str = string.gsub(str, "%d%d%d%d", "", 1)
+				y = tonumber(y)
 			else
 				-- Check of YY/MM/DD
-				y, m, d = string.match( str, "(%d+)[/%-](%d%d?)[/%-](%d%d?)" )
+				y, m, d = string.match(str, "(%d+)[/%-](%d%d?)[/%-](%d%d?)")
 				if not y then -- Year must be today
 					y = NikNaks.DateTime.year
 					fy = false
 				else
-					return tonumber( y ), tonumber( m ), tonumber( d )
+					return tonumber(y), tonumber(m), tonumber(d)
 				end
 			end
 
 			-- Find MM/DD
-			m, d = string.match( str, "(%d%d?)[/%-](%d%d?)" )
+			m, d = string.match(str, "(%d%d?)[/%-](%d%d?)")
 			if m and d then
-				return y, tonumber( m ), tonumber( d )
+				return y, tonumber(m), tonumber(d)
 			end
 
 			-- No date found. Try string-scan for month names
-			m, d = findMonthNameAndDate( str:upper() ) -- Try parse letters
+			m, d = findMonthNameAndDate(str:upper()) -- Try parse letters
 			if m then
 				return y, m, d
 			end
@@ -188,23 +189,23 @@ do
 	end
 
 	-- Tries to parse timezone. Since os.time use the locate time, this will be negative.
-	local function findOffset( str )
-		if str:sub( -1 ) == "Z" then return -NikNaks.DateTime.timezone_dst end
-		local sign, h, m = str:match( "([%-%+])(%d%d?):?(%d?%d?)$" )
+	local function findOffset(str)
+		if str:sub(-1) == "Z" then return -NikNaks.DateTime.timezone_dst end
+		local sign, h, m = str:match("([%-%+])(%d%d?):?(%d?%d?)$")
 		if sign then
-			return ( tonumber( sign .. h ) + tonumber( sign .. m ) / 60 ) - NikNaks.DateTime.timezone_dst
+			return (tonumber(sign .. h) + tonumber(sign .. m) / 60) - NikNaks.DateTime.timezone_dst
 		else
 			-- Use local
 			return 0
 		end
 	end
 
-	function string_to_var( str )
-		str = string.Trim( str )
+	function string_to_var(str)
+		str = string.Trim(str)
 
 		if #str ~= 4 then
-			local n = string.match( str, "%d+" )
-			if n and #n == #str then return tonumber( n ) end
+			local n = string.match(str, "%d+")
+			if n and #n == #str then return tonumber(n) end
 		end
 
 		--[[
@@ -216,23 +217,23 @@ do
 			2008-05-01 7:34:42Z
 			Thu, 01 May 2008 07:34:42 GMT
 		]]
-		local h, m, s = findTime( str )
+		local h, m, s = findTime(str)
 
 		-- Get Time & Date
-		local year, month, day = findDate( str )
+		local year, month, day = findDate(str)
 
 		-- Find offset
-		local offsetH = findOffset( str ) or 0
+		local offsetH = findOffset(str) or 0
 
 		-- Convert to unix
-		return os_time( {
+		return os_time({
 			day = day or 1,
 			hour = h or 0,
 			min = m or 0,
 			month = month or 1,
-			sec = tonumber( s ) or 0,
+			sec = tonumber(s) or 0,
 			year = year --[[ @as number ]]
-		} ) + offsetH * 3600
+		}) + offsetH * 3600
 	end
 end
 
@@ -246,13 +247,13 @@ NikNaks.__metatables["DateTime"] = datetime_obj
 ---@param var string|number|DateTime|TimeDelta The time to convert. If a number, it is treated as a Unix timestamp.
 ---@param t_zone number? UTC offset in hours to associate with this DateTime.
 ---@return DateTime?
-function NikNaks.DateTime.Get( var, t_zone )
+function NikNaks.DateTime.Get(var, t_zone)
 	if not var then
 		var = os_time()
 	else
-		local _type = type( var )
+		local _type = type(var)
 		if _type == "string" then
-			var = string_to_var( var )
+			var = string_to_var(var)
 		elseif _type == "table" then
 			if var.time then
 				var = var.time + os_time()
@@ -274,7 +275,7 @@ function NikNaks.DateTime.Get( var, t_zone )
 	local t = {}
 	t.unix = var
 	t.timezone = t_zone
-	return setmetatable( t, datetime_obj )
+	return setmetatable(t, datetime_obj)
 end
 
 --- Returns the Unix timestamp in seconds.
@@ -286,13 +287,13 @@ end
 --- Returns the difference between this DateTime and the given time as a TimeDelta.
 ---@param var string|number|DateTime|TimeDelta
 ---@return TimeDelta
-function datetime_obj:TimeUntil( var )
+function datetime_obj:TimeUntil(var)
 	local unix = var
-	local _type = type( var )
+	local _type = type(var)
 
-	if _type == "string" then
-		unix = string_to_var( var )
-	elseif _type == "table" then
+	if isstring(var) then
+		unix = string_to_var(var)
+	elseif istable(var) then
 		if var.time then
 			return var.time -- Will always be relative
 		elseif var.unix then
@@ -300,68 +301,70 @@ function datetime_obj:TimeUntil( var )
 		end
 	end
 
-	return NikNaks.TimeDelta( unix - self.unix, tonumber( os.date( "%Y", self.unix ) ) )
+	return NikNaks.TimeDelta(unix - self.unix, tonumber(os.date("%Y", self.unix)))
 end
 
 -- Local variable functions: DateTime.<X>
 function localvars.now()
-	return NikNaks.DateTime.Get( os_time() )
+	return NikNaks.DateTime.Get(os_time())
 end
+
 localvars.today = localvars.now
 
 function localvars.yesterday()
-	return NikNaks.DateTime.Get( os_time() - NikNaks.TimeDelta.Day )
+	return NikNaks.DateTime.Get(os_time() - NikNaks.TimeDelta.Day)
 end
 
 function localvars.tomorrow()
-	return NikNaks.DateTime.Get( os_time() + NikNaks.TimeDelta.Day )
+	return NikNaks.DateTime.Get(os_time() + NikNaks.TimeDelta.Day)
 end
 
 --- Formats the DateTime using os.date with the given format string.
 ---@param format string
 ---@return string
-function datetime_obj:ToDate( format )
-	return os_date( format, self.unix ) --[[ @as string ]]
+function datetime_obj:ToDate(format)
+	return os_date(format, self.unix) --[[ @as string ]]
 end
-datetime_obj.__tostring = function( self )
-	return os_date( nil, self.unix )
+
+datetime_obj.__tostring = function(self)
+	return os_date(nil, self.unix)
 end
 
 -- Operations
-function datetime_obj.__sub( a, b )
-	if isnumber( a ) then -- A is most likely a number. Number - Obj = TimeDelta
-		return NikNaks.TimeDelta( a - b.unix )
-	elseif isnumber( b ) then -- B is most likely a number. Obj - Number = New Obj
-		return NikNaks.DateTime.Get( a.unix - b )
-	else -- Both are objects
+function datetime_obj.__sub(a, b)
+	if isnumber(a) then    -- A is most likely a number. Number - Obj = TimeDelta
+		return NikNaks.TimeDelta(a - b.unix)
+	elseif isnumber(b) then -- B is most likely a number. Obj - Number = New Obj
+		return NikNaks.DateTime.Get(a.unix - b)
+	else                   -- Both are objects
 		if a.unix and b.unix then
-			return NikNaks.TimeDelta( a.unix - b.unix )
+			return NikNaks.TimeDelta(a.unix - b.unix)
 		elseif a.unix then
-			return NikNaks.DateTime.Get( a.unix - ( b.time or b ) )
+			return NikNaks.DateTime.Get(a.unix - (b.time or b))
 		elseif b.unix then
-			return NikNaks.DateTime.Get( b.unix - ( a.time or a ) )
+			return NikNaks.DateTime.Get(b.unix - (a.time or a))
 		end
 	end
 end
 
-function datetime_obj.__add( a, b )
-	if isnumber( a ) then -- A is most likely a number. Number + Obj = New Obj
-		return NikNaks.DateTime.Get( b.unix + a )
-	elseif isnumber( b ) then -- B is most likely a number. Obj - Number = New Obj
-		return NikNaks.DateTime.Get( a.unix + b )
-	else -- Both are objects
+function datetime_obj.__add(a, b)
+	if isnumber(a) then     -- A is most likely a number. Number + Obj = New Obj
+		return NikNaks.DateTime.Get(b.unix + a)
+	elseif isnumber(b) then -- B is most likely a number. Obj - Number = New Obj
+		return NikNaks.DateTime.Get(a.unix + b)
+	else                    -- Both are objects
 		if a.unix and b.unix then -- Get the higest unix-time and add the delta between the two
-			return NikNaks.DateTime.Get( math.max( a.unix, b.unix ) + abs( a.unix - b.unix ) )
+			return NikNaks.DateTime.Get(math.max(a.unix, b.unix) + abs(a.unix - b.unix))
 		elseif a.unix then
-			return NikNaks.DateTime.Get( a.unix + ( b.time or b ) )
+			return NikNaks.DateTime.Get(a.unix + (b.time or b))
 		elseif b.unix then
-			return NikNaks.DateTime.Get( b.unix + ( a.time or a ) )
+			return NikNaks.DateTime.Get(b.unix + (a.time or a))
 		end
 	end
 end
 
-function datetime_obj.__concat( a, b )
-	return tostring( a ) .. tostring( b )
+function datetime_obj.__concat(a, b)
+	return tostring(a) .. tostring(b)
 end
 
 -- Not supported in Gmod!
@@ -369,27 +372,38 @@ datetime_obj.__shl = datetime_obj.__sub
 datetime_obj.__shr = datetime_obj.__add
 
 -- Sadly Lua doesn't support mixed types for compare-operations
-function datetime_obj.__eq( a, b )
+function datetime_obj.__eq(a, b)
 	return a.unix == b.unix
 end
 
-function datetime_obj.__lt( a, b )
+function datetime_obj.__lt(a, b)
 	return a.unix < b.unix
 end
 
-function datetime_obj.__le( a, b )
+function datetime_obj.__le(a, b)
 	return a.unix <= b.unix
 end
 
+local units = {
+	Milisecond = 0.001,
+	Second = 1,
+	Minute = 60,
+	Hour = 3600,
+	Day = 86400,
+	Week = 604800,
+	Year = 31536000,
+	Decade = 315359654,
+	Century = 3153596543
+}
+
 -- TimeDelta functions
-for key, var in pairs( NikNaks.TimeDelta --[[@as table<string, number>]] ) do
-	if(var=="_steps") then continue end
-	datetime_obj["Add" .. key .. "s"] = function( self, num )
+for key, var in pairs(units) do
+	datetime_obj["Add" .. key .. "s"] = function(self, num)
 		self.unix = self.unix + num * var
 		return self
 	end
 
-	datetime_obj["Remove" .. key .. "s"] = function( self, num )
+	datetime_obj["Remove" .. key .. "s"] = function(self, num)
 		self.unix = self.unix - num * var
 		return self
 	end
