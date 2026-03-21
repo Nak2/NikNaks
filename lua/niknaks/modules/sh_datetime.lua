@@ -2,6 +2,8 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 -- License: https://github.com/Nak2/NikNaks/blob/main/LICENSE
 
+---Returns a DateTime object.
+---@overload fun(var: string|number|DateTime|TimeDelta, t_zone:number) : DateTime?
 NikNaks.DateTime = {}
 local localvars, os_time, os_date, rawget, tonumber, getmetatable, abs = {}, os.time, os.date, rawget, tonumber, getmetatable, math.abs
 
@@ -34,9 +36,9 @@ end
 do
 	local months = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
 
-	---Returns the number of days in the month.
-	---@param month number A number between 1 and 12.
-	---@param year number The year to check for leap year.
+	--- Returns the number of days in the given month, accounting for leap years.
+	---@param month number Month index between 1 and 12.
+	---@param year number Year used to determine if February has 29 days.
 	---@return number
 	function NikNaks.DateTime.DaysInMonth( month, year )
 		-- Ensure month is within range
@@ -47,15 +49,15 @@ do
 		return months[month]
 	end
 
-	---A calender for the year.
+	--- Builds a Calendar table with the number of days per month for the given year.
 	---@param year number
-	---@return Calender
-	function NikNaks.DateTime.Calender( year )
+	---@return Calendar
+	function NikNaks.DateTime.Calendar( year )
 		year = year or NikNaks.DateTime.year
 
-		--- @class Calender
-		---@field year number The year
-		---@field month table<number, number> The days in each month
+		---@class Calendar
+		---@field year number The calendar year.
+		---@field month table<number, number> Days in each month (1–12), accounting for leap years.
 		local c = {}
 		c.year = year
 		c.month = {}
@@ -234,15 +236,15 @@ do
 	end
 end
 
---- @class DateTime A fixed point in time
---- @field unix number The unix time
+---@class DateTime A fixed point in time represented as a Unix timestamp.
+---@field unix number The Unix timestamp in seconds.
 local datetime_obj = {}
 datetime_obj.__index = datetime_obj
 NikNaks.__metatables["DateTime"] = datetime_obj
 
 ---Returns a DateTime object.
----@param var string|number|DateTime|TimeDelta The time to convert. If number, then it is assumed to be a unix-time.
----@param t_zone any
+---@param var string|number|DateTime|TimeDelta The time to convert. If a number, it is treated as a Unix timestamp.
+---@param t_zone number? UTC offset in hours to associate with this DateTime.
 ---@return DateTime?
 function NikNaks.DateTime.Get( var, t_zone )
 	if not var then
@@ -268,22 +270,22 @@ function NikNaks.DateTime.Get( var, t_zone )
 	if not var then return nil end
 
 	-- Create object and return
-	--- @class DateTime
+	---@class DateTime
 	local t = {}
 	t.unix = var
 	t.timezone = t_zone
 	return setmetatable( t, datetime_obj )
 end
 
---- Returns the unix-time.
+--- Returns the Unix timestamp in seconds.
 ---@return number
 function datetime_obj:GetUnix()
 	return self.unix
 end
 
----Calculates the time until the given time.
+--- Returns the difference between this DateTime and the given time as a TimeDelta.
 ---@param var string|number|DateTime|TimeDelta
----@return unknown
+---@return TimeDelta
 function datetime_obj:TimeUntil( var )
 	local unix = var
 	local _type = type( var )
@@ -315,9 +317,9 @@ function localvars.tomorrow()
 	return NikNaks.DateTime.Get( os_time() + NikNaks.TimeDelta.Day )
 end
 
---- Returns the time using os.date
---- @param format string
---- @return string
+--- Formats the DateTime using os.date with the given format string.
+---@param format string
+---@return string
 function datetime_obj:ToDate( format )
 	return os_date( format, self.unix ) --[[ @as string ]]
 end
