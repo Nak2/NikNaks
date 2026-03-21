@@ -3,7 +3,7 @@
 -- License: https://github.com/Nak2/NikNaks/blob/main/LICENSE
 
 ---Returns a DateTime object.
----@overload fun(var: string|number|DateTime|TimeDelta, t_zone:number) : DateTime?
+---@overload fun(var: string|number|DateTime|TimeDelta, t_zone:number?) : DateTime?
 NikNaks.DateTime = {}
 local localvars, os_time, os_date, rawget, tonumber, getmetatable, abs = {}, os.time, os.date, rawget, tonumber, getmetatable, math.abs
 
@@ -329,9 +329,9 @@ end
 
 -- Operations
 function datetime_obj.__sub( a, b )
-	if not getmetatable( a ) then -- A is most likely a number. Number - Obj = TimeDelta
+	if isnumber( a ) then -- A is most likely a number. Number - Obj = TimeDelta
 		return NikNaks.TimeDelta( a - b.unix )
-	elseif not getmetatable( b ) then -- B is most likely a number. Obj - Number = New Obj
+	elseif isnumber( b ) then -- B is most likely a number. Obj - Number = New Obj
 		return NikNaks.DateTime.Get( a.unix - b )
 	else -- Both are objects
 		if a.unix and b.unix then
@@ -345,9 +345,9 @@ function datetime_obj.__sub( a, b )
 end
 
 function datetime_obj.__add( a, b )
-	if not getmetatable( a ) then -- A is most likely a number. Number + Obj = New Obj
+	if isnumber( a ) then -- A is most likely a number. Number + Obj = New Obj
 		return NikNaks.DateTime.Get( b.unix + a )
-	elseif not getmetatable( b ) then -- B is most likely a number. Obj - Number = New Obj
+	elseif isnumber( b ) then -- B is most likely a number. Obj - Number = New Obj
 		return NikNaks.DateTime.Get( a.unix + b )
 	else -- Both are objects
 		if a.unix and b.unix then -- Get the higest unix-time and add the delta between the two
@@ -382,7 +382,8 @@ function datetime_obj.__le( a, b )
 end
 
 -- TimeDelta functions
-for key, var in pairs( NikNaks.TimeDelta ) do
+for key, var in pairs( NikNaks.TimeDelta --[[@as table<string, number>]] ) do
+	if(var=="_steps") then continue end
 	datetime_obj["Add" .. key .. "s"] = function( self, num )
 		self.unix = self.unix + num * var
 		return self
@@ -394,33 +395,4 @@ for key, var in pairs( NikNaks.TimeDelta ) do
 	end
 
 	datetime_obj["Sub" .. key .. "s"] = datetime_obj["Remove" .. key .. "s"]
-end
-
--- DateTime string debug test
-if true then return end
-local t = {	"Sun, 01 Sep 2022 00:12:00",
-			"September 01, 2022 12:12 AM",
-			"2022-09-01T00:12:00+02:00",
-			"2022/09/1",
-			"2022-09-01T07:12:00-5:00",
-			"2022-09-01 02:12:00Z",
-			"Thu, 01 Sep 2022 00:12:00" }
-
-function ParseTest()
-	for _, str in ipairs( t ) do
-		print( str .. string.rep( " ", 30 - #str ), "=>", NikNaks.DateTime.Get( str ) )
-	end
-end
-
-function SpeedTest()
-	local n = 20000 * #t
-	local s = SysTime()
-
-	for _, str in ipairs( t ) do
-		for _ = 1, 20000 do
-			NikNaks.DateTime.Get( str )
-		end
-	end
-
-	print( string.format( n .. " took: %fs", SysTime() - s ) )
 end

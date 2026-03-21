@@ -2,20 +2,19 @@
 -- All Rights Reserved. Not allowed to be reuploaded.
 -- License: https://github.com/Nak2/NikNaks/blob/main/LICENSE
 
---- @class TimeDelta
---- @operator add:TimeDelta|DateTime
---- @operator sub:TimeDelta|DateTime
---- @operator mul:TimeDelta
---- @operator div:TimeDelta
---- @operator pow:TimeDelta
---- @operator mod:TimeDelta
+---@class TimeDelta
+---@field time number
+---@operator add:TimeDelta|DateTime
+---@operator sub:TimeDelta|DateTime
+---@operator mul:TimeDelta
+---@operator div:TimeDelta
+---@operator pow:TimeDelta
+---@operator mod:TimeDelta
 local meta = {}
 meta.__index = meta
 meta.MetaName = "TimeDelta"
 NikNaks.__metatables["TimeDelta"] = meta
 
---- @class TimeDeltaModule
---- @operator call:TimeDelta 
 local TimeDelta = {}
 TimeDelta.Milisecond = 0.001
 TimeDelta.Second = 1
@@ -35,16 +34,16 @@ setmetatable( TimeDelta, {
 	end
 } )
 
+---@overload fun(number:number) : TimeDelta
 NikNaks.TimeDelta = TimeDelta
-
 
 do
 	local abs = math.abs
 	local floor = math.floor
 	local steps = TimeDelta._steps
 
-	--- Returns the time as a table
-	--- @return table
+	--- Breaks the duration into a table of named time components (Year, Day, Hour, etc.).
+	---@return table
 	function meta:ToTable()
 		if self._tab then return self._tab end
 
@@ -96,72 +95,151 @@ end
 
 -- Getters
 do
-	--- Generic getter function to get the time amount of the given time type
-	--- @param key string The name of the time type to get
-	--- @return number
+	--- Returns the total duration expressed in the given time unit (e.g. "Hour", "Minute").
+	---@param key string The time unit name to divide by.
+	---@return number
 	function meta:_getter( key )
 		return self.time / TimeDelta[key]
 	end
 
+	--- Returns the total duration expressed as a fractional number of milliseconds.
+	---@return number
 	function meta:GetMiliseconds() return self:_getter( "Milisecond" ) end
+	--- Returns the total duration expressed as a fractional number of seconds.
+	---@return number
 	function meta:GetSeconds() return self:_getter( "Second" ) end
+	--- Returns the total duration expressed as a fractional number of minutes.
+	---@return number
 	function meta:GetMinutes() return self:_getter( "Minute" ) end
+	--- Returns the total duration expressed as a fractional number of hours.
+	---@return number
 	function meta:GetHours() return self:_getter( "Hour" ) end
+	--- Returns the total duration expressed as a fractional number of days.
+	---@return number
 	function meta:GetDays() return self:_getter( "Day" ) end
+	--- Returns the total duration expressed as a fractional number of weeks.
+	---@return number
 	function meta:GetWeeks() return self:_getter( "Week" ) end
+	--- Returns the total duration expressed as a fractional number of months.
+	---@return number
 	function meta:GetMonths() return self:_getter( "Month" ) end
+	--- Returns the total duration expressed as a fractional number of years.
+	---@return number
 	function meta:GetYears() return self:_getter( "Year" ) end
+	--- Returns the total duration expressed as a fractional number of decades.
+	---@return number
 	function meta:GetDecades() return self:_getter( "Decade" ) end
+	--- Returns the total duration expressed as a fractional number of centuries.
+	---@return number
 	function meta:GetCenturies() return self:_getter( "Century" ) end
 end
 
 -- Adders
 do
-	--- Generic adder function to add given time amount to the TimeDelta
-	--- @param key string The name of the time type to add
-	--- @param num number The amount of time to add
-	--- @return self TimeDelta
+	--- Adds the given amount of a time unit to this TimeDelta and invalidates the cached table.
+	---@param key string The time unit name (e.g. "Hour", "Day").
+	---@param num number The amount to add.
+	---@return self
 	function meta:_adder( key, num )
 		self.time = self.time + ( num * TimeDelta[key] )
 		self._tab = nil
 		return self
 	end
 
-	--- @param n number
-	function meta:AddMiliseconds( n ) return self:_adder( "Milisecond", n ) end --- @param n number
-	function meta:AddSeconds( n ) return self:_adder( "Second", n ) end         --- @param n number
-	function meta:AddMinutes( n ) return self:_adder( "Minute", n ) end         --- @param n number
-	function meta:AddHours( n ) return self:_adder( "Hour", n ) end             --- @param n number
-	function meta:AddDays( n ) return self:_adder( "Day", n ) end               --- @param n number
-	function meta:AddWeeks( n ) return self:_adder( "Week", n ) end             --- @param n number
-	function meta:AddMonths( n ) return self:_adder( "Month", n ) end           --- @param n number
-	function meta:AddYears( n ) return self:_adder( "Year", n ) end             --- @param n number
-	function meta:AddDecades( n ) return self:_adder( "Decade", n ) end         --- @param n number
-	function meta:AddCenturies( n ) return self:_adder( "Century", n ) end      --- @param n number
+	--- Adds the given number of milliseconds to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddMiliseconds( n ) return self:_adder( "Milisecond", n ) end
+	--- Adds the given number of seconds to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddSeconds( n ) return self:_adder( "Second", n ) end
+	--- Adds the given number of minutes to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddMinutes( n ) return self:_adder( "Minute", n ) end
+	--- Adds the given number of hours to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddHours( n ) return self:_adder( "Hour", n ) end
+	--- Adds the given number of days to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddDays( n ) return self:_adder( "Day", n ) end
+	--- Adds the given number of weeks to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddWeeks( n ) return self:_adder( "Week", n ) end
+	--- Adds the given number of months to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddMonths( n ) return self:_adder( "Month", n ) end
+	--- Adds the given number of years to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddYears( n ) return self:_adder( "Year", n ) end
+	--- Adds the given number of decades to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddDecades( n ) return self:_adder( "Decade", n ) end
+	--- Adds the given number of centuries to this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:AddCenturies( n ) return self:_adder( "Century", n ) end
 end
 
 -- Subtractors
 do
-	--- Generic subtractor function to subtract given time amount from the TimeDelta
-	--- @param key string The name of the time type to subtract
-	--- @param num number The amount of time to subtract
-	--- @return self TimeDelta
+	--- Subtracts the given amount of a time unit from this TimeDelta and invalidates the cached table.
+	---@param key string The time unit name (e.g. "Hour", "Day").
+	---@param num number The amount to subtract.
+	---@return self
 	function meta:_subtractor( key, num )
 		self.time = self.time - ( num * TimeDelta[key] )
 		self._tab = nil
 		return self
 	end
 
-	function meta:SubMiliseconds( n ) return self:_subtractor( "Milisecond", n ) end --- @param n number
-	function meta:SubSeconds( n ) return self:_subtractor( "Second", n ) end         --- @param n number
-	function meta:SubMinutes( n ) return self:_subtractor( "Minute", n ) end         --- @param n number
-	function meta:SubHours( n ) return self:_subtractor( "Hour", n ) end             --- @param n number
-	function meta:SubDays( n ) return self:_subtractor( "Day", n ) end               --- @param n number
-	function meta:SubWeeks( n ) return self:_subtractor( "Week", n ) end             --- @param n number
-	function meta:SubMonths( n ) return self:_subtractor( "Month", n ) end           --- @param n number
-	function meta:SubYears( n ) return self:_subtractor( "Year", n ) end             --- @param n number
-	function meta:SubDecades( n ) return self:_subtractor( "Decade", n ) end         --- @param n number
-	function meta:SubCenturies( n ) return self:_subtractor( "Century", n ) end      --- @param n number
+	--- Subtracts the given number of milliseconds from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubMiliseconds( n ) return self:_subtractor( "Milisecond", n ) end
+	--- Subtracts the given number of seconds from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubSeconds( n ) return self:_subtractor( "Second", n ) end
+	--- Subtracts the given number of minutes from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubMinutes( n ) return self:_subtractor( "Minute", n ) end
+	--- Subtracts the given number of hours from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubHours( n ) return self:_subtractor( "Hour", n ) end
+	--- Subtracts the given number of days from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubDays( n ) return self:_subtractor( "Day", n ) end
+	--- Subtracts the given number of weeks from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubWeeks( n ) return self:_subtractor( "Week", n ) end
+	--- Subtracts the given number of months from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubMonths( n ) return self:_subtractor( "Month", n ) end
+	--- Subtracts the given number of years from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubYears( n ) return self:_subtractor( "Year", n ) end
+	--- Subtracts the given number of decades from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubDecades( n ) return self:_subtractor( "Decade", n ) end
+	--- Subtracts the given number of centuries from this TimeDelta.
+	---@param n number
+	---@return TimeDelta
+	function meta:SubCenturies( n ) return self:_subtractor( "Century", n ) end
 end
 
 -- ToString
@@ -169,6 +247,7 @@ do
 	local abs = math.abs
 	local steps = TimeDelta._steps
 
+	--- Returns a human-readable string like "1 Year, 2 Days and 3 Hours".
 	function meta:__tostring()
 		local str
 		local si = 0
@@ -197,83 +276,94 @@ do
 	end
 end
 
+--- Returns true if this TimeDelta represents a negative duration.
+---@return boolean
 function meta:IsNegative()
 	return self.time < 0
 end
 
+--- Returns true if this TimeDelta represents a zero or positive duration.
+---@return boolean
 function meta:IsPositive()
 	return self.time >= 0
 end
 
 -- Operations
 do
-	--- @param b TimeDelta|number
-	--- @return TimeDelta|DateTime
+	--- Adds seconds or a DateTime to this delta. `timedelta + number` returns a new TimeDelta.
+	--- `timedelta + DateTime` shifts the DateTime forward and returns a new DateTime.
+	---@param b TimeDelta|number
+	---@return TimeDelta
 	function meta:__add( b )
 		if isnumber( b ) then
 			return TimeDelta( self.time + b )
-		end
-
-		if self.unix and b.time then
-			return NikNaks.DateTime( self.unix + b.time )
-		elseif b.unix and self.time then
-			return NikNaks.DateTime( b.unix + self.time )
+		elseif b.time then
+			return NikNaks.TimeDelta( b.time + self.time )
 		end
 	end
 
-	--- @param b TimeDelta|number
-	--- @return TimeDelta|DateTime
+	--- Subtracts seconds or a DateTime from this delta. `timedelta - number` returns a new TimeDelta.
+	--- `timedelta - DateTime` shifts the DateTime backward by this duration and returns a new DateTime.
+	---@param b TimeDelta|number
+	---@return TimeDelta
 	function meta:__sub( b )
 		if isnumber( b ) then
 			return TimeDelta( self.time - b )
+		elseif b.time then
+			return NikNaks.TimeDelta( b.time - self.time )
 		end
-
-		if self.unix and b.time then
-			return NikNaks.DateTime( self.unix - b.time )
-		elseif b.unix and self.time then
-			return NikNaks.DateTime( b.unix - self.time )
-		end
+		return self
 	end
 
-	--- @param b TimeDelta|number
-	--- @return TimeDelta
+	--- Scales the duration by a multiplier.
+	---@param b TimeDelta|number
+	---@return TimeDelta
 	function meta:__mul( b )
 		b = isnumber( b ) and b or b.time
 		return TimeDelta( self.time * b )
 	end
 
-	--- @param b TimeDelta|number
-	--- @return TimeDelta
+	--- Divides the duration by a divisor.
+	---@param b TimeDelta|number
+	---@return TimeDelta
 	function meta:__div( b )
 		b = isnumber( b ) and b or b.time
 		return TimeDelta( self.time / b )
 	end
 
-	--- @param b TimeDelta|number
-	--- @return TimeDelta
+	--- Raises the duration in seconds to the given power.
+	---@param b TimeDelta|number
+	---@return TimeDelta
 	function meta:__pow( b )
 		b = isnumber( b ) and b or b.time
 		return TimeDelta( self.time ^ b )
 	end
 
-	--- @param b TimeDelta|number
-	--- @return TimeDelta
+	--- Returns the remainder of dividing the duration by the given value.
+	---@param b TimeDelta|number
+	---@return TimeDelta
 	function meta:__mod( b )
 		b = isnumber( b ) and b or b.time
 		return TimeDelta( self.time % b )
 	end
 
-	--- @param b TimeDelta
+	--- Returns true if both TimeDelta values represent the same duration.
+	---@param b TimeDelta
+	---@return boolean
 	function meta:__eq( b )
 		return self.time == b.time
 	end
 
-	--- @param b TimeDelta
+	--- Returns true if this duration is strictly shorter than the other.
+	---@param b TimeDelta
+	---@return boolean
 	function meta:__lt( b )
 		return self.time < b.time
 	end
 
-	--- @param b TimeDelta
+	--- Returns true if this duration is shorter than or equal to the other.
+	---@param b TimeDelta
+	---@return boolean
 	function meta:__le( b )
 		return self.time <= b.time
 	end
