@@ -7,7 +7,8 @@ local band, brshift, blshift, bor, bswap = bit.band, bit.rshift, bit.lshift, bit
 local log, ldexp, frexp, floor, ceil, max, setmetatable, source = math.log, math.ldexp, math.frexp, math.floor, math
 	.ceil, math.max, setmetatable, jit.util.funcinfo(NikNaks.AutoInclude)["source"]
 
---- @class BitBufferModule
+--- Creates a new BitBuffer. 
+--- @overload fun(data: string|table, little_endian: boolean) : BitBuffer
 NikNaks.BitBuffer = {}
 
 --- @class BitBuffer
@@ -94,10 +95,6 @@ end
 
 NikNaks.BitBuffer.Create = create
 setmetatable(NikNaks.BitBuffer, {
-	--- Creates a new BitBuffer. 
-	--- @param data string|table
-	--- @param little_endian boolean? # Defaults to true
-	--- @return BitBuffer
 	__call = function(_, data, little_endian) return create(data, little_endian) end
 })
 

@@ -668,6 +668,8 @@ local function BigNumber(number32Bit)
 	return t
 end
 
+---Creates a 128 bit bignumber
+---@overload fun(number32Bit: number|string): BigNumber
 NikNaks.BigNumber = setmetatable({}, {
 	__call = function(_, ...) return BigNumber(...) end,
 })

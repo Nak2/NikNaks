@@ -1369,13 +1369,19 @@ do
 	meta_bmodel.__index = meta_bmodel
 
 	--- Returns a list of BModels ( Brush Models )
-	--- @return BModel
+	--- @return BModel[]
 	function meta:GetBModels()
 		if self._bmodel then return self._bmodel end
 		self._bmodel = {}
 		local data = self:GetLump(14)
 		for i = 0, data:Size() / 384 - 1 do
 			--- @class BModel
+			--- @field mins Vector
+			--- @field maxs Vector
+			--- @field origin Vector
+			--- @field headnode number
+			--- @field firstface number
+			--- @field numfaces number
 			local t = {}
 			t.mins = data:ReadVector()
 			t.maxs = data:ReadVector()
