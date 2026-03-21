@@ -73,6 +73,8 @@ NikNaks.__metatables["BSP"] = meta
 NikNaks._Source = "niknak"
 
 NikNaks.AutoInclude("niknaks/modules/sh_bignumber.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_timedelta.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_datetime.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_hooks.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_enums.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_util_extended.lua")

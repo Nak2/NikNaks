@@ -40,12 +40,12 @@ local string_format, string_sub = string.format, string.sub
 
 -- CMYK
 
-	---Converts a color into CMYK variables.
+	--- Converts an RGB Color into CMYK components, each in the range 0–1.
 	---@param color Color
-	---@return number c
-	---@return number m
-	---@return number y
-	---@return number j
+	---@return number c Cyan.
+	---@return number m Magenta.
+	---@return number y Yellow.
+	---@return number k Key/black.
 	function NikNaks.ColorToCMYK( color )
 		local r, g, b = color.r / 255, color.g / 255, color.b / 255
 		local k = 1 - max(r, g, b)
@@ -57,18 +57,17 @@ local string_format, string_sub = string.format, string.sub
 		return c, m, y, k
 	end
 
-	---Converts a color into CMYK variables.
 	---@return number c
 	---@return number m
 	---@return number y
-	---@return number j
+	---@return number k
 	COLOR.ToCMYK = NikNaks.ColorToCMYK
 
-	---Converts CMYK variables into a color.
-	---@param c any
-	---@param m any
-	---@param y any
-	---@param k any
+	--- Converts CMYK values (each 0–1) into an RGB Color.
+	---@param c number Cyan component (0–1).
+	---@param m number Magenta component (0–1).
+	---@param y number Yellow component (0–1).
+	---@param k number Key/black component (0–1).
 	---@return Color
 	function NikNaks.CMYKToColor( c, m, y, k )
 		local r = round( 255 * ( 1 - c ) * ( 1 - k ) )
@@ -91,7 +90,7 @@ local string_format, string_sub = string.format, string.sub
 		return Color(n,n,n,self.a)
 	end
 
-	---Cartoonify the color.
+	--- Reduces each channel toward its dominant primary, producing a cartoon-like saturation effect.
 	---@param color Color
 	---@return Color
 	function COLOR:ToCartoon(color)

@@ -3,11 +3,11 @@
 local NikNaks = NikNaks
 local tostring, tonumber, tobool, Angle, Vector, string_ToColor, max = tostring, tonumber, tobool, Angle, Vector, string.ToColor, math.max
 
---- Same as AccessorFunc, but will make 'Set' functions return self. Allowing you to chain-call.
---- @param tab table
---- @param varname string
---- @param name string
---- @param iForce? number
+--- Like AccessorFunc, but Set functions return `self` to allow method chaining.
+---@param tab table
+---@param varname string
+---@param name string
+---@param iForce? number
 function NikNaks.AccessorFuncEx( tab, varname, name, iForce )
 	if not tab then debug.Trace() end
 	tab[ "Get" .. name ] = function( self ) return self[ varname ] end
@@ -44,10 +44,10 @@ NikNaks.util = {}
 
 -- Hull
 do
-	--- Returns a HULL_ENUM fitting the hull given.
-	--- @param vecMin Vector
-	--- @param vecMax Vector
-	--- @return HULL HULL_ENUM
+	--- Returns the closest matching HULL_ENUM for the given bounding box dimensions.
+	---@param vecMin Vector
+	---@param vecMax Vector
+	---@return HULL HULL_ENUM
 	function NikNaks.util.FindHull( vecMin, vecMax )
 		local wide = max(-vecMin.x, -vecMin.y, vecMax.x, vecMax.y)
 		local high = vecMax.z - vecMin.z
@@ -68,9 +68,9 @@ do
 		end
 	end
 
-	--- Returns a HULL_ENUM matching the entitys hull.
-	--- @param entity Entity|Player|NPC
-	--- @return HULL HULL_ENUM
+	--- Returns the HULL_ENUM that best matches the entity's bounding box.
+	---@param entity Entity|Player|NPC
+	---@return HULL HULL_ENUM
 	function NikNaks.util.FindEntityHull( entity )
 		-- Players and NPCs have a hull function
 		local mi,ma

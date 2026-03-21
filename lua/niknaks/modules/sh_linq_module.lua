@@ -26,8 +26,8 @@ end
 
 --#region Filters
 
----Filters the table based on the given predicate
----@param predicate function
+--- Keeps only elements for which the predicate returns true.
+---@param predicate fun(v: any, k: any): boolean
 ---@return self
 function t:Where(predicate)
     local tbl = {}
@@ -40,8 +40,8 @@ function t:Where(predicate)
     return self
 end
 
----Projects the table based on the given selector
----@param selector function
+--- Transforms each element using the selector. If the selector returns multiple values they are wrapped in a table.
+---@param selector fun(v: any, k: any): any
 ---@return self
 function t:Select(selector)
     local tbl = {}
@@ -57,8 +57,8 @@ function t:Select(selector)
     return self
 end
 
----Projects the table based on the given selector. Flattens the result (Each element in the result is a separate element in the table)
----@param selector function
+--- Transforms each element and flattens the results into a single sequence.
+---@param selector fun(v: any, k: any): any
 ---@return self
 function t:SelectMany(selector)
     local tbl = {}
@@ -107,8 +107,8 @@ end
 
 --#region Variables
 
----Returns the first element that satisfies the predicate
----@param predicate function
+--- Returns the first element that satisfies the predicate, or nil if none match.
+---@param predicate fun(v: any, k: any): boolean
 ---@return any
 function t:Single(predicate)
     for k, v in pairs(self.tbl) do
@@ -119,8 +119,8 @@ function t:Single(predicate)
     return nil
 end
 
----Returns the first element that satisfies the predicate or the default value
----@param predicate function
+--- Returns the first matching element, or `default` if none satisfy the predicate.
+---@param predicate fun(v: any, k: any): boolean
 ---@param default any
 ---@return any
 function t:SingleOrDefault(predicate, default)
@@ -132,8 +132,8 @@ function t:SingleOrDefault(predicate, default)
     return default
 end
 
----Returns true if any element in the table satisfies the predicate
----@param predicate any
+--- Returns true if at least one element satisfies the predicate.
+---@param predicate fun(v: any, k: any): boolean
 ---@return boolean
 function t:Any(predicate)
     for k, v in pairs(self.tbl) do
@@ -144,8 +144,8 @@ function t:Any(predicate)
     return false
 end
 
----Returns true if all elements in the table satisfy the predicate
----@param predicate any
+--- Returns true if every element satisfies the predicate.
+---@param predicate fun(v: any, k: any): boolean
 ---@return boolean
 function t:All(predicate)
     for k, v in pairs(self.tbl) do
@@ -315,7 +315,7 @@ function t:Reverse()
     return self
 end
 
----Distincts the table
+--- Removes duplicate elements, keeping only the first occurrence of each value.
 ---@return self
 function t:Distinct()
     local tbl = {}
@@ -328,7 +328,7 @@ function t:Distinct()
     return self
 end
 
----Unions the table with the given table
+--- Merges elements from another LINQ sequence, keeping only distinct values.
 ---@param tbl LINQ
 ---@return self
 function t:Union(tbl)
@@ -340,7 +340,7 @@ function t:Union(tbl)
     return self
 end
 
----Intersects the table with the given table
+--- Keeps only elements that also exist in the other LINQ sequence.
 ---@param tbl LINQ
 ---@return self
 function t:Intersect(tbl)
@@ -354,21 +354,21 @@ function t:Intersect(tbl)
     return self
 end
 
----Zips the table with the given table
+--- Pairs elements from both sequences and combines them using the combiner function.
 ---@param tbl LINQ
----@param func function<any, any> # Returns the new value based on the two values.
+---@param combiner fun(a: any, b: any): any
 ---@return self
-function t:Zip(tbl, func)
+function t:Zip(tbl, combiner)
     local newTbl = {}
     for i = 1, math.min(#self.tbl, #tbl.tbl) do
-        table.insert(newTbl, func(self.tbl[i], tbl.tbl[i]))
+        table.insert(newTbl, combiner(self.tbl[i], tbl.tbl[i]))
     end
     self.tbl = newTbl
     return self
 end
 
----Groups the table based on the given keySelector
----@param keySelector function<string> # The key selector.
+--- Groups elements into sub-tables keyed by the value returned from the selector.
+---@param keySelector fun(v: any, k: any): any
 ---@return self
 function t:GroupBy(keySelector)
     local tbl = {}
@@ -407,8 +407,8 @@ function t:SkipLast(n)
     return self
 end
 
----Skips elements from the beginning until the predicate is false
----@param predicate function
+--- Skips elements from the start as long as the predicate holds, then keeps the rest.
+---@param predicate fun(v: any, k: any): boolean
 ---@return self
 function t:SkipWhile(predicate)
     local tbl = {}
@@ -449,8 +449,8 @@ function t:TakeLast(n)
     return self
 end
 
----Takes elements from the beginning until the predicate is false
----@param predicate function
+--- Takes elements from the start as long as the predicate holds, then stops.
+---@param predicate fun(v: any, k: any): boolean
 ---@return self
 function t:TakeWhile(predicate)
     local tbl = {}

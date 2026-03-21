@@ -8,14 +8,14 @@ local log, ldexp, frexp, floor, ceil, max, setmetatable, source = math.log, math
 	.ceil, math.max, setmetatable, jit.util.funcinfo(NikNaks.AutoInclude)["source"]
 
 --- Creates a new BitBuffer. 
---- @overload fun(data: string|table, little_endian: boolean) : BitBuffer
+---@overload fun(data: string|table, little_endian: boolean) : BitBuffer
 NikNaks.BitBuffer = {}
 
---- @class BitBuffer
---- @field private _data number[]
---- @field private _tell number
---- @field private _len number
---- @field private _little_endian boolean
+---@class BitBuffer
+---@field private _data number[]
+---@field private _tell number
+---@field private _len number
+---@field private _little_endian boolean
 local meta = {}
 meta.__index = meta
 function meta:__tostring()
@@ -25,17 +25,17 @@ end
 ---@diagnostic disable: invisible
 
 --- Fixes bit-shift errors
---- @param int number
---- @param shift number
---- @return number
+---@param int number
+---@param shift number
+---@return number
 local function rshift(int, shift)
 	if shift > 31 then return 0x0 end
 	return brshift(int, shift)
 end
 
---- @param int number
---- @param shift number
---- @return number
+---@param int number
+---@param shift number
+---@return number
 local function lshift(int, shift)
 	if shift > 31 then return 0x0 end
 	return blshift(int, shift)
@@ -64,10 +64,11 @@ local function unsaferawdata(self, str)
 end
 
 --- Creates a new BitBuffer.
---- @param little_endian? boolean # Defaults to true
---- @return BitBuffer
+---@param data? string|table # Data
+---@param little_endian? boolean # Defaults to true
+---@return BitBuffer
 local function create(data, little_endian)
-	--- @type BitBuffer
+	---@type BitBuffer
 	local t = {
 		_data = {},
 		_tell = 0,
@@ -100,9 +101,9 @@ setmetatable(NikNaks.BitBuffer, {
 
 -- Simple int->string and reverse. ( Little-Endian )
 do
-	--- Takes a string of 1-4 charectors and converts it into a Little-Endian int
-	--- @param str string
-	--- @return number
+	--- Takes a string of 1-4 characters and converts it into a Little-Endian integer.
+	---@param str string
+	---@return number
 	function NikNaks.BitBuffer.StringToInt(str)
 		local a, b, c, d = s_byte(str, 1, 4)
 		if d then
@@ -117,9 +118,9 @@ do
 	end
 
 	local q = 0xFF
-	--- Takes an Little-Endian number and converts it into a 4 char-string
-	--- @param int number
-	--- @return string
+	--- Takes a Little-Endian integer and converts it into a 4-character string.
+	---@param int number
+	---@return string
 	function NikNaks.BitBuffer.IntToString(int)
 		local a, b, c, d = brshift(int, 24), band(brshift(int, 16), q), band(brshift(int, 8), q), band(int, q)
 		return s_char(d, c, b, a)
@@ -144,44 +145,44 @@ end
 
 -- Access
 do
-	--- Returns lengh of the BitBuffer.
-	--- @return number
+	--- Returns the total size of the BitBuffer in bits.
+	---@return number
 	function meta:__len()
 		return self._len
 	end
 
 	meta.Size = meta.__len
 
-	--- Returns where we're reading/writing from.
-	--- @return number
+	--- Returns the current read/write cursor position in bits.
+	---@return number
 	function meta:Tell()
 		return self._tell
 	end
 
-	--- Sets the tell to a position.
-	--- @param num number
-	--- @return self
+	--- Sets the read/write cursor to an absolute bit position.
+	---@param num number
+	---@return self
 	function meta:Seek(num)
 		self._tell = brshift(blshift(num, 1), 1)
 		return self
 	end
 
-	--- Skips x bits ahead.
-	--- @param num number
-	--- @return BitBuffer self
+	--- Advances the cursor forward by the given number of bits.
+	---@param num number
+	---@return BitBuffer self
 	function meta:Skip(num)
 		self._tell = self._tell + num
 		return self
 	end
 
-	--- Returns true if we've reached the end of the bitbuffer.
-	--- @return boolean
+	--- Returns true if the cursor has reached or passed the end of the data.
+	---@return boolean
 	function meta:EndOfData()
 		return self._tell >= self._len
 	end
 
 	--- Clears all data from the BitBuffer.
-	--- @return BitBuffer self
+	---@return BitBuffer self
 	function meta:Clear()
 		self._data = {}
 		self._len = 0
@@ -190,9 +191,9 @@ do
 	end
 
 	--- Converts a number to bits. ( Big-Endian )
-	--- @param num number
-	--- @param bits number
-	--- @return string
+	---@param num number
+	---@param bits number
+	---@return string
 	local function toBits(num, bits, byte_space)
 		local str = ""
 		for i = bits, 1, -1 do
@@ -230,26 +231,26 @@ do
 	end
 
 	--- Returns true if the bitbuffer is little-endian.
-	--- @return boolean
+	---@return boolean
 	function meta:IsLittleEndian()
 		return self._little_endian or false
 	end
 
 	--- Returns true if the bitbuffer is big-endian.
-	--- @return boolean
+	---@return boolean
 	function meta:IsBigEndian()
 		return not self._little_endian
 	end
 
 	--- Sets the bitbuffer to be little-endian.
-	--- @return self BitBuffer The BitBuffer that was modified
+	---@return self BitBuffer The BitBuffer that was modified
 	function meta:SetLittleEndian()
 		self._little_endian = true
 		return self
 	end
 
 	--- Sets the bitbuffer to be big-endian.
-	--- @return self BitBuffer The BitBuffer that was modified
+	---@return self BitBuffer The BitBuffer that was modified
 	function meta:SetBigEndian()
 		self._little_endian = false
 		return self
@@ -271,17 +272,17 @@ do
 	-- B |00000000|00000000|00000000|00000000|
 	local b_mask = 0xFFFFFFFF
 
-	--- @param int number
-	--- @param bits number
-	--- @return number
+	---@param int number
+	---@param bits number
+	---@return number
 	local function swap(int, bits)
 		return brshift(bswap(int), 32 - bits)
 	end
 
-	--- @param self BitBuffer
-	--- @param int number
-	--- @param bits number
-	--- @return self BitBuffer The BitBuffer that was modified
+	---@param self BitBuffer
+	---@param int number
+	---@param bits number
+	---@return self BitBuffer The BitBuffer that was modified
 	function writeraw(self, int, bits)
 		if self._little_endian and bits % 8 == 0 then
 			int = swap(int, bits)
@@ -315,9 +316,9 @@ do
 		return self
 	end
 
-	--- @param self BitBuffer
-	--- @param bits number
-	--- @return number # The read data
+	---@param self BitBuffer
+	---@param bits number
+	---@return number # The read data
 	function readraw(self, bits)
 		local tell = self._tell
 		self._tell = tell + bits
@@ -359,8 +360,8 @@ do
 	--We don't need to call write/read raw. Since this is 1 bit.
 
 	--- Writes a boolean.
-	--- @param b boolean
-	--- @return self BitBuffer
+	---@param b boolean
+	---@return self BitBuffer
 	function meta:WriteBoolean(b)
 		local tell = self._tell
 		self._tell = tell + 1
@@ -382,7 +383,7 @@ do
 	end
 
 	--- Reads a boolean.
-	--- @return boolean
+	---@return boolean
 	function meta:ReadBoolean()
 		local tell = self._tell
 		self._tell = tell + 1
@@ -404,8 +405,8 @@ do
 	meta.WriteInt = writeraw
 
 	--- Reads an int.
-	--- @param bits number
-	--- @return number
+	---@param bits number
+	---@return number
 	function meta:ReadInt(bits)
 		return to_signed(readraw(self, bits), bits)
 	end
@@ -418,8 +419,8 @@ do
 	local c = math.pow(2, 32)
 
 	--- Reads an unsigned int.
-	--- @param bits number
-	--- @return number
+	---@param bits number
+	---@return number
 	function meta:ReadUInt(bits)
 		local n = readraw(self, bits)
 		if n > -1 then return n end -- 32bit numbers could be negative when reading.
@@ -430,15 +431,15 @@ end
 -- Byte
 do
 	--- Writes a byte. ( 0 - 255 )
-	--- @param byte number
-	--- @return BitBuffer self
+	---@param byte number
+	---@return BitBuffer self
 	function meta:WriteByte(byte)
 		writeraw(self, byte, 8)
 		return self
 	end
 
 	--- Reads a byte. ( 0 - 255 )
-	--- @return number
+	---@return number
 	function meta:ReadByte()
 		return readraw(self, 8)
 	end
@@ -447,15 +448,15 @@ end
 -- Signed Byte
 do
 	--- Writes a signed byte. ( -128 - 127 )
-	--- @param byte number
-	--- @return BitBuffer self
+	---@param byte number
+	---@return BitBuffer self
 	function meta:WriteSignedByte(byte)
 		self:WriteInt(byte, 8)
 		return self
 	end
 
-	--- Writes a signed byte. ( -128 - 127 )
-	--- @return number
+	--- Reads a signed byte. ( -128 - 127 )
+	---@return number
 	function meta:ReadSignedByte()
 		return self:ReadInt(8)
 	end
@@ -464,15 +465,15 @@ end
 -- Ushort
 do
 	--- Writes an unsigned 2 byte number. ( 0 - 65535 )
-	--- @param num number
-	--- @return BitBuffer self
+	---@param num number
+	---@return BitBuffer self
 	function meta:WriteUShort(num)
 		self:WriteUInt(num, 16)
 		return self
 	end
 
 	--- Reads an unsigned 2 byte number. ( 0 - 65535 )
-	--- @return number
+	---@return number
 	function meta:ReadUShort()
 		return self:ReadUInt(16)
 	end
@@ -481,15 +482,15 @@ end
 -- Short
 do
 	--- Writes a 2 byte number. ( -32768 - 32767 )
-	--- @param num number
-	--- @return BitBuffer self
+	---@param num number
+	---@return BitBuffer self
 	function meta:WriteShort(num)
 		self:WriteInt(num, 16)
 		return self
 	end
 
-	--- Reads an 2 byte number. ( -32768 - 32767 )
-	--- @return number
+	--- Reads a 2-byte signed number. ( -32768 - 32767 )
+	---@return number
 	function meta:ReadShort()
 		return self:ReadInt(16)
 	end
@@ -498,15 +499,15 @@ end
 -- ULong
 do
 	--- Writes an unsigned 4 byte number. ( 0 - 4294967295 )
-	--- @param num number
-	--- @return self BitBuffer
+	---@param num number
+	---@return self BitBuffer
 	function meta:WriteULong(num)
 		self:WriteUInt(num, 32)
 		return self
 	end
 
 	--- Reads an unsigned 4 byte number ( 0 - 4294967295 )
-	--- @return number
+	---@return number
 	function meta:ReadULong()
 		return self:ReadUInt(32)
 	end
@@ -515,15 +516,15 @@ end
 -- Long
 do
 	--- Writes a 4 byte number. ( -2147483648 - 2147483647 )
-	--- @param num number
-	--- @return BitBuffer self
+	---@param num number
+	---@return BitBuffer self
 	function meta:WriteLong(num)
 		self:WriteInt(num, 32)
 		return self
 	end
 
 	--- Reads a 4 byte number. ( -2147483648 - 2147483647 )
-	--- @return number
+	---@return number
 	function meta:ReadLong()
 		return self:ReadInt(32)
 	end
@@ -532,15 +533,15 @@ end
 -- Nibble
 do
 	--- Writes a 4 bit unsigned number. ( 0 - 15 )
-	--- @param num number
-	--- @return BitBuffer self
+	---@param num number
+	---@return BitBuffer self
 	function meta:WriteNibble(num)
 		self:WriteUInt(num, 4)
 		return self
 	end
 
 	--- Reads a 4 bit unsigned number. ( 0 - 15 )
-	--- @return number
+	---@return number
 	function meta:ReadNibble()
 		return self:ReadUInt(4)
 	end
@@ -549,29 +550,29 @@ end
 -- Snort ( 2bit number )
 do
 	--- Writes a 2 bit unsigned number. ( 0 - 3 )
-	--- @param num number
-	--- @return BitBuffer self
+	---@param num number
+	---@return BitBuffer self
 	function meta:WriteSnort(num)
 		self:WriteUInt(num, 2)
 		return self
 	end
 
 	--- Reads a 2 bit unsigned number. ( 0 - 3 )
-	--- @return number
+	---@return number
 	function meta:ReadSnort()
 		return self:ReadUInt(2)
 	end
 end
 
---- @param n number
---- @return boolean
+---@param n number
+---@return boolean
 local function isNegative(n) return 1 / n == -math.huge end
 
 -- Float
 do
 	--- Writes an IEEE 754 little-endian float.
-	--- @param num number
-	--- @return self BitBuffer
+	---@param num number
+	---@return self BitBuffer
 	function meta:WriteFloat(num)
 		local sign = 0
 		local man = 0
@@ -621,7 +622,7 @@ do
 	local _23pow = 2 ^ 23
 
 	--- Reads an IEEE 754 little-endian float.
-	--- @return number
+	---@return number
 	function meta:ReadFloat()
 		local n = self:ReadULong()
 		local sign = band(0x80000000, n) == 0 and 1 or -1
@@ -656,8 +657,8 @@ do
 	local _log = math.log(2)
 
 	--- Writes an IEEE 754 little-endian double. This seems to fail at numbers beyond 1.7976931348623157e+307
-	--- @param num number
-	--- @return BitBuffer self
+	---@param num number
+	---@return BitBuffer self
 	function meta:WriteDouble(num)
 		-- Handle special cases first
 		local sign = 0
@@ -701,7 +702,7 @@ do
 	end
 
 	--- Reads an IEEE 754 little- or big-endian double.
-	--- @return number
+	---@return number
 	function meta:ReadDouble()
 		local a, b
 		if self._little_endian then
@@ -733,8 +734,8 @@ end
 -- Data
 do
 	--- Writes raw string-data.
-	--- @param str string
-	--- @return BitBuffer self
+	---@param str string
+	---@return BitBuffer self
 	function meta:Write(str)
 		local len = #str
 		local q = lshift(rshift(len, 2), 2)
@@ -752,8 +753,8 @@ do
 	end
 
 	--- Reads raw string-data. Default bytes are the length of the bitbuffer.
-	--- @param bytes number? If not given, will read until the end of the bitbuffer.
-	--- @return string
+	---@param bytes number? If not given, will read until the end of the bitbuffer.
+	---@return string
 	function meta:Read(bytes)
 		bytes = bytes or math.ceil((self:Size() - self:Tell()) / 8)
 
@@ -771,8 +772,8 @@ do
 		return s
 	end
 
-	---Ignores little_endian or big_endian and writes the raw data
-	---@param str string 
+	--- Writes raw bytes directly, ignoring the endianness setting.
+	---@param str string
 	---@return BitBuffer
 	function meta:WriteData(str)
 		local len = #str
@@ -793,7 +794,7 @@ do
 		return self
 	end
 
-	---Ignores little_endian or big_endian and reads the raw data
+	--- Reads raw bytes directly, ignoring the endianness setting.
 	---@param bytes number
 	---@return string
 	function meta:ReadData(bytes)
@@ -818,8 +819,8 @@ do
 	local Write, Read = meta.Write, meta.Read
 
 	--- Writes a string. Max string length: 65535
-	--- @param str string
-	--- @return BitBuffer self
+	---@param str string
+	---@return BitBuffer self
 	function meta:WriteString(str)
 		local l = #str
 		if l > 65535 then
@@ -834,24 +835,24 @@ do
 	end
 
 	--- Reads a string. Max string length: 65535
-	--- @return string
+	---@return string
 	function meta:ReadString()
 		return self:ReadData(self:ReadUShort() or 0)
 	end
 
 	local z = '\0'
 
-	--- Writes a string using a nullbyte at the end. Note: Will remove all nullbytes given.
-	--- @param str string
-	--- @return BitBuffer self
+	--- Writes a null-terminated string. Any embedded null bytes in the input are stripped.
+	---@param str string
+	---@return BitBuffer self
 	function meta:WriteStringNull(str)
 		self:WriteData(string.gsub(str, z, '') .. z)
 		return self
 	end
 
-	--- Reads a string using a nullbyte at the end. Note: ReadStringNull is a bit slower than ReadString.
-	--- @param maxLength? number
-	--- @return string
+	--- Reads a null-terminated string. Slightly slower than ReadString due to byte-by-byte scanning.
+	---@param maxLength? number
+	---@return string
 	function meta:ReadStringNull(maxLength)
 		maxLength = maxLength or ceil((self:Size() - self:Tell()) / 8)
 
@@ -869,8 +870,8 @@ do
 	end
 
 	--- Writes a Vector.
-	--- @param vector Vector
-	--- @return BitBuffer self
+	---@param vector Vector
+	---@return BitBuffer self
 	function meta:WriteVector(vector)
 		self:WriteFloat(vector.x)
 		self:WriteFloat(vector.y)
@@ -879,14 +880,14 @@ do
 	end
 
 	--- Reads a Vector.
-	--- @return Vector
+	---@return Vector
 	function meta:ReadVector()
 		return Vector(self:ReadFloat(), self:ReadFloat(), self:ReadFloat())
 	end
 
 	--- Writes an Angle.
-	--- @param angle Angle
-	--- @return BitBuffer self
+	---@param angle Angle
+	---@return BitBuffer self
 	function meta:WriteAngle(angle)
 		self:WriteFloat(angle.p)
 		self:WriteFloat(angle.y)
@@ -895,14 +896,14 @@ do
 	end
 
 	--- Reads an Angle.
-	--- @return Angle
+	---@return Angle
 	function meta:ReadAngle()
 		return Angle(self:ReadFloat(), self:ReadFloat(), self:ReadFloat())
 	end
 
 	--- Writes a 32bit Color.
-	--- @param color Color
-	--- @return self BitBuffer
+	---@param color Color
+	---@return self BitBuffer
 	function meta:WriteColor(color)
 		self:WriteByte(color.r)
 		self:WriteByte(color.g)
@@ -912,7 +913,7 @@ do
 	end
 
 	--- Reads a 32bit color.
-	--- @return Color
+	---@return Color
 	function meta:ReadColor()
 		return Color(self:ReadByte(), self:ReadByte(), self:ReadByte(), self:ReadByte())
 	end
@@ -938,8 +939,8 @@ do
 	}
 
 	--- Writes a type using a byte as TYPE_ID.
-	--- @param obj any
-	--- @return BitBuffer self
+	---@param obj any
+	---@return BitBuffer self
 	function meta:WriteType(obj)
 		local id = TypeID(obj)
 
@@ -972,7 +973,7 @@ do
 	end
 
 	--- Reads a type using a byte as TYPE_ID.
-	--- @return any
+	---@return any
 	function meta:ReadType()
 		local id = self:ReadByte()
 
@@ -998,8 +999,8 @@ do
 	end
 
 	--- Writes a table
-	--- @param tab table
-	--- @return self BitBuffer
+	---@param tab table
+	---@return self BitBuffer
 	function meta:WriteTable(tab)
 		for k, v in pairs(tab) do
 			self:WriteType(k)
@@ -1012,8 +1013,8 @@ do
 	end
 
 	--- Reads a table. Default maxValues is 150
-	--- @param maxValues? number
-	--- @return table
+	---@param maxValues? number
+	---@return table
 	function meta:ReadTable(maxValues)
 		maxValues = maxValues or 150
 
@@ -1034,11 +1035,11 @@ end
 -- File functions
 do
 	--- Same as file.Open, but returns it as a bitbuffer. little_endian is true by default.
-	--- @param fileName string
-	--- @param gamePath? string
-	--- @param lzma? boolean
-	--- @param little_endian? boolean
-	--- @return BitBuffer?
+	---@param fileName string
+	---@param gamePath? string
+	---@param lzma? boolean
+	---@param little_endian? boolean
+	---@return BitBuffer?
 	function NikNaks.BitBuffer.OpenFile(fileName, gamePath, lzma, little_endian)
 		if gamePath == true then gamePath = "GAME" end
 		if gamePath == nil then gamePath = "DATA" end
@@ -1055,7 +1056,7 @@ do
 
 		f:Close()
 
-		--- @type BitBuffer
+		---@type BitBuffer
 		local b = NikNaks.BitBuffer(str, little_endian)
 		b:Seek(0)
 
@@ -1063,9 +1064,9 @@ do
 	end
 
 	--- Saves the bitbuffer to a file within the data folder. Returns true if it got saved.
-	--- @param fileName string
-	--- @param lzma? boolean
-	--- @return boolean
+	---@param fileName string
+	---@param lzma? boolean
+	---@return boolean
 	function meta:SaveToFile(fileName, lzma)
 		local f = file.Open(fileName, "wb", "DATA")
 		if not f then return false end
@@ -1107,8 +1108,8 @@ end
 -- Net functions
 
 --- Reads a bitbuffer from the net and returns self.
---- @param bits number
---- @return self
+---@param bits number
+---@return self
 function meta:ReadFromNet(bits)
 	for i = 1, bits / 32 do
 		self:WriteUInt(net.ReadUInt(32), 32)
@@ -1124,14 +1125,14 @@ function meta:ReadFromNet(bits)
 end
 
 --- Creates and reads a bitbuffer from the net and returns it.
---- @param bits number
---- @return BitBuffer
+---@param bits number
+---@return BitBuffer
 function NikNaks.BitBuffer.FromNet(bits)
 	return NikNaks.BitBuffer():ReadFromNet(bits)
 end
 
 --- Writes the bitbuffer to the net and returns the size.
---- @return number # The size of the bitbuffer
+---@return number # The size of the bitbuffer
 function meta:WriteToNet()
 	local tell = self:Tell()
 	self:Seek(0)
@@ -1151,8 +1152,8 @@ function meta:WriteToNet()
 end
 
 --- Writes the bitbuffer to the net and returns the size.
---- @param buf BitBuffer
---- @return number # The size of the bitbuffer
+---@param buf BitBuffer
+---@return number # The size of the bitbuffer
 function NikNaks.BitBuffer.ToNet(buf)
 	return buf:WriteToNet()
 end

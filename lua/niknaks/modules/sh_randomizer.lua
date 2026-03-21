@@ -36,7 +36,8 @@ hook.Add("ShutDown", "NikNaks.LavaLamp", function()
     cookie.Set("niknaks.lavalamp", lava)
 end)
 
----Generates a secure random number ( 0x00000000 -> 0x7FFFFFFF)
+--- Generates a non-repeatable random integer (0x00000000 – 0x7FFFFFFF).
+--- Mixes os.time, a memory address, and the lava-lamp entropy value.
 ---@return number
 function NikNaks.Randomizer.GetSecureNumber()
     local seed = os.time() -- Seed with current time
@@ -75,8 +76,8 @@ function NikNaks.Randomizer.GetFloatRange(min, max)
     return NikNaks.Randomizer.GetFloat() * (max - min) + min
 end
 
----Creates a new PRNG object that utilizes the Mersenne Twister algorithm.
----@param seed number -- 32bit signed int.
+--- Creates a new PRNG seeded with the given value, using a Mersenne Twister-style algorithm.
+---@param seed number 32-bit seed value.
 ---@return PRNGObject
 function NikNaks.Randomizer.CreatePRNG(seed)
 	local self = setmetatable({
@@ -142,7 +143,7 @@ end
 ---Generates a float from min to max
 ---@param min number
 ---@param max number
----@param decimals  number? Default 3
+---@param decimals number? Decimal places to round to. Default 3.
 ---@return number
 function meta_prng:RandomFloatRange(min, max, decimals)
 	return math.Round(self:RandomFloat() * (max - min) + min, decimals or 3)

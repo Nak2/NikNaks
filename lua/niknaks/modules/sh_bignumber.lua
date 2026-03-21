@@ -24,7 +24,7 @@ end
 
 --#region Compare operators
 
---- '=' operator
+---'=' operator
 ---@param bNumber BigNumber|number
 ---@return boolean
 function meta:__eq(bNumber)
@@ -34,7 +34,7 @@ function meta:__eq(bNumber)
 	return self.x == bNumber.x and self.y == bNumber.y and self.z == bNumber.z and magW(self.w) == magW(bNumber.w)
 end
 
---- '<' operator
+---'<' operator
 ---@param bNumber BigNumber|number
 ---@return boolean
 function meta:__lt(bNumber)
@@ -48,7 +48,7 @@ function meta:__lt(bNumber)
 	return self.x < bNumber.x
 end
 
---- '<=' operator
+---'<=' operator
 ---@param bNumber BigNumber|number
 ---@return boolean
 function meta:__le(bNumber)
@@ -97,7 +97,7 @@ local function shrd(lo, hi, shift)
 	return bor(rshift(lo, shift), blshift(hi, 32 - shift))
 end
 
---- '<<' operator
+---'<<' operator
 ---@param b number
 ---@return BigNumber
 function meta:__shl(b)
@@ -136,7 +136,7 @@ function meta:__shl(b)
 	return res
 end
 
---- '>>' operator
+---'>>' operator
 ---@param b number
 ---@return BigNumber
 function meta:__shr(b)
@@ -168,7 +168,7 @@ function meta:__shr(b)
 	return res
 end
 
---- '~' operator
+---'~' operator
 ---@return BigNumber
 function meta:__bnot()
 	local res = { x = bit.bnot(self.x), y = bit.bnot(self.y), z = bit.bnot(self.z), w = bit.bnot(self.w) }
@@ -176,7 +176,7 @@ function meta:__bnot()
 	return res
 end
 
---- '&' operator
+---'&' operator
 ---@param b BigNumber
 ---@return BigNumber
 function meta:__band(b)
@@ -191,7 +191,7 @@ function meta:__band(b)
 	return res
 end
 
---- '|' operator
+---'|' operator
 ---@param b BigNumber
 ---@return BigNumber
 function meta:__bor(b)
@@ -200,7 +200,7 @@ function meta:__bor(b)
 	return res
 end
 
---- '^' operator (bitwise XOR)
+---'^' operator (bitwise XOR)
 ---@param b BigNumber
 ---@return BigNumber
 function meta:__bxor(b)
@@ -247,7 +247,7 @@ local function sub(self, bNumber)
 	return result
 end
 
---- Adds two numbers together
+---Adds two numbers together
 ---@param bNumber BigNumber|number
 ---@return BigNumber
 function meta:__add(bNumber)
@@ -260,7 +260,7 @@ function meta:__add(bNumber)
 	return add(self, bNumber)
 end
 
---- '-' operator
+---'-' operator
 ---@param bNumber BigNumber|number
 ---@return BigNumber
 function meta:__sub(bNumber)
@@ -304,9 +304,9 @@ local function acc64(rx, ry, rz, rw, lo, hi, pos)
 	return rx, ry, rz, rw
 end
 
---- Multiplies two BigNumbers. Result is truncated to 128 bits.
---- @param bNumber BigNumber|number
---- @return BigNumber
+---Multiplies two BigNumbers. Result is truncated to 128 bits.
+---@param bNumber BigNumber|number
+---@return BigNumber
 function meta:__mul(bNumber)
 	if isnumber(bNumber) then
 		bNumber = NikNaks.BigNumber(bNumber --[[@as number]])
@@ -354,7 +354,7 @@ function meta:__mul(bNumber)
 	}, meta)
 end
 
---- '^' operator — binary (fast) exponentiation, result truncated to 128 bits.
+---'^' operator — binary (fast) exponentiation, result truncated to 128 bits.
 ---@param exp BigNumber|number
 ---@return BigNumber
 function meta:__pow(exp)
@@ -386,7 +386,7 @@ function meta:__pow(exp)
 	return result
 end
 
---- Unsigned less-than comparison (ignores sign bit; compares raw magnitude).
+---Unsigned less-than comparison (ignores sign bit; compares raw magnitude).
 ---@param a BigNumber
 ---@param b BigNumber
 ---@return boolean
@@ -400,7 +400,7 @@ local function ult(a, b)
 	return (a.x % 0x100000000) < (b.x % 0x100000000)
 end
 
---- Unsigned 128-bit division using Knuth's Algorithm D (base 2^16).
+---Unsigned 128-bit division using Knuth's Algorithm D (base 2^16).
 ---@param a BigNumber
 ---@param b BigNumber
 ---@return BigNumber, BigNumber
@@ -535,7 +535,7 @@ local function divmod(a, b)
 	return pack16(q), pack16(rd)
 end
 
---- '/' operator — integer (floor) division.
+---'/' operator — integer (floor) division.
 ---@param bNumber BigNumber|number
 ---@return BigNumber
 function meta:__div(bNumber)
@@ -550,8 +550,8 @@ function meta:__div(bNumber)
 	return q
 end
 
---- '%' operator — remainder after integer division.
---- The remainder carries the sign of the dividend (like C % behaviour).
+---'%' operator — remainder after integer division.
+---The remainder carries the sign of the dividend (like C % behaviour).
 ---@param bNumber BigNumber|number
 ---@return BigNumber
 function meta:__mod(bNumber)
@@ -565,8 +565,8 @@ function meta:__mod(bNumber)
 	return r
 end
 
---- Converts the 128-bit number to a decimal string.
---- @return string
+---Converts the 128-bit number to a decimal string.
+---@return string
 function meta:__tostring()
 	local wx = self.x % 0x100000000
 	local wy = self.y % 0x100000000
@@ -612,9 +612,9 @@ function meta:__tostring()
 	return isNeg(self) and ("-" .. str) or str
 end
 
---- Creates a 128 bit bignumber
---- @param number32Bit number|string
---- @return BigNumber
+---Creates a 128 bit bignumber
+---@param number32Bit number|string
+---@return BigNumber
 local function BigNumber(number32Bit)
 	if isstring(number32Bit) then
 		local str = number32Bit --[[@as string]]
@@ -668,13 +668,13 @@ local function BigNumber(number32Bit)
 	return t
 end
 
----Creates a 128 bit bignumber
+--- Creates a 128-bit signed integer. Accepts a 32-bit number, a decimal string, or a hex string ("0x…").
 ---@overload fun(number32Bit: number|string): BigNumber
 NikNaks.BigNumber = setmetatable({}, {
 	__call = function(_, ...) return BigNumber(...) end,
 })
 
---- Writes the 128bit number to net
+--- Writes all 128 bits to the active net message as four UInt32 values.
 ---@return BigNumber
 function meta:WriteToNET()
 	net.WriteUInt(self.x, 32)
@@ -684,7 +684,7 @@ function meta:WriteToNET()
 	return self
 end
 
---- Reads the 128bit number from net
+--- Reads a BigNumber written by WriteToNET from the active net message.
 ---@return BigNumber
 function NikNaks.BigNumber.ReadFromNET()
 	local t = {
@@ -703,7 +703,7 @@ end
 
 -- Helper meta functions
 
---- Adds a number to this BigNumber. Accepts BigNumber, number, or decimal/hex string.
+---Adds a number to this BigNumber. Accepts BigNumber, number, or decimal/hex string.
 ---@param number BigNumber|number|string
 ---@return BigNumber
 function meta:Add(number)
@@ -713,7 +713,7 @@ function meta:Add(number)
 	return self:__add(number --[[@as BigNumber|number]])
 end
 
---- Subtracts a number from this BigNumber. Accepts BigNumber, number, or decimal/hex string.
+---Subtracts a number from this BigNumber. Accepts BigNumber, number, or decimal/hex string.
 ---@param number BigNumber|number|string
 ---@return BigNumber
 function meta:Sub(number)
@@ -723,7 +723,7 @@ function meta:Sub(number)
 	return self:__sub(number --[[@as BigNumber|number]])
 end
 
---- Multiplies this BigNumber by a number. Result is truncated to 128 bits. Accepts BigNumber, number, or decimal/hex string.
+---Multiplies this BigNumber by a number. Result is truncated to 128 bits. Accepts BigNumber, number, or decimal/hex string.
 ---@param number BigNumber|number|string
 ---@return BigNumber
 function meta:Mul(number)
@@ -733,7 +733,7 @@ function meta:Mul(number)
 	return self:__mul(number --[[@as BigNumber|number]])
 end
 
---- Divides this BigNumber by a number (integer floor division). Accepts BigNumber, number, or decimal/hex string.
+---Divides this BigNumber by a number (integer floor division). Accepts BigNumber, number, or decimal/hex string.
 ---@param number BigNumber|number|string
 ---@return BigNumber
 function meta:Div(number)
@@ -743,7 +743,7 @@ function meta:Div(number)
 	return self:__div(number --[[@as BigNumber|number]])
 end
 
---- Raises this BigNumber to a power. Result is truncated to 128 bits. Accepts BigNumber, number, or decimal/hex string.
+---Raises this BigNumber to a power. Result is truncated to 128 bits. Accepts BigNumber, number, or decimal/hex string.
 ---@param number BigNumber|number|string
 ---@return BigNumber
 function meta:Pow(number)
@@ -753,7 +753,7 @@ function meta:Pow(number)
 	return self:__pow(number --[[@as BigNumber|number]])
 end
 
---- Returns the remainder after dividing by a number (sign follows dividend). Accepts BigNumber, number, or decimal/hex string.
+---Returns the remainder after dividing by a number (sign follows dividend). Accepts BigNumber, number, or decimal/hex string.
 ---@param number BigNumber|number|string
 ---@return BigNumber
 function meta:Mod(number)
@@ -764,7 +764,7 @@ function meta:Mod(number)
 end
 
 --- Returns the lowest 32 bits as a signed Lua integer.
---- Values outside the 32-bit range are clamped to [-2147483648, 2147483647].
+--- Values that exceed the 32-bit range are clamped to ±2147483647.
 ---@return integer
 function meta:To32Bit()
 	local neg = isNeg(self)
@@ -777,7 +777,7 @@ function meta:To32Bit()
 	return (self.x < 0) and 2147483647 or self.x
 end
 
---- Returns the value as a hexadecimal string, e.g. "0x000000000000000000000000000000FF".
+--- Returns the value as a 32-digit hex string, e.g. `"0x000000000000000000000000000000FF"`.
 ---@return string
 function meta:ToHex()
 	local wx = self.x % 0x100000000
@@ -788,25 +788,25 @@ function meta:ToHex()
 	return string.format("%s0x%08X%08X%08X%08X", sign, ww, wz, wy, wx)
 end
 
---- Returns true if the value equals zero.
+---Returns true if the value equals zero.
 ---@return boolean
 function meta:IsZero()
 	return self.x == 0 and self.y == 0 and self.z == 0 and magW(self.w) == 0
 end
 
---- Returns true if the value is negative.
+---Returns true if the value is negative.
 ---@return boolean
 function meta:IsNegative()
 	return isNeg(self)
 end
 
---- Returns a new BigNumber with the absolute value.
+---Returns a new BigNumber with the absolute value.
 ---@return BigNumber
 function meta:Abs()
 	return setmetatable({ x = self.x, y = self.y, z = self.z, w = magW(self.w) }, meta)
 end
 
---- Returns a copy of this BigNumber.
+---Returns a copy of this BigNumber.
 ---@return BigNumber
 function meta:Copy()
 	return setmetatable({ x = self.x, y = self.y, z = self.z, w = self.w }, meta)
