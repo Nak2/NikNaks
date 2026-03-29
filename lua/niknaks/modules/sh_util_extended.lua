@@ -52,19 +52,19 @@ do
 		local wide = max(-vecMin.x, -vecMin.y, vecMax.x, vecMax.y)
 		local high = vecMax.z - vecMin.z
 		if wide <= 16 and high <= 8 then
-			return NikNaks.HULL_TINY_CENTERED
+			return NikNaks.HULL.TINY_CENTERED
 		elseif wide <= 24 and high <= 24 then
-			return NikNaks.HULL_TINY
+			return NikNaks.HULL.TINY
 		elseif wide <= 40 and high <= 40 then
-			return NikNaks.HULL_SMALL_CENTERED
+			return NikNaks.HULL.SMALL_CENTERED
 		elseif wide <= 36 and high <= 65 then
-			return NikNaks.HULL_MEDIUM
+			return NikNaks.HULL.MEDIUM
 		elseif wide <= 32 and high <= 73 then
-			return NikNaks.HULL_HUMAN
+			return NikNaks.HULL.HUMAN
 		elseif wide <= 36 and high <= 100 then
-			return NikNaks.HULL_MEDIUM_TALL
+			return NikNaks.HULL.MEDIUM_TALL
 		else
-			return NikNaks.HULL_LARGE
+			return NikNaks.HULL.LARGE
 		end
 	end
 

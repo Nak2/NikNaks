@@ -84,10 +84,10 @@ local thisMapObject
 --- **Note:** The current map will be cached and returned if the same map is loaded twice.
 ---
 --- **Error Codes:**
---- - `NikNaks.BSP_ERROR_FILENOTFOUND` - File not found
---- - `NikNaks.BSP_ERROR_FILECANTOPEN` - Unable to open file
---- - `NikNaks.BSP_ERROR_NOT_BSP` - Not a BSP file
---- - `NikNaks.BSP_ERROR_TOO_NEW` - Map is too new
+--- - `NikNaks.BSP_ERROR.FILENOTFOUND` - File not found
+--- - `NikNaks.BSP_ERROR.FILECANTOPEN` - Unable to open file
+--- - `NikNaks.BSP_ERROR.NOT_BSP` - Not a BSP file
+--- - `NikNaks.BSP_ERROR.TOO_NEW` - Map is too new
 function NikNaks.Map(fileName)
 	-- Handle filename
 	if not fileName then
@@ -102,19 +102,19 @@ function NikNaks.Map(fileName)
 
 	if not file.Exists(fileName, "GAME") then
 		-- File not found
-		return nil, NikNaks.BSP_ERROR_FILENOTFOUND
+		return nil, NikNaks.BSP_ERROR.FILENOTFOUND
 	end
 
 	local f = file.Open(fileName, "rb", "GAME")
 	if not f then
 		-- Unable to open file
-		return nil, NikNaks.BSP_ERROR_FILECANTOPEN
+		return nil, NikNaks.BSP_ERROR.FILECANTOPEN
 	end
 
 	-- Read the header
 	if f:Read(4) ~= "VBSP" then
 		f:Close()
-		return nil, NikNaks.BSP_ERROR_NOT_BSP
+		return nil, NikNaks.BSP_ERROR.NOT_BSP
 	end
 
 	-- Create BSP object
@@ -130,7 +130,7 @@ function NikNaks.Map(fileName)
 
 	if BSP._version > 21 then
 		f:Close()
-		return nil, NikNaks.BSP_ERROR_TOO_NEW
+		return nil, NikNaks.BSP_ERROR.TOO_NEW
 	end
 
 	-- Read Lump Header
