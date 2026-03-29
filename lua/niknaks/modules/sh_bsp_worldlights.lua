@@ -8,55 +8,24 @@ local format = string.format
 --- @class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
---[[
-	World lights are stored in lumps 15 (LDR) and 54 (HDR).
-	Each entry is a dworldlight_t struct (88 bytes = 704 bits):
-
-	Vector  origin          12 bytes
-	Vector  intensity       12 bytes  (RGB; pre-scaled by 255 * 2^exponent)
-	Vector  normal          12 bytes  (spotlight / sky direction)
-	int     cluster          4 bytes
-	int     type             4 bytes  (emittype_t)
-	int     style            4 bytes  (light style index, 0 = always on)
-	float   stopdot          4 bytes  (cos of inner cone angle; spotlights)
-	float   stopdot2         4 bytes  (cos of outer cone angle; spotlights)
-	float   exponent         4 bytes  (falloff exponent)
-	float   radius           4 bytes  (0 = no distance limit)
-	float   constant_attn    4 bytes
-	float   linear_attn      4 bytes
-	float   quadratic_attn   4 bytes
-	int     flags            4 bytes
-	int     texinfo          4 bytes
-	int     owner            4 bytes  (entity index that owns this light)
-
-	emittype_t values:
-	  0 = emit_surface    (area / 90-degree spotlight on a surface)
-	  1 = emit_point      (omnidirectional point light)
-	  2 = emit_spotlight  (cone spotlight)
-	  3 = emit_skylight   (sun / directional env_light)
-	  4 = emit_quakelight (HL1-style linear falloff point)
-	  5 = emit_skyambient (ambient sky fill)
-]]
-
 local WORLDLIGHT_SIZE_BITS = 704  -- 88 bytes
-
 --- @class BSPWorldLight
---- @field origin Vector        # World-space origin of the light source
---- @field intensity Vector     # Pre-scaled RGB intensity
---- @field normal Vector        # Direction the light faces (spotlights / sky)
---- @field cluster number       # Visibility cluster the light is in
---- @field type number          # Emit type (0-5; see EMIT_* constants)
---- @field style number         # Light style index (0 = always on)
---- @field stopdot number       # cos( inner cone angle ) for spotlights
---- @field stopdot2 number      # cos( outer cone angle ) for spotlights
---- @field exponent number      # Distance falloff exponent
---- @field radius number        # Max light radius (0 = unlimited)
---- @field constant_attn number # Constant attenuation term
---- @field linear_attn number   # Linear attenuation term
---- @field quadratic_attn number# Quadratic attenuation term
---- @field flags number         # Misc flags
---- @field texinfo number       # Texture info index (-1 if none)
---- @field owner number         # Source entity index (-1 if world)
+--- @field origin Vector         # World-space origin of the light source
+--- @field intensity Vector      # Pre-scaled RGB intensity
+--- @field normal Vector         # Direction the light faces (spotlights / sky)
+--- @field cluster number        # Visibility cluster the light is in
+--- @field type LightEmissionType# Emit type (0-5; see LightEmissionType)
+--- @field style number          # Light style index (0 = always on)
+--- @field stopdot number        # cos( inner cone angle ) for spotlights
+--- @field stopdot2 number       # cos( outer cone angle ) for spotlights
+--- @field exponent number       # Distance falloff exponent
+--- @field radius number         # Max light radius (0 = unlimited)
+--- @field constant_attn number  # Constant attenuation term
+--- @field linear_attn number    # Linear attenuation term
+--- @field quadratic_attn number # Quadratic attenuation term
+--- @field flags number          # Misc flags
+--- @field texinfo number        # Texture info index (-1 if none)
+--- @field owner number          # Source entity index (-1 if world)
 --- @field __map BSPObject
 
 local meta_light = {}
@@ -66,14 +35,6 @@ meta_light.__tostring = function( self )
 end
 meta_light.MetaName = "BSP WorldLight"
 NikNaks.__metatables["BSP WorldLight"] = meta_light
-
--- Emit type constants --------------------------------------------------------
-NikNaks.EMIT_SURFACE    = 0
-NikNaks.EMIT_POINT      = 1
-NikNaks.EMIT_SPOTLIGHT  = 2
-NikNaks.EMIT_SKYLIGHT   = 3
-NikNaks.EMIT_QUAKELIGHT = 4
-NikNaks.EMIT_SKYAMBIENT = 5
 
 -- Parsing helper -------------------------------------------------------------
 --- @param self BSPObject
@@ -159,7 +120,7 @@ function meta:FindNearestLight( position, hdr )
 end
 
 --- Returns all world lights of a given emit type.
---- @param emitType number # One of NikNaks.EMIT_* constants
+--- @param emitType LightEmissionType
 --- @param hdr boolean?   # If true, uses HDR data. Default is LDR.
 --- @return BSPWorldLight[]
 function meta:FindLightsByType( emitType, hdr )
@@ -228,8 +189,8 @@ function meta_light:GetNormal()
 	return self.normal
 end
 
---- Returns the emit type of this light (one of NikNaks.EMIT_* constants).
---- @return number
+--- Returns the emit type of this light (one of LightEmissionTypes).
+--- @return LightEmissionType
 function meta_light:GetType()
 	return self.type
 end

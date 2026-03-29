@@ -23,6 +23,17 @@ NikNaks.BSP_ERROR = {
     FILENOTFOUND  = 3, -- This error is thrown when the file isn't found.
 }
 
+-- The type of the world-light.
+---@enum LightEmissionType
+NikNaks.LightEmissionType = {
+    EMIT_SURFACE    = 0, --Light emitted from a brush surface/texture (e.g., glowing light-strips).
+    EMIT_POINT      = 1, --An omnidirectional point source that radiates light in all directions.
+    EMIT_SPOTLIGHT  = 2, --A directional cone of light with defined inner and outer beam angles.
+    EMIT_SKYLIGHT   = 3, --Parallel light rays representing direct sunlight from the skybox.
+    EMIT_QUAKELIGHT = 4, --Legacy linear-falloff light using original Quake engine attenuation logic.
+    EMIT_SKYAMBIENT = 5 --Non-directional ambient filler light representing the sky's indirect glow.
+}
+
 -- AI Nodes
 ---@enum NODE_TYPE
 NikNaks.NODE_TYPE = {
