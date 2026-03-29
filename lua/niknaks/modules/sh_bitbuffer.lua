@@ -652,11 +652,12 @@ do
 		|Fe|Ff|Fg|Fh| |Fa|Fb|Fc|Fd|
 		|Fa|Fb|Fc|Fd| |Fe|Ff|Fg|Fh|
 	]]
-	local _52pow = 2 ^ 52
+	local _1022pow = 2^-1022
+	local _52pow = 2 ^ -52
 	local _32pow = 2 ^ 32
-	local _log = math.log(2)
+	local _20pow = 2^-20
 
-	--- Writes an IEEE 754 little-endian double. This seems to fail at numbers beyond 1.7976931348623157e+307
+	--- Writes an IEEE 754 little-endian double.
 	---@param num number
 	---@return BitBuffer self
 	function meta:WriteDouble(num)
@@ -667,35 +668,39 @@ do
 			sign = 0x80000000
 		end
 
-		local ex, man
+		local ex, man_hi, man_lo
 		if num == 0 then -- Zero
-			ex = 0
-			man = 0
-		elseif num == math.huge then -- Infinity
-			ex = 2047
-			man = 0
+			ex, man_hi, man_lo = 0, 0, 0
 		elseif num ~= num then -- NaN
-			ex = 2047
-			man = 1
+			ex, man_hi, man_lo = 2047, 0, 1
+		elseif num == math.huge then -- Infinity
+			ex, man_hi, man_lo = 2047, 0, 0
 		else
-			-- Normal numbers
-			local m, e = math.frexp(num)
-			ex = e + 1022 -- frexp returns exponent as if mantissa is in [0.5, 1); bias it by 1023 - 1
-			man = (m * 2 - 1) * _52pow -- Adjust mantissa to IEEE 754 format
-
-			-- Handle cases where exponent overflows to ensure no inadvertent infinity
-			if ex > 2046 then
-				ex = 2046
-				man = _52pow - 1 -- Max mantissa value before tipping into infinity
-			end
+    	local m, e = math.frexp(num)
+		ex = e + 1022
+		if ex >= 2047 then
+			ex, man_hi, man_lo = 2047, 0, 0
+		elseif ex <= 0 then
+			local shift = 1 - ex  -- how many bits to shift mantissa right
+			m = m * 2^(20 - shift)  -- scale to 20-bit hi field with shift applied
+			man_hi = math.floor(m)
+			man_lo = math.floor((m - man_hi) * _32pow + 0.5)
+			ex = 0
+		else
+			m = m * 2 - 1
+			local man_hi_f = math.floor(m * 2^20)
+			local m_frac = m * 2^20 - man_hi_f
+			man_hi = man_hi_f
+			man_lo = math.floor(m_frac * _32pow + 0.5)
 		end
+	end
 
 		if self._little_endian then
-			self:WriteULong(band(man, 0xFFFFFFFF))
-			self:WriteULong(bor(sign, lshift(ex, 20), band(man / _32pow, 0x000FFFFF)))
+			self:WriteULong(man_lo)
+			self:WriteULong(bor(sign, lshift(ex, 20), band(man_hi, 0x000FFFFF)))
 		else
-			self:WriteULong(bor(sign, lshift(ex, 20), band(man / _32pow, 0x000FFFFF)))
-			self:WriteULong(band(man, 0xFFFFFFFF))
+			self:WriteULong(bor(sign, lshift(ex, 20), band(man_hi, 0x000FFFFF)))
+			self:WriteULong(man_lo)
 		end
 
 		return self
@@ -710,23 +715,24 @@ do
 		else
 			a, b = self:ReadULong(), self:ReadULong()
 		end
-	
+
 		local sign = band(0x80000000, a) == 0 and 1 or -1
 		local ex = rshift(band(0x7FF00000, a), 20)
-		local man = band(a, 0x000FFFFF) * _32pow + b
-	
-		if ex == 0 and man == 0 then
-			return 0 * sign -- Number 0
-		elseif ex == 0x7FF and man == 0 then
+		local man_hi = band(a, 0x000FFFFF)
+		local man_lo = band(b, 0xFFFFFFFF)
+
+		if ex == 0 and man_hi == 0 and man_lo == 0 then
+			return 0 * sign -- ± Zero
+		elseif ex == 0x7FF and man_hi == 0 and man_lo == 0 then
 			return math.huge * sign -- Infinity
-		elseif ex == 0x7FF and man ~= 0 then
+		elseif ex == 0x7FF then
 			return 0 / 0   -- NaN
 		elseif ex == 0 then
-			-- Subnormal numbers (denormals)
-			return sign * man / _52pow * math.pow(2, -1022)
+			-- Subnormal: sign * (0.mantissa) * 2^-1022
+			return sign * (man_hi * _20pow + man_lo * _52pow) * _1022pow
 		else
-			-- Normal numbers
-			return sign * (man / _52pow + 1) * math.pow(2, ex - 1023)
+			-- Normal: sign * (1.mantissa) * 2^(ex-1023)
+			return sign * (1 + man_hi * _20pow + man_lo * _52pow) * 2^(ex - 1023)
 		end
 	end
 end

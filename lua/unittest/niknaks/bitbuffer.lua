@@ -264,6 +264,70 @@ return {
             end
         },
         {
+            name = "DoubleSpecialValues",
+            func = function()
+                local specials = {
+                    {val = 0.0,        label = "positive zero"},
+                    {val = -0.0,       label = "negative zero"},
+                    {val = math.huge,  label = "positive infinity"},
+                    {val = -math.huge, label = "negative infinity"},
+                    {val = 0/0,        label = "NaN"},
+                    {val = 1.0/0.0 * 0.0, label = "NaN (inf*0)"},
+                }
+                for _, s in ipairs(specials) do
+                    local bb = NikNaks.BitBuffer.Create()
+                    bb:WriteDouble(s.val)
+                    bb:Seek(0)
+                    local got = bb:ReadDouble()
+                    if s.val ~= s.val then
+                        -- NaN: just check it reads back as NaN
+                        Should(got ~= got):Be(true)
+                    elseif s.val == 0 then
+                        -- Check sign of zero separately
+                        Should(got):Be(0)
+                        Should(1/got == 1/s.val):Be(true)
+                    else
+                        Should(s.val):Be(got)
+                    end
+                end
+            end
+        },
+        {
+            name = "DoubleMinSubnormal",
+            func = function()
+                local bb = NikNaks.BitBuffer.Create()
+                bb:WriteDouble(4.9406564584124654e-324)
+                bb:Seek(0)
+                for i = 1, 8 do
+                    print(string.format("byte %d: %02X", i, bb:ReadByte()))
+                end
+                bb:Seek(0)
+                local got = bb:ReadDouble()
+                print(string.format("got=%.20g", got))
+                Should(4.9406564584124654e-324):Be(got)
+            end
+        },
+        {
+            name = "DoubleNaNSequence",
+            func = function()
+                local values = {
+                    0/0, -0/0, 1.0/0.0 * 0.0,
+                    4.9406564584124654e-324, -4.9406564584124654e-324,
+                }
+                for i, v in ipairs(values) do
+                    local bb = NikNaks.BitBuffer.Create()
+                    bb:WriteDouble(v)
+                    bb:Seek(0)
+                    local got = bb:ReadDouble()
+                    if v ~= v then
+                        Should(got ~= got):Be(true)
+                    else
+                        Should(v):Be(got)
+                    end
+                end
+            end
+        },
+        {
             name = "Boolean",
             func = function()
                 local bb = NikNaks.BitBuffer.Create()
