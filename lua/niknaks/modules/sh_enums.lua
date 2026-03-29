@@ -25,7 +25,7 @@ NikNaks.BSP_ERROR = {
 
 -- The type of the world-light.
 ---@enum LightEmissionType
-NikNaks.LightEmissionType = {
+NikNaks.LIGHTEMISSIONTYPE = {
     EMIT_SURFACE    = 0, --Light emitted from a brush surface/texture (e.g., glowing light-strips).
     EMIT_POINT      = 1, --An omnidirectional point source that radiates light in all directions.
     EMIT_SPOTLIGHT  = 2, --A directional cone of light with defined inner and outer beam angles.

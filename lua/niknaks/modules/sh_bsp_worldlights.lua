@@ -210,25 +210,25 @@ end
 --- Returns true if this is a point light.
 --- @return boolean
 function meta_light:IsPoint()
-	return self.type == NikNaks.EMIT_POINT
+	return self.type == NikNaks.LIGHTEMISSIONTYPE.EMIT_POINT
 end
 
 --- Returns true if this is a spotlight.
 --- @return boolean
 function meta_light:IsSpotlight()
-	return self.type == NikNaks.EMIT_SPOTLIGHT
+	return self.type == NikNaks.LIGHTEMISSIONTYPE.EMIT_SPOTLIGHT
 end
 
 --- Returns true if this is a directional sky (sun) light.
 --- @return boolean
 function meta_light:IsSkyLight()
-	return self.type == NikNaks.EMIT_SKYLIGHT
+	return self.type == NikNaks.LIGHTEMISSIONTYPE.EMIT_SKYLIGHT
 end
 
 --- Returns true if this is an ambient sky fill light.
 --- @return boolean
 function meta_light:IsSkyAmbient()
-	return self.type == NikNaks.EMIT_SKYAMBIENT
+	return self.type == NikNaks.LIGHTEMISSIONTYPE.EMIT_SKYAMBIENT
 end
 
 --- Returns the inner and outer cone angles (in degrees) for spotlights.
