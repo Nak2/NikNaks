@@ -152,7 +152,8 @@ function meta_face:GetLightmapSamples()
 	local samples = { average = average, full = full }
 	self._lightmap_samples = samples
 
-	local has_bumpmap = self:GetMaterial():GetString( "$bumpmap" ) ~= nil
+	local mat = self:GetMaterial()
+	local has_bumpmap = mat:GetString( "$bumpmap" ) ~= nil
 	local luxel_count = ( self.LightmapTextureSizeInLuxels[1] + 1 ) * ( self.LightmapTextureSizeInLuxels[2] + 1 )
 
 	local lightstyle_count = 0
@@ -232,6 +233,14 @@ function meta_face:GetMaterial()
 	if self._mat then return self._mat end
 	self._mat = Material( self:GetTexture() or "__error" )
 	return self._mat
+end
+
+--- Returns true if the face uses the Lightmapped_4WayBlend shader.
+--- @return boolean
+function meta_face:IsLightmapped4WayBlend()
+	if self._is4wayblend ~= nil then return self._is4wayblend end
+	self._is4wayblend = self:GetMaterial():GetShader() == "Lightmapped_4WayBlend"
+	return self._is4wayblend
 end
 
 --- Returns true if the face should render.
@@ -413,6 +422,7 @@ end
 --- @class PolygonMeshVertex
 --- @field normal Vector
 --- @field pos Vector
+--- @field color Color
 --- @field u number
 --- @field v number
 --- @field lu number
@@ -498,9 +508,12 @@ local function GetDisplacementVertexs(self, faceVertexData )
 	do
 	    local LerpVector = LerpVector
 	    local math_floor = math.floor
+	    local math_Clamp = math.Clamp
 	    local table_insert = table.insert
 
 		local dispVertices = self.__map:GetDispVerts()
+		local dispMultiBlend = self.__map:GetDispMultiBlend()
+		local isMultiBlend = self:IsLightmapped4WayBlend()
 		local vertex, t1, t2, baryVert, dispVert, trueVert, textureUV, lightmapUV
 		local normal = baseVerts[1].normal
 
@@ -524,6 +537,23 @@ local function GetDisplacementVertexs(self, faceVertexData )
 			textureUV = LerpVector( t2, uvA + ( uvAD * t1 ), uvB + ( uvBC * t1 ) )
 			lightmapUV = LerpVector( t2, uv2A + ( uv2AD * t1 ), uv2B + ( uv2BC * t1 ) )
 
+			-- For Lightmapped_4WayBlend, pass lump-63 weights as vertex RGBA:
+			--   A = blend texture 1 → 2,  R/G/B = weights for textures 3 and 4.
+			-- Falls back to standard displacement alpha when lump 63 is absent.
+			local color
+			local mb = isMultiBlend and dispMultiBlend[v]
+			if mb then
+				local blend = mb.multiblend
+				color = Color(
+					math_Clamp( blend[1] * 255, 0, 255 ),
+					math_Clamp( blend[2] * 255, 0, 255 ),
+					math_Clamp( blend[3] * 255, 0, 255 ),
+					math_Clamp( blend[4] * 255, 0, 255 )
+				)
+			else
+				color = Color( 255, 255, 255, vertex.alpha )
+			end
+
 			table_insert( vertices, {
 				pos = trueVert,
 				normal = normal,
@@ -532,7 +562,7 @@ local function GetDisplacementVertexs(self, faceVertexData )
 				u1 = lightmapUV.x,
 				v1 = lightmapUV.y,
 				userdata = tangentUD,
-				color = Color( 255, 255, 255, vertex.alpha )
+				color = color,
 			} )
 
 			index = index + 1
@@ -795,13 +825,21 @@ if CLIENT then
 		-- Vert
 		local vertCount = #verts
 		local cr, cg, cb, ca = col.r, col.g, col.b, col.a
+		-- Lightmapped_4WayBlend reads per-vertex RGBA blend weights; use them instead of the
+		-- uniform tint colour. Other surfaces keep the standard col behaviour.
+		local use_vertex_color = self:IsDisplacement() and self:IsLightmapped4WayBlend()
 		mesh.Begin( self._mesh, MATERIAL_TRIANGLES, vertCount / 3 )
 		for i = 1, vertCount do
 			local vert = verts[i]
 			-- > Mesh
 			mesh.Normal( vert.normal )
 			mesh.Position( vert.pos )
-			mesh.Color( cr, cg, cb, ca )
+			if use_vertex_color and vert.color then
+				local vc = vert.color
+				mesh.Color( vc.r, vc.g, vc.b, vc.a )
+			else
+				mesh.Color( cr, cg, cb, ca )
+			end
 			mesh.TexCoord( 0, vert.u, vert.v )   -- texture UV
 			mesh.TexCoord( 1, vert.u1, vert.v1 ) -- lightmap UV
 			mesh.TexCoord( 2, vert.u1, vert.v1 )

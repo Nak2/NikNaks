@@ -1179,6 +1179,53 @@ do
 		return self._dispVert
 	end
 
+	--- Returns per-vertex multi-blend data for Lightmapped_4WayBlend displacement surfaces.
+	--- Used by Portal 2, CS:GO, L4D2, and Alien Swarm (BSP lump 63).
+	--- Entries are indexed identically to GetDispVerts() (same DispVertStart offset).
+	--- Returns an empty table for maps that don't include this lump (e.g. standard HL2/Source 2013).
+	--- @return DispMultiBlend[]
+	function meta:GetDispMultiBlend()
+		if self._dispMultiBlend then return self._dispMultiBlend end
+		self._dispMultiBlend = {}
+
+		local data = self:GetLump( 63 )
+		if not data or data:Size() == 0 then return self._dispMultiBlend end
+
+		-- dDispMultiBlend_t layout (all floats, IEEE 754):
+		--   Vector4D multiblend         (4 × float = 16 bytes) — per-layer blend weights [0..1]
+		--   Vector4D alphablend         (4 × float = 16 bytes) — per-layer alpha weights [0..1]
+		--   Vector4D multiblendcolors[4](4 × 4 × float = 64 bytes) — per-layer tint colors
+		-- Full struct: 96 bytes = 768 bits.
+		-- Some stripped BSPs omit the color block: 32 bytes = 256 bits.
+		local ENTRY_BITS
+		if data:Size() % 768 == 0 then
+			ENTRY_BITS = 768
+		elseif data:Size() % 256 == 0 then
+			ENTRY_BITS = 256
+		else
+			self:ClearLump( 63 )
+			return self._dispMultiBlend
+		end
+
+		local count = data:Size() / ENTRY_BITS
+		for i = 0, count - 1 do
+			--- @class DispMultiBlend
+			--- @field multiblend number[]  -- [1..4] blend weights (0–1) per texture layer
+			--- @field alphablend number[]  -- [1..4] alpha weights (0–1) per texture layer
+			local t = {
+				multiblend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
+				alphablend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
+			}
+			if ENTRY_BITS == 768 then
+				data:Skip( 512 ) -- skip multiblendcolors (64 bytes = 512 bits)
+			end
+			self._dispMultiBlend[i] = t
+		end
+
+		self:ClearLump( 63 )
+		return self._dispMultiBlend
+	end
+
 	--- Holds flags for the triangle in the displacment mesh.
 	--- Returns the DispTris data
 	--- @return number[]
