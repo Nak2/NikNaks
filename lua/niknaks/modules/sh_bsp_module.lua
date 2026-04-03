@@ -140,9 +140,10 @@ function NikNaks.Map(fileName)
 		BSP._lumpheader[i] = read_lump_h(BSP, f)
 	end
 
+	BSP._mapRevision = f:ReadLong()
+
 	--- @type BitBuffer[]
 	BSP._lumpstream = {}
-
 	BSP._gamelumps = {}
 	f:Close()
 
@@ -165,6 +166,12 @@ do
 	--- @return string
 	function meta:GetMapFile()
 		return self._mapfile or "No file"
+	end
+
+	---Returns the map revision. This is increased each time the map is saved in the Hammer editor.
+	---@return number
+	function meta:GetMapRevision()
+		return self._mapRevision
 	end
 
 	--- Returns the map-version.
@@ -1194,12 +1201,16 @@ do
 		-- dDispMultiBlend_t layout (all floats, IEEE 754):
 		--   Vector4D multiblend         (4 × float = 16 bytes) — per-layer blend weights [0..1]
 		--   Vector4D alphablend         (4 × float = 16 bytes) — per-layer alpha weights [0..1]
-		--   Vector4D multiblendcolors[4](4 × 4 × float = 64 bytes) — per-layer tint colors
-		-- Full struct: 96 bytes = 768 bits.
+		--   Vector   multiblendcolors[4](4 × 3 floats = 48 bytes) — per-layer tint colors
+		-- Full struct: 80 bytes = 640 bits.
 		-- Some stripped BSPs omit the color block: 32 bytes = 256 bits.
+		local floats = 8
+		local bits = floats * 32
 		local ENTRY_BITS
-		if data:Size() % 768 == 0 then
-			ENTRY_BITS = 768
+		if data:Size() % bits == 0 then
+			ENTRY_BITS = bits
+		elseif data:Size() % 256 == 0 then
+			ENTRY_BITS = 256
 		elseif data:Size() % 256 == 0 then
 			ENTRY_BITS = 256
 		else
@@ -1209,6 +1220,7 @@ do
 
 		local count = data:Size() / ENTRY_BITS
 		for i = 0, count - 1 do
+			data:Seek(count * ENTRY_BITS)
 			--- @class DispMultiBlend
 			--- @field multiblend number[]  -- [1..4] blend weights (0–1) per texture layer
 			--- @field alphablend number[]  -- [1..4] alpha weights (0–1) per texture layer
@@ -1216,9 +1228,6 @@ do
 				multiblend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
 				alphablend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
 			}
-			if ENTRY_BITS == 768 then
-				data:Skip( 512 ) -- skip multiblendcolors (64 bytes = 512 bits)
-			end
 			self._dispMultiBlend[i] = t
 		end
 

@@ -8,7 +8,7 @@ local log, ldexp, frexp, floor, ceil, max, setmetatable, source = math.log, math
 	.ceil, math.max, setmetatable, jit.util.funcinfo(NikNaks.AutoInclude)["source"]
 
 --- Creates a new BitBuffer. 
----@overload fun(data: string|table, little_endian: boolean) : BitBuffer
+---@overload fun(data: string|table?, little_endian: boolean?) : BitBuffer
 NikNaks.BitBuffer = {}
 
 ---@class BitBuffer
