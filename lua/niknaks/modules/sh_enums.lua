@@ -11,6 +11,7 @@ NikNaks.HULL = {
     LARGE           = 7, -- 80w, 100t    // Antlion Guard
     LARGE_CENTERED  = 8, -- ?           // Mortar Synth / Strider
     MEDIUM_TALL     = 9, -- 36w, 100t    // Hunter
+    NUM_HULLS       = 10
 }
 NikNaks.NUM_HULLS = 10
 
@@ -32,30 +33,4 @@ NikNaks.LIGHTEMISSIONTYPE = {
     EMIT_SKYLIGHT   = 3, --Parallel light rays representing direct sunlight from the skybox.
     EMIT_QUAKELIGHT = 4, --Legacy linear-falloff light using original Quake engine attenuation logic.
     EMIT_SKYAMBIENT = 5 --Non-directional ambient filler light representing the sky's indirect glow.
-}
-
--- AI Nodes
----@enum NODE_TYPE
-NikNaks.NODE_TYPE = {
-    INVALID = -1, -- Any nodes not matching these
-    ANY     = 0,
-    DELETED = 1,  -- Internal in hammer?
-    GROUND  = 2,
-    AIR     = 3,
-    CLIMB   = 4,
-}
-
--- AI movement
----@enum PATHTYPE
-NikNaks.PATHTYPE = {
-    NONE   = -1, -- In case there are no path-options on the map
-    AIN    = 0,
-    NAV    = 1,
-    NIKNAV = 2,
-}
-
----@enum PATHMOVETYPE
-NikNaks.PATHMOVETYPE = {
-    GROUND = 0,
-    FLY    = 1,
 }
