@@ -23,8 +23,8 @@ TimeDelta.Hour = 3600
 TimeDelta.Day = 86400
 TimeDelta.Week = 604800
 TimeDelta.Year = 31536000
-TimeDelta.Decade = 315359654
-TimeDelta.Century = 3153596543
+TimeDelta.Decade = 315360000
+TimeDelta.Century = 3153600000
 TimeDelta._steps = { "Year", "Day", "Hour", "Minute", "Second", "Milisecond" }
 
 setmetatable( TimeDelta, {

@@ -429,15 +429,14 @@ return {
         {
             name = "add: negative + positive subtracts magnitudes",
             func = function()
-                -- bn(-1,-1,-1,-1) has the sign bit set in w (w=-1 < 0), so it
-                -- represents -(2^127-1) in sign-magnitude form.
-                -- -(2^127-1) + 1  →  |result| = (2^127-1) - 1 = 2^127-2, positive.
+                -- bn(-1,-1,-1,-1) represents -(2^127-1) in sign-magnitude form.
+                -- -(2^127-1) + 1 = -(2^127-2); |self| > |bNumber| so sign = negative.
                 -- 2^127-2 = 0x7FFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFE
                 local r = bn(-1, -1, -1, -1) + BN(1)
-                Should(r.x):Be(-2)          -- 0xFFFFFFFE
-                Should(r.y):Be(-1)          -- 0xFFFFFFFF
-                Should(r.z):Be(-1)          -- 0xFFFFFFFF
-                Should(r.w):Be(2147483647)  -- 0x7FFFFFFF (sign bit clear)
+                Should(r.x):Be(-2)  -- 0xFFFFFFFE
+                Should(r.y):Be(-1)  -- 0xFFFFFFFF
+                Should(r.z):Be(-1)  -- 0xFFFFFFFF
+                Should(r.w):Be(-1)  -- 0xFFFFFFFF (sign bit set = negative)
             end
         },
         {

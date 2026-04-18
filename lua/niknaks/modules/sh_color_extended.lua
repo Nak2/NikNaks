@@ -93,8 +93,8 @@ local string_format, string_sub = string.format, string.sub
 	--- Reduces each channel toward its dominant primary, producing a cartoon-like saturation effect.
 	---@param color Color
 	---@return Color
-	function COLOR:ToCartoon(color)
-		local R,G,B = color.r / 255,color.g / 255,color.b / 255
+	function COLOR:ToCartoon()
+		local R,G,B = self.r / 255,self.g / 255,self.b / 255
 		local max_gb = max(G,B)
 		local max_rb = max(R,B)
 		local max_rg = max(R,G)

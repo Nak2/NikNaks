@@ -255,7 +255,7 @@ end
 --- @param position Vector
 --- @return number # Brightness in [0, 1] (clamped)
 function meta_light:BrightnessAt( position )
-	if self.type == NikNaks.EMIT_SKYLIGHT or self.type == NikNaks.EMIT_SKYAMBIENT then
+	if self.type == NikNaks.LIGHTEMISSIONTYPE.EMIT_SKYLIGHT or self.type == NikNaks.LIGHTEMISSIONTYPE.EMIT_SKYAMBIENT then
 		return 0
 	end
 

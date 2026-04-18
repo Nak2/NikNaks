@@ -17,13 +17,14 @@ NikNaks.Path.AI = NikNaks.Path.AI or {}
 ---@field _rawpos Vector
 ---@field _gridKey string?
 ---@field _type AI_NodeType
+---@field _controllers AI_Controller[] -- Controllers whose volume contains this node's position
 local meta = {}
 meta.__index = meta
 meta.MetaName = "AI Node"
 NikNaks.Path.AI.NodeMeta = meta
 
 meta.__tostring = function( self )
-    return node.MetaName  -- should be self.MetaName or meta.MetaName
+    return meta.MetaName
 end
 
 ---Type of nodes.
@@ -239,6 +240,28 @@ function meta:SetPos(vec)
         self._pos = self._rawpos
     end
 
+    -- Cache controllers whose volume contains this node's position
+    local ctrlList = NikNaks.Path.AI.GetControllers()
+    if ctrlList[1] then
+        local p   = self._pos
+        local hit = {}
+        for _, ctrl in ipairs(ctrlList) do
+            if not ctrl.origin then continue end
+            local o   = ctrl.origin
+            local wx1 = o.x + ctrl.mins.x;  local wx2 = o.x + ctrl.maxs.x
+            local wy1 = o.y + ctrl.mins.y;  local wy2 = o.y + ctrl.maxs.y
+            local wz1 = o.z + ctrl.mins.z;  local wz2 = o.z + ctrl.maxs.z
+            if p.x >= wx1 and p.x <= wx2 and
+               p.y >= wy1 and p.y <= wy2 and
+               p.z >= wz1 and p.z <= wz2 then
+                hit[#hit + 1] = ctrl
+            end
+        end
+        self._controllers = hit
+    else
+        self._controllers = {}
+    end
+
     -- Insert into new grid cell
     local key = gridKey(self._pos)
     self._gridKey = key  -- cache on node for fast removal next time
@@ -279,6 +302,15 @@ function meta:GetLinkMoves(node, hull)
     end
 
     return entry[hull] or 0
+end
+
+---Returns true if the node has the link move
+---@param node AI_Node
+---@param hull HULL?
+---@param moveType AI_MOVE_FLAGS
+---@return boolean
+function meta:HasLinkMoves(node, hull, moveType)
+    return bit.band(self:GetLinkMoves(node, hull), moveType) ~= 0
 end
 
 ---Removes the link between this node and another node.
@@ -341,11 +373,12 @@ end
 function meta:GetHintType()
     local link = self:GetLookupLink()
     if not link then return NikNaks.Path.AI.HintTypes.None end
+    local NONE = NikNaks.Path.AI.HintTypes.None
     for _, ent in ipairs(link.entities) do
-        local hint = NikNaks.Path.AI.GetHintType(ent)
-        if hint ~= NikNaks.Path.AI.HintTypes.None then return hint end
+        local hinttype = ent.hinttype
+        if hinttype and hinttype ~= NONE then return hinttype end
     end
-    return NikNaks.Path.AI.HintTypes.None
+    return NONE
 end
 
 

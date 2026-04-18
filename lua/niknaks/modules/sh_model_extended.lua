@@ -19,7 +19,7 @@ do
 			return Vector( cache[name][1] ), Vector( cache[name][2] )
 		end
 
-		local f = file_Open( name, "r", "GAME" )
+		local f = file_Open( name, "rb", "GAME" )
 		if f == nil then
 			cache[name] = { Vector(), Vector() }
 			return Vector( cache[name][1] ), Vector( cache[name][2] )

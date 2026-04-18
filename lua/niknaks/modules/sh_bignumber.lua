@@ -233,6 +233,20 @@ local function add(self, bNumber)
 	return result
 end
 
+---Unsigned less-than comparison (ignores sign bit; compares raw magnitude).
+---@param a BigNumber
+---@param b BigNumber
+---@return boolean
+local function ult(a, b)
+	local aw = magW(a.w); local bw = magW(b.w)
+	if aw ~= bw then return aw < bw end
+	local az = a.z % 0x100000000; local bz = b.z % 0x100000000
+	if az ~= bz then return az < bz end
+	local ay = a.y % 0x100000000; local by = b.y % 0x100000000
+	if ay ~= by then return ay < by end
+	return (a.x % 0x100000000) < (b.x % 0x100000000)
+end
+
 -- Two's-complement subtraction of unsigned magnitudes. Callers must strip sign first.
 local function sub(self, bNumber)
 	if isnumber(bNumber) then
@@ -255,7 +269,20 @@ function meta:__add(bNumber)
 		bNumber = NikNaks.BigNumber(bNumber --[[@as number]])
 	end
 	if isNeg(self) ~= isNeg(bNumber) then
-		return sub(self, bNumber)
+		local selfStrip = stripSign(self)
+		local bStrip    = stripSign(bNumber)
+		local result, resultNeg
+		if ult(selfStrip, bStrip) then
+			-- |bNumber| > |self|: result = |bNumber| - |self|, sign of bNumber
+			result    = sub(bNumber, self)
+			resultNeg = isNeg(bNumber)
+		else
+			-- |self| >= |bNumber|: result = |self| - |bNumber|, sign of self
+			result    = sub(self, bNumber)
+			resultNeg = isNeg(self)
+		end
+		result.w = resultNeg and bor(magW(result.w), SIGN_BIT) or magW(result.w)
+		return result
 	end
 	return add(self, bNumber)
 end
@@ -384,20 +411,6 @@ function meta:__pow(exp)
 	end
 
 	return result
-end
-
----Unsigned less-than comparison (ignores sign bit; compares raw magnitude).
----@param a BigNumber
----@param b BigNumber
----@return boolean
-local function ult(a, b)
-	local aw = magW(a.w); local bw = magW(b.w)
-	if aw ~= bw then return aw < bw end
-	local az = a.z % 0x100000000; local bz = b.z % 0x100000000
-	if az ~= bz then return az < bz end
-	local ay = a.y % 0x100000000; local by = b.y % 0x100000000
-	if ay ~= by then return ay < by end
-	return (a.x % 0x100000000) < (b.x % 0x100000000)
 end
 
 ---Unsigned 128-bit division using Knuth's Algorithm D (base 2^16).

@@ -392,8 +392,8 @@ local units = {
 	Day = 86400,
 	Week = 604800,
 	Year = 31536000,
-	Decade = 315359654,
-	Century = 3153596543
+	Decade = 315360000,
+	Century = 3153600000
 }
 
 -- TimeDelta functions

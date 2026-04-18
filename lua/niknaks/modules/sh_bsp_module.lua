@@ -287,7 +287,8 @@ do
 		self._gamelump = {}
 
 		local lump = self:GetLump(35)
-		for i = 0, math.min(63, lump:ReadLong()) do
+		local lumpCount = lump:ReadLong()
+		for i = 0, math.min(63, lumpCount) do
 			--- @class BSPGameLumpHeader
 			--- @field id number # ID of the lump
 			--- @field flags number # Flags of the lump
@@ -972,8 +973,13 @@ do
 		local num_clusters = data:ReadLong()
 
 		-- Check to see if the num_clusters match
-		if num_clusters ~= self:GetLeafsNumClusters() then
-			error("Invalid NumClusters!")
+		local expected_clusters = self:GetLeafsNumClusters()
+		if num_clusters ~= expected_clusters then
+			-- Warn the user that visibility may be broken, but continue to read the data anyway.
+			ErrorNoHalt(string.format(
+				"[NikNaks] Warning: Number of clusters in visibility lump (%d) does not match number of clusters in leafs (%d). Visibility data may be broken and will most definitely cause unexpected behavior.",
+				num_clusters, expected_clusters
+			))
 		end
 
 		--- @class VisibilityInfo

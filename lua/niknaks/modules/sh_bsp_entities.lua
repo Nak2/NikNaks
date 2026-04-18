@@ -86,7 +86,7 @@ local function ParseEntity( str )
 		value = tonumber( value ) or value
 		if t[key] then
 			if type( t[key] ) ~= "table" then
-				t[key] = { t[key] }
+				t[key] = { t[key], value }
 			else
 				table.insert( t[key], value )
 			end

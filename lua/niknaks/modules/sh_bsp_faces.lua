@@ -404,13 +404,13 @@ function meta_face:CalculateSegmentIntersection( startPos, endPos )
 		if t <= 0 or t >= 1 then return end
 		local poly = self:GetVertexs()
 		if not poly then return end
+		local dir = (endPos - startPos):GetNormalized()
 		for i = 1, #poly - 2 do
             local v0 = poly[1]
             local v1 = poly[i + 1]
             local v2 = poly[i + 2]
 
             -- Check if ray is intersecting triangle point v0, v1 and v2
-			local dir = (endPos - startPos):GetNormalized()
 			local hitPos, dis = IsRayIntersectingTriangle(startPos, dir, v0, v1, v2)
             if hitPos then
 				return hitPos, dis
@@ -459,15 +459,15 @@ local function GetDisplacementVertexs(self, faceVertexData )
 	do
 		local minDist = math.huge
 
-		local pos, idx, dist
+		local pos, dist
 		for i = 1, 4 do
 			pos = baseVerts[i].pos
-			idx = table.insert( baseQuad, pos ) --[[@as number]]
+			table.insert( baseQuad, pos )
 
 			dist = pos:Distance( start )
 			if dist < minDist then
 				minDist = dist
-				startIdx = idx
+				startIdx = i
 			end
 		end
 	end
@@ -538,17 +538,17 @@ local function GetDisplacementVertexs(self, faceVertexData )
 			lightmapUV = LerpVector( t2, uv2A + ( uv2AD * t1 ), uv2B + ( uv2BC * t1 ) )
 
 			-- For Lightmapped_4WayBlend, pass lump-63 weights as vertex RGBA:
-			--   A = blend texture 1 → 2,  R/G/B = weights for textures 3 and 4.
+			--   A = blend[1] (layer 1→2),  R = blend[2] (layer 3),  G = blend[3] (layer 4),  B = blend[4] (unused).
 			-- Falls back to standard displacement alpha when lump 63 is absent.
 			local color
 			local mb = isMultiBlend and dispMultiBlend[v]
 			if mb then
 				local blend = mb.multiblend
 				color = Color(
-					math_Clamp( blend[1] * 255, 0, 255 ),
 					math_Clamp( blend[2] * 255, 0, 255 ),
 					math_Clamp( blend[3] * 255, 0, 255 ),
-					math_Clamp( blend[4] * 255, 0, 255 )
+					math_Clamp( blend[4] * 255, 0, 255 ),
+					math_Clamp( blend[1] * 255, 0, 255 )
 				)
 			else
 				color = Color( 255, 255, 255, vertex.alpha )
@@ -772,8 +772,8 @@ end
 function meta_face:GenerateMeshData()
 	--- @class PolygonMeshData
 	local t = {}
-	t.verticies = self:GenerateVertexData()
-	t.triangles = PolyChop( t.verticies )
+	t.vertices = self:GenerateVertexData()
+	t.triangles = self:IsDisplacement() and GridPolyChop( t.vertices ) or PolyChop( t.vertices )
 	t.material = self:GetTexture()
 	return {t}
 end

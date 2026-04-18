@@ -287,46 +287,59 @@ end
 --- @param includeDisplacment boolean? # If true, it will include displacment faces. Note: this can be slow.
 --- @return BSPFaceObject[]
 function meta_leaf:GetFaces(includeDisplacment)
-	if self._faces then return self._faces end
-
-	--- @type BSPFaceObject[]
-	self._faces = {}
-	local faces = self.__map:GetFaces()
-	local leafFace = self.__map:GetLeafFaces()
-	local c = self.firstleafface
-
-	for i = 0, self.numleaffaces - 1 do
-		local f_id = leafFace[ i + c ]
-		self._faces[i + 1] = faces[f_id]
+	if includeDisplacment then
+		if self._faces_disp then return self._faces_disp end
+	else
+		if self._faces then return self._faces end
 	end
 
-	if(includeDisplacment)then
-		--- Displacments aren't included in leafs, we need to manually add them.
-		if(not self.__map._dispFaceLeaf) then
-			--- @type table<number, BSPFaceObject>
-			self.__map._dispFaceLeaf = {}
-			for key, value in pairs(self.__map:GetDisplacmentFaces()) do
-				local vertexs = value:GetVertexs()
-				if vertexs == nil or #vertexs ~= 4 then continue end -- Invalid displacment
-				local leafs = self.__map:AABBInLeafs(0, vertexs[1], vertexs[3])
-				for key, leaf in pairs(leafs) do
-					if(not self.__map._dispFaceLeaf[leaf:GetIndex()]) then
-						self.__map._dispFaceLeaf[leaf:GetIndex()] = {}
-					end
-					table.insert(self.__map._dispFaceLeaf[leaf:GetIndex()], value)
+	-- Build base face list if not already done
+	if not self._faces then
+		--- @type BSPFaceObject[]
+		self._faces = {}
+		local faces = self.__map:GetFaces()
+		local leafFace = self.__map:GetLeafFaces()
+		local c = self.firstleafface
+
+		for i = 0, self.numleaffaces - 1 do
+			local f_id = leafFace[ i + c ]
+			self._faces[i + 1] = faces[f_id]
+		end
+	end
+
+	if not includeDisplacment then
+		return self._faces
+	end
+
+	-- Build displacement-inclusive list
+	--- Displacments aren't included in leafs, we need to manually add them.
+	if(not self.__map._dispFaceLeaf) then
+		--- @type table<number, BSPFaceObject>
+		self.__map._dispFaceLeaf = {}
+		for key, value in pairs(self.__map:GetDisplacmentFaces()) do
+			local vertexs = value:GetVertexs()
+			if vertexs == nil or #vertexs ~= 4 then continue end -- Invalid displacment
+			local leafs = self.__map:AABBInLeafs(0, vertexs[1], vertexs[3])
+			for key, leaf in pairs(leafs) do
+				if(not self.__map._dispFaceLeaf[leaf:GetIndex()]) then
+					self.__map._dispFaceLeaf[leaf:GetIndex()] = {}
 				end
-			end
-		end
-
-		local dispFaces = self.__map._dispFaceLeaf[self:GetIndex()]
-		if(dispFaces)then
-			for key, value in pairs(dispFaces) do
-				table.insert(self._faces, value)
+				table.insert(self.__map._dispFaceLeaf[leaf:GetIndex()], value)
 			end
 		end
 	end
 
-	return self._faces
+	-- Copy base faces then append displacement faces into the disp cache
+	local t = {}
+	for i = 1, #self._faces do t[i] = self._faces[i] end
+	local dispFaces = self.__map._dispFaceLeaf[self:GetIndex()]
+	if dispFaces then
+		for _, value in pairs(dispFaces) do
+			t[#t + 1] = value
+		end
+	end
+	self._faces_disp = t
+	return self._faces_disp
 end
 
 --- Returns true if the leaf has water within.

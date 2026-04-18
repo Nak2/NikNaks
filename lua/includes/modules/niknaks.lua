@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.70
+local version = 0.72
 if NikNaks and NikNaks.VERSION > version then return end
 
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
@@ -95,8 +95,8 @@ NikNaks.AutoInclude("niknaks/modules/sh_bsp_worldlights.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_trace.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_sound_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_datapackage.lua")
-NikNaks.AutoInclude("niknaks/modules/sh_path.lua")
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_path.lua")
 
 NikNaks.Msg(Color(0, 255, 100), "NikNaks ", Color(255, 255, 255), NikNaks.VERSION, Color(0, 255, 100), " loaded.")
 

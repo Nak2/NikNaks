@@ -298,12 +298,7 @@ return {
                 local bb = NikNaks.BitBuffer.Create()
                 bb:WriteDouble(4.9406564584124654e-324)
                 bb:Seek(0)
-                for i = 1, 8 do
-                    print(string.format("byte %d: %02X", i, bb:ReadByte()))
-                end
-                bb:Seek(0)
                 local got = bb:ReadDouble()
-                print(string.format("got=%.20g", got))
                 Should(4.9406564584124654e-324):Be(got)
             end
         },

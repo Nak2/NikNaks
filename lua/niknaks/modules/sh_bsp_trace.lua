@@ -77,14 +77,12 @@ end
 function meta_face:LineDirectionIntersection( origin, dir )
 	local poly = self:GetVertexs()
 	if not poly then return end
-	local j = 1
 	for i = 1, #poly - 2 do
 		local v0 = poly[1]
 		local v1 = poly[i + 1]
 		local v2 = poly[i + 2]
 		local hitPos = IsRayIntersectingTriangle(origin, dir, v0, v1, v2)
 		if hitPos then return hitPos end
-		j = j + 3
 	end
 	return nil
 end
@@ -104,13 +102,14 @@ function meta_face:LineSegmentIntersection( startPos, endPos )
 		if t <= 0 or t >= 1 then return end
 		local poly = self:GetVertexs()
 		if not poly then return end
+		local dir = (endPos - startPos):GetNormalized()
 		for i = 1, #poly - 2 do
             local v0 = poly[1]
             local v1 = poly[i + 1]
             local v2 = poly[i + 2]
 
             -- Check if ray is intersecting triangle point v0, v1 and v2
-			local hit = IsRayIntersectingTriangle(startPos, (endPos - startPos):GetNormalized(), v0, v1, v2)
+			local hit = IsRayIntersectingTriangle(startPos, dir, v0, v1, v2)
             if hit then return hit end
         end
 	end
@@ -126,83 +125,6 @@ function meta_leaf:IsRayIntersecting( origin, dir )
 		local hit = brush:IsRayIntersecting( origin, dir )
 		if hit then return brush end
 	end
-end
-
---- Casts a ray on the brush
---- @param self BSPObject
---- @param brush BSPBrushObject
---- @param startPos Vector
---- @param endPos Vector
---- @param trace table
---- @return boolean
-local function rayCastBrush( self, brush, startPos, endPos, trace)
-	local sides = self:GetBrushSides()
-	if #sides < 1 then return false end
-
-	local f_enter = -99
-	local f_leave = 1
-	local starts_out = false
-	local ends_out = false
-	for _, side in pairs( sides ) do
-		if side.bevel == 1 then continue end
-
-		local plane = side.plane
-		local start_dist = startPos:Dot( plane.normal ) - plane.dist
-		local end_dist = endPos:Dot( plane.normal ) - plane.dist
-		if start_dist > 0 then
-			starts_out = true
-			if end_dist > 0 then return end
-		else
-			if end_dist <= 0 then continue end
-			ends_out = true
-		end
-
-		if start_dist > end_dist then
-			local fraction = math.max( start_dist - DIST_EPSILON, 0 )
-			fraction = fraction / ( start_dist - end_dist )
-			f_enter = math.max( f_enter, fraction )
-		else
-			local fraction = ( start_dist + DIST_EPSILON ) / ( start_dist - end_dist )
-			f_leave = math.min( f_leave, fraction)
-		end
-	end
-
-	if starts_out then
-		if trace.FractionLeftSolid - f_enter > 0 then
-			starts_out = false
-		end
-	end
-
-	if not starts_out then
-		trace.StartSolid = true
-		trace.Content = brush.Content
-		
-		if not ends_out then
-			trace.AllSolid = true
-			trace.Fraction = 0
-			trace.FractionLeftSolid = 1
-		else
-			if f_leave ~= 1 and f_leave > trace.FractionLeftSolid then
-				trace.FractionLeftSolid = f_leave
-				if trace.Fraction <= f_leave then
-					trace.Fraction = 1
-				end
-			end
-		end
-		return false
-	end
-
-	if f_enter < f_leave then
-		if f_enter > -99 and f_enter < trace.Fraction then
-			if f_enter < 0 then
-				f_enter = 0
-			end
-			trace.Fraction = f_enter
-			trace.Brush = brush
-			trace.Content = brush.Content
-		end
-	end
-	return false
 end
 
 -- Raycasts a BSPFaceObject and returns the result in the trace table.

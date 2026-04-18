@@ -10,6 +10,7 @@ local retryTime             = nil
 ---Returns the AI network for the current map, or false if unavailable.
 ---@return AI_Network|false
 function NikNaks.Path.AI.GetNetwork()
+    if not NikNaks.CurrentMap then return false end
     if networkFailed then return false end
     if network then return network end
     if retryTime and CurTime() < retryTime then
@@ -46,7 +47,7 @@ end
 ---@field _version integer The AIN version
 ---@field _mapVersion integer The map revision version. If smaller, will recompile.
 ---@field _nodes AI_Node[]
----@field _graph table<string, AI_Node> -- Fast lookup table for nodes
+---@field _graph table<string, AI_Node[]> -- Fast lookup table for nodes
 ---@field _entityLookup table<integer, AI_Node>
 local meta = NikNaks.Path.AI.NetworkMeta
 meta.__index = meta
@@ -316,32 +317,46 @@ end
 
 local GRID_SIZE = 1000 -- must match the value in the node file
 
+local function canSee(pos1, pos2)
+    local tr = util.TraceLine({
+        start = pos1,
+        endpos = pos2,
+        mask = MASK_SOLID_BRUSHONLY,
+    })
+    return not tr.Hit
+end
+
 ---Returns the nearest node from the grid within a certain distance.
 ---@param pos Vector
 ---@param type AI_NodeType?
 ---@param maxDistance number?   -- Will default to 1000
+---@param zone integer?         -- If set, only nodes in this zone are considered
 ---@return AI_Node?
-function meta:FindNearestNode(pos, type, maxDistance)
+function meta:FindNearestNode(pos, type, maxDistance, zone)
     maxDistance      = maxDistance or GRID_SIZE
     local cellRadius = math.ceil(maxDistance / GRID_SIZE)
     local bestNode   = nil
     local bestDist   = maxDistance * maxDistance
     local cx         = math.floor(pos.x / GRID_SIZE)
     local cy         = math.floor(pos.y / GRID_SIZE)
-    local isGround   = type == NodeTypes.Ground
-    local isAny      = type == NodeTypes.Any or type == nil
+    local isGround   = type == NikNaks.Path.AI.NodeTypes.Ground
+    local isAny      = type == NikNaks.Path.AI.NodeTypes.Any or type == nil
+    local pvs = NikNaks.CurrentMap:PVSForOrigin(pos) --[[@as PVSObject]]
 
     for dx = -cellRadius, cellRadius do
         for dy = -cellRadius, cellRadius do
             local cell = self._graph[(cx + dx) .. "," .. (cy + dy)]
             if not cell then continue end
             for _, node in ipairs(cell) do
+                if zone and node._zone ~= zone then continue end
                 if not isAny and node._type ~= type then
-                    if not isGround or node._type ~= NodeTypes.Climb or not node:IsWalkableClimb() then
+                    if not isGround or node._type ~= NikNaks.Path.AI.NodeTypes.Climb or not node:IsWalkableClimb() then
                         continue
                     end
                 end
-                local dist = (node:GetPos() - pos):LengthSqr()
+                local np = node:GetPos()
+                if not pvs:TestPosition(np) or not canSee(pos, np) then continue end
+                local dist = (np - pos):LengthSqr()
                 if dist < bestDist then
                     bestDist = dist
                     bestNode = node
@@ -365,8 +380,8 @@ function meta:FindNodesByDistance(pos, type, distance)
     local result     = {}
     local cx         = math.floor(pos.x / GRID_SIZE)
     local cy         = math.floor(pos.y / GRID_SIZE)
-    local isGround   = type == NodeTypes.Ground
-    local isAny      = type == NodeTypes.Any or type == nil
+    local isGround   = type == NikNaks.Path.AI.NodeTypes.Ground
+    local isAny      = type == NikNaks.Path.AI.NodeTypes.Any or type == nil
 
     for dx = -cellRadius, cellRadius do
         for dy = -cellRadius, cellRadius do
@@ -374,7 +389,7 @@ function meta:FindNodesByDistance(pos, type, distance)
             if not cell then continue end
             for _, node in ipairs(cell) do
                 if not isAny and node._type ~= type then
-                    if not isGround or node._type ~= NodeTypes.Climb or not node:IsWalkableClimb() then
+                    if not isGround or node._type ~= NikNaks.Path.AI.NodeTypes.Climb or not node:IsWalkableClimb() then
                         continue
                     end
                 end
