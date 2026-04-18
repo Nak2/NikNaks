@@ -1210,13 +1210,12 @@ do
 		--   Vector   multiblendcolors[4](4 × 3 floats = 48 bytes) — per-layer tint colors
 		-- Full struct: 80 bytes = 640 bits.
 		-- Some stripped BSPs omit the color block: 32 bytes = 256 bits.
-		local floats = 8
-		local bits = floats * 32
+		-- dDispMultiBlend_t layout (Source SDK bspfile.h):
+		--   Full struct:    multiblend (16B) + alphablend (16B) + multiblendcolors[4] (48B) = 80 bytes = 640 bits
+		--   Stripped struct: multiblend (16B) + alphablend (16B) = 32 bytes = 256 bits
 		local ENTRY_BITS
-		if data:Size() % bits == 0 then
-			ENTRY_BITS = bits
-		elseif data:Size() % 256 == 0 then
-			ENTRY_BITS = 256
+		if data:Size() % 640 == 0 then
+			ENTRY_BITS = 640
 		elseif data:Size() % 256 == 0 then
 			ENTRY_BITS = 256
 		else
@@ -1226,7 +1225,7 @@ do
 
 		local count = data:Size() / ENTRY_BITS
 		for i = 0, count - 1 do
-			data:Seek(count * ENTRY_BITS)
+			data:Seek(i * ENTRY_BITS)
 			--- @class DispMultiBlend
 			--- @field multiblend number[]  -- [1..4] blend weights (0–1) per texture layer
 			--- @field alphablend number[]  -- [1..4] alpha weights (0–1) per texture layer
