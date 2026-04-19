@@ -9,7 +9,6 @@ if NikNaks and NikNaks.VERSION > version then return end
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
 
 NikNaks = {}
-NikNaks.net = {}
 NikNaks.VERSION = version
 NikNaks.Version = version -- For backwards compatibility
 NikNaks.AUTHORS = { "Nak", "Phatso" }
