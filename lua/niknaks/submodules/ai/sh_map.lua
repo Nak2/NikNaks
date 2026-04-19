@@ -100,7 +100,6 @@ local NodeClasses = {
 ---@param dynamicLinks table<string, AI_DynamicLink>
 ---@param controlEntities table<string, AI_Controller>
 local function AddEntityHooks(dynamicLinks, controlEntities)
-    print("Adding entity hooks for dynamic links and link controllers")
     hook.Add("AcceptInput", "NikNaks.AI_DynamicLinkControl", function(ent, key, value)
         local name = ent:GetName()
         key = string.lower(key)
@@ -234,9 +233,6 @@ function NikNaks.Path.AI.GetLookupTable()
                 end
                 hasEnts = true
             end
-        elseif nodeid >= 0 then
-            print("Warning: Entity with classname " ..
-            class .. " has a nodeid but is not a recognized node entity. NodeID: " .. nodeid)
         end
     end
 

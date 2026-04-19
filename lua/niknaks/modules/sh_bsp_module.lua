@@ -1286,10 +1286,6 @@ do
 		for i = 0, dispInfoCount - 1 do
 			target = i * m_Ddispinfo_t
 
-			if data:Tell() ~= target then
-				print("ERROR: Mismatched tell. Expected:", target, "got:", data:Tell(), "diff:", target - data:Tell())
-			end
-
 			--- @class DispInfo
 			--- @field startPosition Vector
 			--- @field DispVertStart number
