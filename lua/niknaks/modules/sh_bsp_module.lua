@@ -288,7 +288,7 @@ do
 
 		local lump = self:GetLump(35)
 		local lumpCount = lump:ReadLong()
-		for i = 0, math.min(63, lumpCount) do
+		for i = 0, lumpCount do
 			--- @class BSPGameLumpHeader
 			--- @field id number # ID of the lump
 			--- @field flags number # Flags of the lump
@@ -325,8 +325,8 @@ do
 	--- @field version number
 	--- @field flags number
 
-	--- Returns the game lump as a bytebuffer. This will also be cached on the BSP object.
-	--- @param gameLumpID any
+	--- Returns the game lump. This will also be cached on the BSP object.
+	--- @param gameLumpID number
 	---	@return BSPGameLump?
 	function meta:GetGameLump(gameLumpID)
 		--- @type BSPGameLump?

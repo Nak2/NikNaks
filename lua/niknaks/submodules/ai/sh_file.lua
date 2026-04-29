@@ -4,43 +4,33 @@ NikNaks.Path.AI             = NikNaks.Path.AI or {}
 NikNaks.Path.AI.NetworkMeta = NikNaks.Path.AI.NetworkMeta or {}
 
 local network               = nil
-local networkFailed         = false
-local retryTime             = nil
 
 ---Returns the AI network for the current map, or false if unavailable.
+---**Note** This will be cached if successful, but keep the result in a variable instead of calling multiple times.
 ---@return AI_Network|false
 function NikNaks.Path.AI.GetNetwork()
     if not NikNaks.CurrentMap then return false end
-    if networkFailed then return false end
     if network then return network end
-    if retryTime and CurTime() < retryTime then
-        networkFailed = true
-        return false
-    end
-
-    -- No info_node entities means no AIN will ever exist for this map
-    if #NikNaks.CurrentMap:FindByClass("info_node") == 0 then
-        networkFailed = true
-        ErrorNoHalt("NikNaks: map has no info_node entities, AIN unavailable\n")
-        return false
-    end
 
     local buffer = NikNaks.BitBuffer.OpenFile("maps/graphs/" .. game.GetMap() .. ".ain", "GAME")
     if not buffer then
-        -- Only retry if server just started — AIN may still be compiling
-        if not retryTime and CurTime() < 5 then
-            retryTime = CurTime() + 5
-            ErrorNoHalt("AI Network: failed to load AIN, retry in 5 seconds\n")
-        else
-            networkFailed = true
-            ErrorNoHalt("AI Network: failed to load AIN, giving up\n")
-        end
         return false
     end
 
     network = NikNaks.Path.AI.ReadAIN(buffer)
-    retryTime = nil
     return network
+end
+
+---Creates a new empty AI network for the current map.
+---@return AI_Network
+function NikNaks.Path.AI.CreateAIN()
+    local net = setmetatable({}, NikNaks.Path.AI.NetworkMeta)
+    net._version = 1
+    net._mapVersion = NikNaks.CurrentMap:GetMapRevision()
+    net._nodes = {}
+    net._graph = {}
+    net._entityLookup = {}
+    return net
 end
 
 ---@class AI_Network
@@ -105,6 +95,7 @@ local function readLink(buffer, nodeFile)
 end
 
 ---Reads the buffer as an AI_Network.
+---**Warning** This does not validate the buffer, and can result in errors or crashes if the buffer is malformed.
 ---@param buffer BitBuffer
 ---@return AI_Network
 function NikNaks.Path.AI.ReadAIN(buffer)
