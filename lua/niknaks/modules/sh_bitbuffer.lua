@@ -208,25 +208,48 @@ do
 	NikNaks.BitBuffer.ToBits = toBits
 
 	--- Debug print function for the bitbuffer.
-	function meta:Debug()
+	function meta:Debug(maxRows)
+		maxRows = maxRows or 10
 		local size = string.NiceSize(self._len / 8)
 		local rep = string.rep("=", (32 - (#size + 6)) / 2)
-		print("BitBuff	" ..
-			rep .. " [" .. size .. "] " .. (self:IsLittleEndian() and "Le " or "Be ") .. rep .. "\t= 0xHX =")
+		print("BitBuff  " ..
+			rep .. " [" .. size .. "] " .. (self:IsLittleEndian() and "Le " or "Be ") .. rep .. "\t= 0xHX =\t= CHAR =")
+
 		local lines = math.ceil(self._len / 32)
 		local foundData = nil
+
 		for i = 1, lines do
 			if not foundData then
 				if not self._data[i] then continue end
 				foundData = i
-			elseif i > foundData + 10 then
+			elseif i > foundData + maxRows then
 				break
 			end
+
+			local bits, hex, chars
+
 			if not self._data[i] then
-				print(i * 4 - 4, "00000000000000000000000000000000", "00000000")
+				bits  = "00000000000000000000000000000000"
+				hex   = "00000000"
+				chars = "...."
 			else
-				print(i * 4 - 4, toBits(self._data[i], 32), bit.tohex(self._data[i]):upper())
+				local word = self._data[i]
+				bits = toBits(word, 32)
+				hex  = bit.tohex(word):upper()
+
+				local b1 = bit.rshift(bit.band(word, 0xFF000000), 24)
+				local b2 = bit.rshift(bit.band(word, 0x00FF0000), 16)
+				local b3 = bit.rshift(bit.band(word, 0x0000FF00),  8)
+				local b4 =             bit.band(word, 0x000000FF)
+
+				local function toChar(b)
+					return (b >= 32 and b <= 126) and string.char(b) or "."
+				end
+
+				chars = toChar(b1) .. toChar(b2) .. toChar(b3) .. toChar(b4)
 			end
+
+			print(i * 4 - 4, bits, hex, "  " .. chars)
 		end
 	end
 
