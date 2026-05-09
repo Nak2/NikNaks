@@ -163,7 +163,7 @@ do
 	---@param num number
 	---@return self
 	function meta:Seek(num)
-		self._tell = brshift(blshift(num, 1), 1)
+		self._tell = bit.bor(num, 0)
 		return self
 	end
 
