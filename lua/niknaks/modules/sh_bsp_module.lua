@@ -540,13 +540,17 @@ do
 		return self._cubemaps
 	end
 
-	--- Returns the nearest cubemap to the given position.
-	--- @param pos Vector # The position to check from
+	--- Returns the nearest cubemap matching the given position.
+	--- @param pos Vector # The position and PVS to check from
 	--- @return BSPCubeMap?
 	function meta:FindNearestCubemap(pos)
+		local pvs = self:PVSForOrigin(pos)
+		local t = self:GetCubemaps()
 		local lr, lc
-		for _, v in ipairs(self:GetCubemaps()) do
-			local cd = v:GetPos():DistToSqr(pos)
+		for i = 1, #t do
+			local v = t[i]
+			if(not pvs:TestPosition(v.origin)) then continue end
+			local cd = v.origin:DistToSqr(pos)
 
 			if not lc then
 				lc = v
