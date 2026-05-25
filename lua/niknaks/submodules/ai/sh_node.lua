@@ -152,7 +152,7 @@ function meta:CalculatePosition(hull)
         else
             origin = self:GetPos() - (shift * offsetDir)
         end
-        return origin
+        return origin -- This is in the source code but seems unused. Code will never hit this.
     elseif(self._type == NikNaks.Path.AI.NodeTypes.Ground) then
         local v = self:GetPos()
         return Vector(v.x, v.y, v.z + (self._offsets[hull] or 0))

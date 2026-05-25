@@ -74,16 +74,18 @@ end
 
 ---@type table<integer, AI_LookupLink>|nil
 local lookupLinks = nil
+---@type table<integer, integer>|nil  -- WC nodeid → nodeIndex
+local wcToNodeIndex = nil
 ---@type AI_Controller[]|nil
 local controllers = nil
 ---@type AI_Hint[]|nil
 local hints = nil
 
 local function isUseful(data)
+    if #data.dynamicLinks > 0 then return true end
     local n = #data.entities
-    if (n == 0 and #data.dynamicLinks == 0) then return false end
-    if (n > 1) then return true end
-
+    if n == 0 then return false end
+    if n > 1 then return true end
     local e = data.entities[1]
     return e.classname ~= "info_node" and e.classname ~= "info_node_air"
 end
@@ -241,18 +243,28 @@ function NikNaks.Path.AI.GetLookupTable()
     end
 
     -- Second pass: invert lookUpTab to nodeid -> nodeIndex, patch onto each link
-    lookupLinks = {}
+    lookupLinks   = {}
+    wcToNodeIndex = {}
     for nodeIndex, nodeid in pairs(lookUpTab) do
         -- Toss out map-entities that hold no data
         local data = tempLookupLinks[nodeid]
         if not data or not isUseful(data) then continue end
-        lookupLinks[nodeIndex] = data
-        data.nodeIndex = nodeIndex
+        lookupLinks[nodeIndex]   = data
+        data.nodeIndex           = nodeIndex
+        wcToNodeIndex[nodeid]    = nodeIndex
     end
 
     controllers = allControllers
     hints = allHints
     return lookupLinks
+end
+
+--- Returns a table mapping WC nodeids (from info_node_link StartNode/EndNode) to nodeIndex (AIN array position).
+--- Must be called after GetLookupTable().
+---@return table<integer, integer>
+function NikNaks.Path.AI.GetWCNodeLookup()
+    if not wcToNodeIndex then NikNaks.Path.AI.GetLookupTable() end
+    return wcToNodeIndex or {}
 end
 
 --- Returns the list of link controllers for the current map.

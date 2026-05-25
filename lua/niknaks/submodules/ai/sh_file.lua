@@ -30,6 +30,7 @@ function NikNaks.Path.AI.CreateAIN()
     net._nodes = {}
     net._graph = {}
     net._entityLookup = {}
+    net._wcLookup = {}
     return net
 end
 
@@ -38,7 +39,8 @@ end
 ---@field _mapVersion integer The map revision version. If smaller, will recompile.
 ---@field _nodes AI_Node[]
 ---@field _graph table<string, AI_Node[]> -- Fast lookup table for nodes
----@field _entityLookup table<integer, AI_Node>
+---@field _entityLookup table<integer, AI_Node> -- nodeIndex → AI_Node
+---@field _wcLookup table<integer, AI_Node>      -- WC nodeid → AI_Node (for dynamic link resolution)
 local meta = NikNaks.Path.AI.NetworkMeta
 meta.__index = meta
 
@@ -107,6 +109,7 @@ function NikNaks.Path.AI.ReadAIN(buffer)
     nodeFile._nodes        = {}
     nodeFile._graph        = {}
     nodeFile._entityLookup = {}
+    nodeFile._wcLookup     = {}
 
     local lookupTable      = NikNaks.Path.AI.GetLookupTable()
 
@@ -119,6 +122,8 @@ function NikNaks.Path.AI.ReadAIN(buffer)
         nodeFile._nodes[i] = node
         if (lookupTable[i] == nil) then continue end
         node:SetLookupLinkIndex(i)
+        -- Also register under WC nodeid for dynamic link resolution
+        nodeFile._wcLookup[lookupTable[i].nodeId] = node
     end
 
     -- Load links
@@ -186,8 +191,8 @@ local function floodFillZone(newZone, startNode, usedNodes, file)
         end
 
         for _, dynamicLink in pairs(node:LocateDynamicLinks() or {}) do
-            local n1 = file._entityLookup[dynamicLink.startNode]
-            local n2 = file._entityLookup[dynamicLink.endNode]
+            local n1 = file._wcLookup[dynamicLink.startNode]
+            local n2 = file._wcLookup[dynamicLink.endNode]
             if n1 and not usedNodes[n1] then queue[#queue + 1] = n1 end
             if n2 and not usedNodes[n2] then queue[#queue + 1] = n2 end
         end
@@ -416,8 +421,12 @@ function meta:AddNode(pos, type, yaw)
     end
 
     -- Register in _nodes using next available key
-    local idx = table.Count(self._nodes)
-    self._nodes[idx] = node
+    local index = 0
+    while true do
+        if self._nodes[index] then continue end
+        self._nodes[index] = node
+        break
+    end
 
     -- SetPos handles grid registration
     node:SetPos(pos)
