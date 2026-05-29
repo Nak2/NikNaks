@@ -423,7 +423,10 @@ function meta:AddNode(pos, type, yaw)
     -- Register in _nodes using next available key
     local index = 0
     while true do
-        if self._nodes[index] then continue end
+        if self._nodes[index] then
+            index = index + 1
+            continue
+        end
         self._nodes[index] = node
         break
     end
