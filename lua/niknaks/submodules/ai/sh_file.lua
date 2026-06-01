@@ -55,8 +55,8 @@ end
 local function readNode(buffer)
     ---@class AI_Node
     local t = setmetatable({}, NikNaks.Path.AI.NodeMeta)
-    t._pos = buffer:ReadVector()
-    t._rawpos = t._pos
+    t._rawpos = buffer:ReadVector()
+    t._pos    = t._rawpos  -- placeholder; overwritten by SetPos below
     t._yaw = buffer:ReadFloat()
     t._offsets = {}
     for i = 0, NUM_HULLS - 1 do
@@ -190,18 +190,29 @@ local function floodFillZone(newZone, startNode, usedNodes, file)
             end
         end
 
-        for _, dynamicLink in pairs(node:LocateDynamicLinks() or {}) do
-            local n1 = file._wcLookup[dynamicLink.startNode]
-            local n2 = file._wcLookup[dynamicLink.endNode]
-            if n1 and not usedNodes[n1] then queue[#queue + 1] = n1 end
-            if n2 and not usedNodes[n2] then queue[#queue + 1] = n2 end
+        local dynLinks = node:LocateDynamicLinks()
+        if dynLinks then
+            for _, dynamicLink in ipairs(dynLinks) do
+                local n1 = file._wcLookup[dynamicLink.startNode]
+                local n2 = file._wcLookup[dynamicLink.endNode]
+                if n1 and not usedNodes[n1] then queue[#queue + 1] = n1 end
+                if n2 and not usedNodes[n2] then queue[#queue + 1] = n2 end
+            end
         end
     end
 end
 
+---Returns true if the AIN was built for a different BSP revision than the current map.
+---An outdated AIN may have nodes misaligned relative to current geometry.
+---@return boolean
+function meta:IsOutdated()
+    if self._mapVersion == 0x7FFFFFFF then return false end
+    return self._mapVersion ~= NikNaks.CurrentMap:GetMapRevision()
+end
+
 ---Rebuilds zone IDs from node connectivity.
 ---@param self AI_Network
-local function RebuildZones(self)
+function meta:RebuildZones()
     local visited = {}
     local zoneNum = 0
     for _, node in pairs(self._nodes) do
@@ -215,7 +226,7 @@ end
 ---@param overrideRevision boolean -- Will max the map revision, preventing it from being outdated
 ---@return BitBuffer
 function meta:WriteToBuffer(overrideRevision)
-    RebuildZones(self)
+    self:RebuildZones()
     local buffer = NikNaks.BitBuffer.Create()
     buffer:WriteLong(self._version)
     buffer:WriteLong(overrideRevision and 0x7FFFFFFF or NikNaks.CurrentMap:GetMapRevision())
@@ -313,13 +324,11 @@ end
 
 local GRID_SIZE = 1000 -- must match the value in the node file
 
+local _canSeeTr = { start = Vector(), endpos = Vector(), mask = MASK_SOLID_BRUSHONLY }
 local function canSee(pos1, pos2)
-    local tr = util.TraceLine({
-        start = pos1,
-        endpos = pos2,
-        mask = MASK_SOLID_BRUSHONLY,
-    })
-    return not tr.Hit
+    _canSeeTr.start.x  = pos1.x; _canSeeTr.start.y  = pos1.y; _canSeeTr.start.z  = pos1.z
+    _canSeeTr.endpos.x = pos2.x; _canSeeTr.endpos.y = pos2.y; _canSeeTr.endpos.z = pos2.z
+    return not util.TraceLine(_canSeeTr).Hit
 end
 
 ---Returns the nearest node from the grid within a certain distance.
@@ -352,7 +361,8 @@ function meta:FindNearestNode(pos, type, maxDistance, zone)
                 end
                 local np = node:GetPos()
                 if not pvs:TestPosition(np) or not canSee(pos, np) then continue end
-                local dist = (np - pos):LengthSqr()
+                local dx = np.x - pos.x; local dy = np.y - pos.y; local dz = np.z - pos.z
+                local dist = dx*dx + dy*dy + dz*dz
                 if dist < bestDist then
                     bestDist = dist
                     bestNode = node
@@ -389,7 +399,9 @@ function meta:FindNodesByDistance(pos, type, distance)
                         continue
                     end
                 end
-                if (node:GetPos() - pos):LengthSqr() <= distSqr then
+                local np2 = node:GetPos()
+                local dx2 = np2.x - pos.x; local dy2 = np2.y - pos.y; local dz2 = np2.z - pos.z
+                if dx2*dx2 + dy2*dy2 + dz2*dz2 <= distSqr then
                     result[#result + 1] = node
                 end
             end

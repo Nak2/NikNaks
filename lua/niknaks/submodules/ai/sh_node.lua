@@ -236,6 +236,7 @@ function meta:SetPos(vec)
         self._pos = (trace.Hit and not NikNaks.CurrentMap:IsOutsideMap(trace.HitPos))
             and trace.HitPos
             or self._rawpos
+        self:ComputeHullOffsets()
     else
         self._pos = self._rawpos
     end
@@ -396,69 +397,251 @@ local HULL_SAFE_DROP = {
     [NikNaks.HULL.MEDIUM_TALL]    = 150,
 }
 
-local GROUND_TRACE_OFFSET = Vector(0, 0, 10)
+local offset = 5
+local HULL_MINS = {
+    [NikNaks.HULL.HUMAN]          = Vector(-16 - offset, -16 - offset, 0),
+    [NikNaks.HULL.SMALL_CENTERED] = Vector(-12 - offset, -12 - offset, -12),
+    [NikNaks.HULL.WIDE_HUMAN]     = Vector(-24 - offset, -24 - offset, 0),
+    [NikNaks.HULL.TINY]           = Vector(-8 - offset,  -8 - offset,  0),
+    [NikNaks.HULL.WIDE_SHORT]     = Vector(-36 - offset, -36 - offset, 0),
+    [NikNaks.HULL.MEDIUM]         = Vector(-16 - offset, -16 - offset, 0),
+    [NikNaks.HULL.TINY_CENTERED]  = Vector(-8 - offset,  -8 - offset,  -8),
+    [NikNaks.HULL.LARGE]          = Vector(-32 - offset, -32 - offset, 0),
+    [NikNaks.HULL.LARGE_CENTERED] = Vector(-32 - offset, -32 - offset, -32),
+    [NikNaks.HULL.MEDIUM_TALL]    = Vector(-16 - offset, -16 - offset, 0),
+}
+
+local HULL_MAXS = {
+    [NikNaks.HULL.HUMAN]          = Vector(16 + offset,  16 + offset,  72),
+    [NikNaks.HULL.SMALL_CENTERED] = Vector(12 + offset,  12 + offset,  12),
+    [NikNaks.HULL.WIDE_HUMAN]     = Vector(24 + offset,  24 + offset,  72),
+    [NikNaks.HULL.TINY]           = Vector(8 + offset,   8 + offset,   16),
+    [NikNaks.HULL.WIDE_SHORT]     = Vector(36 + offset,  36 + offset,  36),
+    [NikNaks.HULL.MEDIUM]         = Vector(16 + offset,  16 + offset,  36),
+    [NikNaks.HULL.TINY_CENTERED]  = Vector(8 + offset,   8 + offset,   8),
+    [NikNaks.HULL.LARGE]          = Vector(32 + offset,  32 + offset,  80),
+    [NikNaks.HULL.LARGE_CENTERED] = Vector(32 + offset,  32 + offset,  32),
+    [NikNaks.HULL.MEDIUM_TALL]    = Vector(16 + offset,  16 + offset,  60),
+}
+
+-- Flat (pancake) hulls for offset calculation.
+-- SDK InitGroundNodePosition: set maxs.z = mins.z so the disc can't snag on ceilings.
+local HULL_FLAT_MINS = {}
+local HULL_FLAT_MAXS = {}
+for i = 0, NikNaks.HULL.NUM_HULLS - 1 do
+    local mn = HULL_MINS[i]; local mx = HULL_MAXS[i]
+    if mn and mx then
+        HULL_FLAT_MINS[i] = Vector(mn.x, mn.y, mn.z)
+        HULL_FLAT_MAXS[i] = Vector(mx.x, mx.y, mn.z)  -- top = bottom = flat disc
+    end
+end
+
+local _offTr = { start = Vector(), endpos = Vector(), mins = nil, maxs = nil, mask = MASK_NPCSOLID_BRUSHONLY }
+
+---Computes per-hull vertical offsets for this ground node.
+---Mirrors SDK CAI_NetworkBuilder::InitGroundNodePosition (ai_networkmanager.cpp:2524).
+---Stores in node._offsets[hull]: added to node._pos.z to get the hull's actual
+---standing Z (used by CalculatePosition). No-op for air/climb nodes.
+function meta:ComputeHullOffsets()
+    if self._type ~= NikNaks.Path.AI.NodeTypes.Ground then return end
+    local ox = self._pos.x; local oy = self._pos.y; local oz = self._pos.z
+    for hull = 0, NikNaks.HULL.NUM_HULLS - 1 do
+        local mins = HULL_FLAT_MINS[hull]; local maxs = HULL_FLAT_MAXS[hull]
+        if not mins or not maxs then self._offsets[hull] = 0; continue end
+        -- Raise start so disc bottom sits exactly at the node origin (+0.1 epsilon)
+        local startZ = oz - mins.z + 0.1
+        _offTr.start.x  = ox; _offTr.start.y  = oy; _offTr.start.z  = startZ
+        _offTr.endpos.x = ox; _offTr.endpos.y = oy; _offTr.endpos.z = startZ - 384
+        _offTr.mins = mins; _offTr.maxs = maxs
+        local tr = util.TraceHull(_offTr)
+        self._offsets[hull] = not tr.startsolid
+            and (tr.HitPos.z - oz + 0.1)
+            or  (-mins.z + 0.1)  -- fallback: embedded in solid
+    end
+end
+
+-- SDK constants (ai_moveprobe.cpp)
+local STEP_SIZE    = 16      -- LOCAL_STEP_SIZE: distance per step iteration
+local STEP_EPSILON = 0.0625  -- MOVE_HEIGHT_EPSILON: raise above ground to avoid embedding
+
+-- Per-hull step heights based on typical NPC values (SDK StepHeight())
+local HULL_STEP_HEIGHT = {
+    [NikNaks.HULL.HUMAN]          = 18,
+    [NikNaks.HULL.SMALL_CENTERED] = 16,
+    [NikNaks.HULL.WIDE_HUMAN]     = 18,
+    [NikNaks.HULL.TINY]           = 6,
+    [NikNaks.HULL.WIDE_SHORT]     = 16,
+    [NikNaks.HULL.MEDIUM]         = 16,
+    [NikNaks.HULL.TINY_CENTERED]  = 6,
+    [NikNaks.HULL.LARGE]          = 22,
+    [NikNaks.HULL.LARGE_CENTERED] = 0,  -- helicopters/gunships/striders: air nodes only
+    [NikNaks.HULL.MEDIUM_TALL]    = 18,
+}
+local STEP_DOWN_MULT = 2  -- GetStepDownMultiplier(): allows stepping down ramps/slopes
+
+-- Persistent trace tables — reused every call to avoid per-call allocation.
+local _slFwd     = { start = Vector(), endpos = Vector(), mins = nil, maxs = nil, mask = MASK_NPCSOLID_BRUSHONLY }
+local _slStepUp  = { start = Vector(), endpos = Vector(), mins = nil, maxs = nil, mask = MASK_NPCSOLID_BRUSHONLY }
+local _slStepFd  = { start = Vector(), endpos = Vector(), mins = nil, maxs = nil, mask = MASK_NPCSOLID_BRUSHONLY }
+local _slDown    = { start = Vector(), endpos = Vector(), mins = nil, maxs = nil, mask = MASK_NPCSOLID_BRUSHONLY }
+local _slAir     = { start = Vector(), endpos = Vector(), mins = nil, maxs = nil, mask = MASK_NPCSOLID_BRUSHONLY }
+local _slJumpLOS = { start = Vector(), endpos = Vector(),                         mask = MASK_SOLID_BRUSHONLY   }
+
+-- Mirrors SDK CheckStep (ai_moveprobe.cpp).
+-- Advances one step in direction (dx,dy). Attempts step-up if blocked, then drops to ground.
+-- Returns (x, y, z) on success, nil on failure.
+local function checkStep(cx, cy, cz, dx, dy, stepSize, stepH, mins, maxs)
+    local eps = STEP_EPSILON
+    local nx  = cx + dx * stepSize
+    local ny  = cy + dy * stepSize
+
+    -- Forward trace at +epsilon height (2D sweep, Z held constant)
+    _slFwd.start.x  = cx; _slFwd.start.y  = cy; _slFwd.start.z  = cz + eps
+    _slFwd.endpos.x = nx; _slFwd.endpos.y = ny; _slFwd.endpos.z = cz + eps
+    _slFwd.mins = mins; _slFwd.maxs = maxs
+    local fwd = util.TraceHull(_slFwd)
+    if fwd.startsolid then return nil end
+
+    local landX, landY, landZ
+
+    if fwd.Fraction < 1.0 then
+        -- Blocked: trace up from the obstruction, then retry forward from raised height
+        local bx = fwd.HitPos.x; local by = fwd.HitPos.y
+
+        _slStepUp.start.x  = bx; _slStepUp.start.y  = by; _slStepUp.start.z  = cz + eps
+        _slStepUp.endpos.x = bx; _slStepUp.endpos.y = by; _slStepUp.endpos.z = cz + eps + stepH
+        _slStepUp.mins = mins; _slStepUp.maxs = maxs
+        local up      = util.TraceHull(_slStepUp)
+        local raisedZ = up.HitPos.z
+
+        _slStepFd.start.x  = bx; _slStepFd.start.y  = by; _slStepFd.start.z  = raisedZ
+        _slStepFd.endpos.x = nx; _slStepFd.endpos.y = ny; _slStepFd.endpos.z = raisedZ
+        _slStepFd.mins = mins; _slStepFd.maxs = maxs
+        local sf = util.TraceHull(_slStepFd)
+        if sf.startsolid or sf.Fraction <= 0.01 then return nil end
+
+        landX = sf.HitPos.x; landY = sf.HitPos.y; landZ = raisedZ
+    else
+        landX = nx; landY = ny; landZ = cz + eps
+    end
+
+    -- Drop to find ground (max = stepH * STEP_DOWN_MULT below the step's start Z)
+    _slDown.start.x  = landX; _slDown.start.y  = landY; _slDown.start.z  = landZ
+    _slDown.endpos.x = landX; _slDown.endpos.y = landY; _slDown.endpos.z = cz - stepH * STEP_DOWN_MULT - eps
+    _slDown.mins = mins; _slDown.maxs = maxs
+    local down = util.TraceHull(_slDown)
+    if down.Fraction == 1.0 then return nil end  -- no ground below
+
+    return landX, landY, down.HitPos.z + eps
+end
+
+-- Mirrors SDK TestGroundMove (ai_moveprobe.cpp): iterative step simulation.
+-- Returns true if the hull can walk from srcPos to destPos.
+local function testGroundMove(srcPos, destPos, mins, maxs, stepH)
+    local sx = srcPos.x; local sy = srcPos.y; local sz = srcPos.z
+    local ex = destPos.x; local ey = destPos.y; local ez = destPos.z
+
+    local dx    = ex - sx; local dy = ey - sy
+    local dist2D = math.sqrt(dx*dx + dy*dy)
+    if dist2D < 0.001 then
+        return math.abs(ez - sz) <= math.max(maxs.z * 0.5, stepH + 0.1)
+    end
+    local inv = 1.0 / dist2D
+    dx = dx * inv; dy = dy * inv
+
+    local cx = sx; local cy = sy; local cz = sz
+    local walked = 0
+
+    while walked < dist2D do
+        local ss      = math.min(STEP_SIZE, dist2D - walked)
+        local nx, ny, nz = checkStep(cx, cy, cz, dx, dy, ss, stepH, mins, maxs)
+        if not nx then return false end
+        cx = nx; cy = ny; cz = nz
+        walked = walked + ss
+    end
+
+    -- SDK final check: verify we arrived near the target Z, not on a ledge above/below
+    return math.abs(cz - ez) <= math.max(maxs.z * 0.5, stepH + 0.1)
+end
 
 ---@class AI_SmartLinkResult
 ---@field hull HULL
 ---@field move AI_MOVE_FLAGS
 
 ---Calculates what links would be created between two positions without applying them.
+---Mirrors SDK CAI_NetworkBuilder::ComputeConnection (ai_networkmanager.cpp).
 ---@param posA Vector
 ---@param posB Vector
----@param isAir boolean?  -- true if either node is an air node
+---@param isAir boolean?  -- true if BOTH nodes are air nodes
 ---@return AI_SmartLinkResult[]
 function NikNaks.Path.AI.CalculateSmartLink(posA, posB, isAir)
-    local heightDiff = posA.z - posB.z
-    local results = {}
+    local results  = {}
+    local NUM      = NikNaks.HULL.NUM_HULLS - 1
+    local FLY      = NikNaks.Path.AI.MoveFlags.Fly
+    local GROUND   = NikNaks.Path.AI.MoveFlags.Ground
+    local JUMP     = NikNaks.Path.AI.MoveFlags.Jump
 
-    for hull = 0, NikNaks.HULL.NUM_HULLS - 1 do
-        local mins = HULL_MINS[hull]
-        local maxs = HULL_MAXS[hull]
+    if isAir then
+        -- SDK: air→air only, direct clearance trace per hull, no ground simulation
+        for hull = 0, NUM do
+            local mins = HULL_MINS[hull]; local maxs = HULL_MAXS[hull]
+            if not mins or not maxs then continue end
+            _slAir.start.x  = posA.x; _slAir.start.y  = posA.y; _slAir.start.z  = posA.z
+            _slAir.endpos.x = posB.x; _slAir.endpos.y = posB.y; _slAir.endpos.z = posB.z
+            _slAir.mins = mins; _slAir.maxs = maxs
+            local tr = util.TraceHull(_slAir)
+            if not tr.startsolid and tr.Fraction == 1.0 then
+                results[#results + 1] = { hull = hull, move = FLY }
+            end
+        end
+        return results
+    end
+
+    -- Ground pass: find every hull that can walk the path
+    local groundHulls = {}
+    local anyGround   = false
+    for hull = 0, NUM do
+        local mins = HULL_MINS[hull]; local maxs = HULL_MAXS[hull]
         if not mins or not maxs then continue end
+        local stepH = HULL_STEP_HEIGHT[hull] or 18
+        if testGroundMove(posA, posB, mins, maxs, stepH) then
+            groundHulls[hull] = true
+            anyGround = true
+        end
+    end
 
-        local raisedA = posA + GROUND_TRACE_OFFSET
-        local raisedB = posB + GROUND_TRACE_OFFSET
+    if anyGround then
+        -- At least one hull walks: only emit Ground results, never Jump.
+        -- SDK: jump is only tried when ground walk fails; here we extend that to
+        -- the whole pair — if the path is walkable at all, jump is not needed.
+        for hull, _ in pairs(groundHulls) do
+            results[#results + 1] = { hull = hull, move = GROUND }
+        end
+    else
+        -- No hull can walk: try Jump for each hull independently.
+        -- SDK approximation: height within NPC range AND path is clear.
+        local heightDiff = posA.z - posB.z  -- positive = dropping A→B
+        local peakZ      = math.max(posA.z, posB.z) + 48
+        local jumpUp     = 200  -- approximate max upward jump for most NPCs
 
-        if util.TraceHull({
-            start  = raisedA,
-            endpos = raisedB,
-            mins   = mins,
-            maxs   = maxs,
-            mask   = MASK_NPCSOLID,
-        }).Hit then continue end
-
-        local move = NikNaks.Path.AI.MoveFlags.None
-
-        if isAir then
-            move = NikNaks.Path.AI.MoveFlags.Fly
-        elseif math.abs(heightDiff) > (HULL_SAFE_DROP[hull] or 150) then
-            move = NikNaks.Path.AI.MoveFlags.Jump
-        else
-            local diff   = raisedB - raisedA
-            local dist   = diff:Length()
-            local step   = math.max(maxs.x - mins.x, 32)
-            local steps  = math.max(math.floor(dist / step), 1)
-            local hasGap = false
-
-            for i = 1, steps - 1 do
-                local samplePos = raisedA + diff * (i / steps)
-                if not util.TraceHull({
-                    start  = samplePos,
-                    endpos = samplePos - Vector(0, 0, 74),
-                    mins   = Vector(mins.x, mins.y, 0),
-                    maxs   = Vector(maxs.x, maxs.y, 4),
-                    mask   = MASK_SOLID_BRUSHONLY,
-                }).Hit then
-                    hasGap = true
-                    break
+        -- LOS from slightly above ground: fast single check that rejects jumps
+        -- through walls before doing the more expensive per-hull arc traces.
+        _slJumpLOS.start.x  = posA.x; _slJumpLOS.start.y  = posA.y; _slJumpLOS.start.z  = posA.z + 32
+        _slJumpLOS.endpos.x = posB.x; _slJumpLOS.endpos.y = posB.y; _slJumpLOS.endpos.z = posB.z + 32
+        if not util.TraceLine(_slJumpLOS).Hit then
+            for hull = 0, NUM do
+                local mins = HULL_MINS[hull]; local maxs = HULL_MAXS[hull]
+                if not mins or not maxs then continue end
+                local drop = HULL_SAFE_DROP[hull] or 150
+                if heightDiff < -jumpUp or heightDiff > drop then continue end
+                _slAir.start.x  = posA.x; _slAir.start.y  = posA.y; _slAir.start.z  = peakZ
+                _slAir.endpos.x = posB.x; _slAir.endpos.y = posB.y; _slAir.endpos.z = peakZ
+                _slAir.mins = mins; _slAir.maxs = maxs
+                local arc = util.TraceHull(_slAir)
+                if not arc.startsolid and arc.Fraction == 1.0 then
+                    results[#results + 1] = { hull = hull, move = JUMP }
                 end
             end
-
-            move = hasGap and NikNaks.Path.AI.MoveFlags.Jump or NikNaks.Path.AI.MoveFlags.Ground
-        end
-
-        if move ~= NikNaks.Path.AI.MoveFlags.None then
-            results[#results + 1] = { hull = hull, move = move }
         end
     end
 
@@ -468,8 +651,9 @@ end
 ---Automatically creates smart links between two nodes.
 ---@param other AI_Node
 function meta:SmartLink(other)
+    -- SDK (ai_networkmanager.cpp ComputeConnection): fly links only form when BOTH nodes are air.
     local isAir = self._type == NikNaks.Path.AI.NodeTypes.Air
-        or other._type == NikNaks.Path.AI.NodeTypes.Air
+        and other._type == NikNaks.Path.AI.NodeTypes.Air
 
     local results = NikNaks.Path.AI.CalculateSmartLink(self:GetPos(), other:GetPos(), isAir)
     for _, r in ipairs(results) do

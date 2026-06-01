@@ -95,7 +95,7 @@ NikNaks.AutoInclude("niknaks/modules/sh_bsp_trace.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_sound_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_datapackage.lua")
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
-NikNaks.AutoInclude("niknaks/modules/sh_path.lua")
+NikNaks.AutoInclude("niknaks/submodules/sh_submodules.lua")
 
 NikNaks.Msg(Color(0, 255, 100), "NikNaks ", Color(255, 255, 255), NikNaks.VERSION, Color(0, 255, 100), " loaded.")
 

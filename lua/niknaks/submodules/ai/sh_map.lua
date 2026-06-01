@@ -87,7 +87,7 @@ local function isUseful(data)
     if n == 0 then return false end
     if n > 1 then return true end
     local e = data.entities[1]
-    return e.classname ~= "info_node" and e.classname ~= "info_node_air"
+    return e.classname ~= "info_node" and e.classname ~= "info_node_air" and e.classname ~= "info_node_climb"
 end
 
 local NodeClasses = {
@@ -303,9 +303,12 @@ function NikNaks.Path.AI.GetHintType(BSPEntity)
         hinttypeLookup[type] or "Unknown"
 end
 
----Returns the hinttype for the given BSPEntity ( If any )
+---Returns the hint name for the given BSPEntity ( If any )
 ---@param BSPEntity BSPEntity
 ---@return string
 function NikNaks.Path.AI.GetHintName(BSPEntity)
-    return hinttypeLookup[NikNaks.Path.AI.GetHintType(BSPEntity)] or "Unknown"
+    local htype = BSPEntity.hinttype --[[@as integer?]]
+    return htype == nil and "None" or
+        obsoleteNotes[htype] and "Obsolete" or
+        hinttypeLookup[htype] or "Unknown"
 end
