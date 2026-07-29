@@ -968,6 +968,15 @@ end
 
 -- Visibility, leafbrush and leaf functions
 do
+	local corrupt = false
+
+	--- Will return true if the visibility data in the map is corrupted.
+	--- Requires the visibility lump to be read first.
+	---@return boolean
+	function meta:IsVisibilityCorrupted()
+		return corrupt
+	end
+
 	--- Returns the visibility data.
 	--- @return VisibilityInfo
 	function meta:GetVisibility()
@@ -976,21 +985,27 @@ do
 		local data = self:GetLump(4)
 		local num_clusters = data:ReadLong()
 
-		-- Check to see if the num_clusters match
-		local expected_clusters = self:GetLeafsNumClusters()
-		if num_clusters ~= expected_clusters then
-			-- Warn the user that visibility may be broken, but continue to read the data anyway.
-			ErrorNoHalt(string.format(
-				"[NikNaks] Warning: Number of clusters in visibility lump (%d) does not match number of clusters in leafs (%d). Visibility data may be broken and will most definitely cause unexpected behavior.",
-				num_clusters, expected_clusters
-			))
-		end
-
 		--- @class VisibilityInfo
 		--- @field VisData VisbilityData[] # Visibility data
 		--- @field num_clusters number # Number of clusters
 		local t = { VisData = {} }
 		local visData = t.VisData
+
+		-- Check to see if the num_clusters match
+		local expected_clusters = self:GetLeafsNumClusters()
+		if num_clusters ~= expected_clusters then
+			corrupt = true
+			-- Warn the user that visibility may be broken, but continue to read the data anyway.
+			ErrorNoHalt(string.format(
+				"[NikNaks] Warning: Number of clusters in visibility lump (%d) does not match number of clusters in leafs (%d). Visibility data may be broken and will most definitely cause unexpected behavior.",
+				num_clusters, expected_clusters
+			))
+
+			-- Insert dummy clusters
+			for i = 0, math.max(num_clusters, expected_clusters) - 1 do
+				visData[i] = { PVS = 0, PAS = 0 }
+			end
+		end
 
 		for i = 0, num_clusters - 1 do
 			--- @class VisbilityData
