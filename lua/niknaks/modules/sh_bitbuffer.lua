@@ -7,7 +7,7 @@ local band, brshift, blshift, bor, bswap = bit.band, bit.rshift, bit.lshift, bit
 local log, ldexp, frexp, floor, ceil, max, setmetatable, source = math.log, math.ldexp, math.frexp, math.floor, math
 	.ceil, math.max, setmetatable, jit.util.funcinfo(NikNaks.AutoInclude)["source"]
 
---- Creates a new BitBuffer. 
+--- Creates a new BitBuffer.
 ---@overload fun(data: string|table?, little_endian: boolean?) : BitBuffer
 NikNaks.BitBuffer = {}
 
@@ -163,7 +163,7 @@ do
 	---@param num number
 	---@return self
 	function meta:Seek(num)
-		self._tell = bit.bor(num, 0)
+		self._tell = bor(num, 0)
 		return self
 	end
 
@@ -207,50 +207,76 @@ do
 	end
 	NikNaks.BitBuffer.ToBits = toBits
 
+	local function toChar(b)
+		return (b >= 32 and b <= 126) and string.char(b) or "."
+	end
+
 	--- Debug print function for the bitbuffer.
+	---@param maxRows number? Maximum number of rows to display. Default is 10.
 	function meta:Debug(maxRows)
 		maxRows = maxRows or 10
+
 		local size = string.NiceSize(self._len / 8)
-		local rep = string.rep("=", (32 - (#size + 6)) / 2)
-		print("BitBuff  " ..
-			rep .. " [" .. size .. "] " .. (self:IsLittleEndian() and "Le " or "Be ") .. rep .. "\t= 0xHX =\t= CHAR =")
+		local startTell = self:Tell()
+		local bitOffset = startTell % 8
 
-		local lines = math.ceil(self._len / 32)
-		local foundData = nil
+		-- Alignment info
+		local alignStr = bitOffset == 0 and "aligned" or ("misaligned +" .. bitOffset .. "b")
 
-		for i = 1, lines do
-			if not foundData then
-				if not self._data[i] then continue end
-				foundData = i
-			elseif i > foundData + maxRows then
-				break
-			end
+		-- Header
+		local label = " [" .. size .. "] " .. (self:IsLittleEndian() and "LE" or "BE") .. " | " .. alignStr .. " "
+		local totalWidth = 72
+		local padTotal = totalWidth - #label
+		local padL = math.floor(padTotal / 2)
+		local padR = padTotal - padL
+		print(string.rep("=", padL) .. label .. string.rep("=", padR))
+		print(string.format("  %-14s  %-35s  %-11s  %s", "byte", "bits (4 bytes)", "hex", "char"))
+		print(string.rep("-", 72))
 
-			local bits, hex, chars
-
-			if not self._data[i] then
-				bits  = "00000000000000000000000000000000"
-				hex   = "00000000"
-				chars = "...."
+		local function fmtBytePos(bitPos)
+			local byte = math.floor(bitPos / 8)
+			if bitOffset == 0 then
+				return string.format("%d", byte)
 			else
-				local word = self._data[i]
-				bits = toBits(word, 32)
-				hex  = bit.tohex(word):upper()
+				return string.format("%d+%db", byte, bitOffset)
+			end
+		end
 
-				local b1 = bit.rshift(bit.band(word, 0xFF000000), 24)
-				local b2 = bit.rshift(bit.band(word, 0x00FF0000), 16)
-				local b3 = bit.rshift(bit.band(word, 0x0000FF00),  8)
-				local b4 =             bit.band(word, 0x000000FF)
+		for i = 1, maxRows do
+			local bytesLeft = math.ceil((self._len - self._tell) / 8)
+			if bytesLeft <= 0 then break end
 
-				local function toChar(b)
-					return (b >= 32 and b <= 126) and string.char(b) or "."
-				end
-
-				chars = toChar(b1) .. toChar(b2) .. toChar(b3) .. toChar(b4)
+			local b = {}
+			local valid = {}
+			for j = 1, 4 do
+				valid[j] = bytesLeft >= j
+				b[j] = valid[j] and self:ReadByte() or 0
 			end
 
-			print(i * 4 - 4, bits, hex, "  " .. chars)
+			local bitsStr = ""
+			for j = 1, 4 do
+				bitsStr = bitsStr .. (valid[j] and toBits(b[j], 8) or "........") .. " "
+			end
+
+			local hexStr = ""
+			for j = 1, 4 do
+				hexStr = hexStr .. (valid[j] and string.format("%02X ", b[j]) or ".. ")
+			end
+
+			local charStr = ""
+			for j = 1, 4 do
+				charStr = charStr .. (valid[j] and toChar(b[j]) or ".")
+			end
+
+			local rowBitPos = startTell + (i - 1) * 32
+			local rowMarker = i == 1 and ">" or " "
+
+			print(string.format("%s %-14s  %-35s  %-11s  %s",
+				rowMarker, fmtBytePos(rowBitPos), bitsStr, hexStr, charStr))
 		end
+
+		print(string.rep("=", 72))
+		self:Seek(startTell)
 	end
 
 	--- Returns true if the bitbuffer is little-endian.
@@ -281,7 +307,7 @@ do
 end
 
 -- Write / Read Raw
-local writeraw, readraw
+local writeraw, readraw, writeraw32, readraw32
 do
 	-- Need to check endian type here.
 	-- B |--|--|FF|11|
@@ -370,6 +396,51 @@ do
 		return bor(data1, data2)
 	end
 
+	-- Raw (endian-agnostic) 32-bit word read/write. Same bit-merge math as readraw/writeraw
+	-- with bits=32, but skips the little-endian swap check -- used to batch-move whole
+	-- 4-byte groups (Read/ReadData/Write/WriteData) without a per-byte function call.
+
+	---@param self BitBuffer
+	---@return number
+	function readraw32(self)
+		local tell = self._tell
+		self._tell = tell + 32
+
+		local i_word = rshift(tell, 5) + 1
+		local bitPos = tell % 32
+
+		if bitPos == 0 then
+			return self._data[i_word] or 0x0
+		end
+
+		local data1 = lshift(band(self._data[i_word] or 0x0, rshift(b_mask, bitPos)), bitPos)
+		local data2 = rshift(self._data[i_word + 1] or 0x0, 32 - bitPos)
+		return bor(data1, data2)
+	end
+
+	---@param self BitBuffer
+	---@param int number
+	function writeraw32(self, int)
+		local tell = self._tell
+		self._tell = tell + 32
+		self._len = max(self._len, self._tell)
+
+		local i_word = rshift(tell, 5) + 1
+		local bitPos = tell % 32
+
+		if bitPos == 0 then
+			self._data[i_word] = int
+			return
+		end
+
+		local mask = lshift(b_mask, 32 - bitPos)
+		local data = band(self._data[i_word] or 0x0, mask)
+		self._data[i_word] = bor(data, rshift(int, bitPos))
+
+		data = band(rshift(b_mask, bitPos), self._data[i_word + 1] or 0x0)
+		self._data[i_word + 1] = bor(data, lshift(int, 32 - bitPos))
+	end
+
 	if not source:find("niknak") then return end
 end
 
@@ -423,6 +494,8 @@ do
 	end
 end
 
+local pow32 = math.pow(2, 32)
+
 -- 32 bit Int
 do
 	meta.WriteInt = writeraw
@@ -439,15 +512,13 @@ end
 do
 	meta.WriteUInt = writeraw
 
-	local c = math.pow(2, 32)
-
 	--- Reads an unsigned int.
 	---@param bits number
 	---@return number
 	function meta:ReadUInt(bits)
 		local n = readraw(self, bits)
 		if n > -1 then return n end -- 32bit numbers could be negative when reading.
-		return n + c
+		return n + pow32
 	end
 end
 
@@ -474,14 +545,14 @@ do
 	---@param byte number
 	---@return BitBuffer self
 	function meta:WriteSignedByte(byte)
-		self:WriteInt(byte, 8)
+		writeraw(self, byte, 8)
 		return self
 	end
 
 	--- Reads a signed byte. ( -128 - 127 )
 	---@return number
 	function meta:ReadSignedByte()
-		return self:ReadInt(8)
+		return to_signed(readraw(self, 8), 8)
 	end
 end
 
@@ -491,14 +562,14 @@ do
 	---@param num number
 	---@return BitBuffer self
 	function meta:WriteUShort(num)
-		self:WriteUInt(num, 16)
+		writeraw(self, num, 16)
 		return self
 	end
 
 	--- Reads an unsigned 2 byte number. ( 0 - 65535 )
 	---@return number
 	function meta:ReadUShort()
-		return self:ReadUInt(16)
+		return readraw(self, 16)
 	end
 end
 
@@ -508,14 +579,14 @@ do
 	---@param num number
 	---@return BitBuffer self
 	function meta:WriteShort(num)
-		self:WriteInt(num, 16)
+		writeraw(self, num, 16)
 		return self
 	end
 
 	--- Reads a 2-byte signed number. ( -32768 - 32767 )
 	---@return number
 	function meta:ReadShort()
-		return self:ReadInt(16)
+		return to_signed(readraw(self, 16), 16)
 	end
 end
 
@@ -525,14 +596,16 @@ do
 	---@param num number
 	---@return self BitBuffer
 	function meta:WriteULong(num)
-		self:WriteUInt(num, 32)
+		writeraw(self, num, 32)
 		return self
 	end
 
 	--- Reads an unsigned 4 byte number ( 0 - 4294967295 )
 	---@return number
 	function meta:ReadULong()
-		return self:ReadUInt(32)
+		local n = readraw(self, 32)
+		if n > -1 then return n end
+		return n + pow32
 	end
 end
 
@@ -542,14 +615,14 @@ do
 	---@param num number
 	---@return BitBuffer self
 	function meta:WriteLong(num)
-		self:WriteInt(num, 32)
+		writeraw(self, num, 32)
 		return self
 	end
 
 	--- Reads a 4 byte number. ( -2147483648 - 2147483647 )
 	---@return number
 	function meta:ReadLong()
-		return self:ReadInt(32)
+		return to_signed(readraw(self, 32), 32)
 	end
 end
 
@@ -559,14 +632,14 @@ do
 	---@param num number
 	---@return BitBuffer self
 	function meta:WriteNibble(num)
-		self:WriteUInt(num, 4)
+		writeraw(self, num, 4)
 		return self
 	end
 
 	--- Reads a 4 bit unsigned number. ( 0 - 15 )
 	---@return number
 	function meta:ReadNibble()
-		return self:ReadUInt(4)
+		return readraw(self, 4)
 	end
 end
 
@@ -576,14 +649,14 @@ do
 	---@param num number
 	---@return BitBuffer self
 	function meta:WriteSnort(num)
-		self:WriteUInt(num, 2)
+		writeraw(self, num, 2)
 		return self
 	end
 
 	--- Reads a 2 bit unsigned number. ( 0 - 3 )
 	---@return number
 	function meta:ReadSnort()
-		return self:ReadUInt(2)
+		return readraw(self, 2)
 	end
 end
 
@@ -762,20 +835,73 @@ end
 
 -- Data
 do
-	--- Writes raw string-data.
+	--- Writes `len` bytes of `str`, packing each 4-byte group MSB-first (byte 1 = top byte).
+	---@param self BitBuffer
 	---@param str string
-	---@return BitBuffer self
-	function meta:Write(str)
-		local len = #str
+	---@param len number
+	local function writeBytesBE(self, str, len)
 		local q = lshift(rshift(len, 2), 2)
 
 		for i = 1, q, 4 do
 			local a, b, c, d = s_byte(str, i, i + 3)
-			self:WriteUInt(bor(lshift(a, 24), lshift(b, 16), lshift(c, 8), d), 32)
+			writeraw32(self, bor(lshift(a, 24), lshift(b, 16), lshift(c, 8), d))
 		end
 
 		for i = q + 1, len do
 			self:WriteUInt(s_byte(str, i), 8)
+		end
+	end
+
+	--- Writes `len` bytes of `str`, packing each 4-byte group reversed (byte 1 = bottom byte).
+	---@param self BitBuffer
+	---@param str string
+	---@param len number
+	local function writeBytesLE(self, str, len)
+		local q = lshift(rshift(len, 2), 2)
+
+		for i = 1, q, 4 do
+			local a, b, c, d = s_byte(str, i, i + 3)
+			writeraw32(self, bswap(bor(lshift(a, 24), lshift(b, 16), lshift(c, 8), d)))
+		end
+
+		for i = q + 1, len do
+			self:WriteUInt(s_byte(str, i), 8)
+		end
+	end
+
+	--- Reads `bytes` raw bytes back out (endian-agnostic; matches writeBytesBE's byte order).
+	---@param self BitBuffer
+	---@param bytes number
+	---@return string
+	local function readBytesRaw(self, bytes)
+		local q = lshift(rshift(bytes, 2), 2)
+		local parts, n = {}, 0
+
+		-- Pull a whole 4-byte group in one raw 32-bit read instead of 4 separate
+		-- ReadByte calls, then unpack it locally (same trick as IntToString).
+		for _ = 1, q, 4 do
+			local w = readraw32(self)
+			n = n + 1
+			parts[n] = s_char(brshift(w, 24), band(brshift(w, 16), 0xFF), band(brshift(w, 8), 0xFF), band(w, 0xFF))
+		end
+
+		local ReadByte = meta.ReadByte
+		for _ = q + 1, bytes do
+			n = n + 1
+			parts[n] = s_char(ReadByte(self))
+		end
+
+		return table.concat(parts)
+	end
+
+	--- Writes raw string-data.
+	---@param str string
+	---@return BitBuffer self
+	function meta:Write(str)
+		if self._little_endian then
+			writeBytesLE(self, str, #str)
+		else
+			writeBytesBE(self, str, #str)
 		end
 
 		return self
@@ -786,40 +912,14 @@ do
 	---@return string
 	function meta:Read(bytes)
 		bytes = bytes or math.ceil((self:Size() - self:Tell()) / 8)
-
-		local ReadByte = meta.ReadByte
-		local c, s = lshift(rshift(bytes, 2), 2), ""
-
-		for _ = 1, c, 4 do
-			s = s .. s_char(ReadByte(self), ReadByte(self), ReadByte(self), ReadByte(self))
-		end
-
-		for _ = c + 1, bytes do
-			s = s .. s_char(ReadByte(self))
-		end
-
-		return s
+		return readBytesRaw(self, bytes)
 	end
 
 	--- Writes raw bytes directly, ignoring the endianness setting.
 	---@param str string
 	---@return BitBuffer
 	function meta:WriteData(str)
-		local len = #str
-		local q = lshift(rshift(len, 2), 2)
-
-		for i = 1, q, 4 do
-			local a, b, c, d = s_byte(str, i, i + 3)
-			self:WriteByte(a)
-			self:WriteByte(b)
-			self:WriteByte(c)
-			self:WriteByte(d)
-		end
-
-		for i = q + 1, len do
-			self:WriteByte(s_byte(str, i))
-		end
-
+		writeBytesBE(self, str, #str)
 		return self
 	end
 
@@ -827,18 +927,7 @@ do
 	---@param bytes number
 	---@return string
 	function meta:ReadData(bytes)
-		local ReadByte = meta.ReadByte
-		local c, s = lshift(rshift(bytes, 2), 2), ""
-
-		for _ = 1, c, 4 do
-			s = s .. s_char(ReadByte(self), ReadByte(self), ReadByte(self), ReadByte(self))
-		end
-
-		for _ = c + 1, bytes do
-			s = s .. s_char(ReadByte(self))
-		end
-
-		return s
+		return readBytesRaw(self, bytes)
 	end
 
 end
@@ -885,17 +974,20 @@ do
 	function meta:ReadStringNull(maxLength)
 		maxLength = maxLength or ceil((self:Size() - self:Tell()) / 8)
 
-		local str = ""
-		if maxLength < 1 then return str end
+		if maxLength < 1 then return "" end
 
-		local c = self:ReadByte()
+		local ReadByte = meta.ReadByte
+		local parts, n = {}, 0
+
+		local c = ReadByte(self)
 		while c ~= 0 and maxLength > 0 do
-			str = str .. s_char(c)
-			c = self:ReadByte()
+			n = n + 1
+			parts[n] = s_char(c)
+			c = ReadByte(self)
 			maxLength = maxLength - 1
 		end
 
-		return str
+		return table.concat(parts)
 	end
 
 	--- Writes a Vector.
