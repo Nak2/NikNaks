@@ -6,7 +6,7 @@ local obj_tostring = "BSP %s [ %s ]"
 local format, clamp, min, max = string.format, math.Clamp, math.min, math.max
 
 --- @class BSPObject
---- @field _dispFaceLeaf table<number, BSPFaceObject>
+--- @field _dispFaceLeaf table<number, BSPFaceObject[]> Leaf index -> list of displacement faces touching it.
 local meta = NikNaks.__metatables["BSP"]
 
 --- @class BSPLeafObject
@@ -314,7 +314,7 @@ function meta_leaf:GetFaces(includeDisplacment)
 	-- Build displacement-inclusive list
 	--- Displacments aren't included in leafs, we need to manually add them.
 	if(not self.__map._dispFaceLeaf) then
-		--- @type table<number, BSPFaceObject>
+		--- @type table<number, BSPFaceObject[]>
 		self.__map._dispFaceLeaf = {}
 		for key, value in pairs(self.__map:GetDisplacmentFaces()) do
 			local vertexs = value:GetVertexs()

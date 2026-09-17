@@ -27,13 +27,14 @@ end
 --#region Filters
 
 --- Keeps only elements for which the predicate returns true.
----@param predicate fun(v: any, k: any): boolean
+---@param predicate fun(v: any, ...): boolean
+---@param ... any Extra arguments forwarded to the predicate function.
 ---@return self
-function t:Where(predicate)
+function t:Where(predicate, ...)
     local tbl = {}
-    for k, v in pairs(self.tbl) do
-        if predicate(v, k) then
-            table.insert(tbl, v)
+    for _, v in pairs(self.tbl) do
+        if predicate(v, ...) then
+            tbl[#tbl + 1] = v
         end
     end
     self.tbl = tbl
@@ -41,16 +42,19 @@ function t:Where(predicate)
 end
 
 --- Transforms each element using the selector. If the selector returns multiple values they are wrapped in a table.
----@param selector fun(v: any, k: any): any
+---
+--- Extra arguments after `selector` are forwarded to it on every call
+---@param selector fun(v: any, ...): any
+---@param ... any Extra arguments forwarded to the selector function.
 ---@return self
-function t:Select(selector)
+function t:Select(selector, ...)
     local tbl = {}
-    for k, v in pairs(self.tbl) do
-        local a, b, c, d, e, f = selector(v, k)
+    for _, v in pairs(self.tbl) do
+        local a, b, c, d, e, f = selector(v, ...)
         if b == nil then
-            table.insert(tbl, a)
+            tbl[#tbl + 1] = a
         else
-            table.insert(tbl, {a, b, c, d, e, f})
+            tbl[#tbl + 1] = {a, b, c, d, e, f}
         end
     end
     self.tbl = tbl
@@ -64,7 +68,7 @@ function t:SelectMany(selector)
     local tbl = {}
     for k, v in pairs(self.tbl) do
         for _, value in ipairs({selector(v, k)}) do
-            table.insert(tbl, value)
+            tbl[#tbl + 1] = value
         end
     end
     self.tbl = tbl
@@ -72,15 +76,13 @@ function t:SelectMany(selector)
 end
 
 ---Filters the table based on the given type.
----
----**Warning:** This function is slow and should be used sparingly.
 ---@param strType string
 ---@return self
 function t:OfType(strType)
     local tbl = {}
     for _, v in pairs(self.tbl) do
         if strType == type(v) then
-            table.insert(tbl, v)
+            tbl[#tbl + 1] = v
         end
     end
     self.tbl = tbl
@@ -88,15 +90,18 @@ function t:OfType(strType)
 end
 
 ---Filters the table based on the given types.
----
----**Warning:** This function is slow and should be used sparingly.
 ---@param types table<string>
 ---@return self
 function t:OfTypes(types)
+    local set = {}
+    for _, ty in pairs(types) do
+        set[ty] = true
+    end
+
     local tbl = {}
     for _, v in pairs(self.tbl) do
-        if table.HasValue(types, type(v)) then
-            table.insert(tbl, v)
+        if set[type(v)] then
+            tbl[#tbl + 1] = v
         end
     end
     self.tbl = tbl
@@ -108,11 +113,15 @@ end
 --#region Variables
 
 --- Returns the first element that satisfies the predicate, or nil if none match.
----@param predicate fun(v: any, k: any): boolean
+---
+--- Extra arguments after `predicate` are forwarded to it on every call, same as Where() -- see its
+--- note on avoiding a fresh per-call closure.
+---@param predicate fun(v: any, ...): boolean
+---@param ... any Extra arguments forwarded to the predicate function.
 ---@return any
-function t:Single(predicate)
-    for k, v in pairs(self.tbl) do
-        if predicate(v, k) then
+function t:Single(predicate, ...)
+    for _, v in pairs(self.tbl) do
+        if predicate(v, ...) then
             return v
         end
     end
@@ -120,12 +129,12 @@ function t:Single(predicate)
 end
 
 --- Returns the first matching element, or `default` if none satisfy the predicate.
----@param predicate fun(v: any, k: any): boolean
+---@param predicate fun(v: any): boolean
 ---@param default any
 ---@return any
 function t:SingleOrDefault(predicate, default)
-    for k, v in pairs(self.tbl) do
-        if predicate(v, k) then
+    for _, v in pairs(self.tbl) do
+        if predicate(v) then
             return v
         end
     end
@@ -133,11 +142,11 @@ function t:SingleOrDefault(predicate, default)
 end
 
 --- Returns true if at least one element satisfies the predicate.
----@param predicate fun(v: any, k: any): boolean
+---@param predicate fun(v: any): boolean
 ---@return boolean
 function t:Any(predicate)
-    for k, v in pairs(self.tbl) do
-        if predicate(v, k) then
+    for _, v in pairs(self.tbl) do
+        if predicate(v) then
             return true
         end
     end
@@ -145,11 +154,11 @@ function t:Any(predicate)
 end
 
 --- Returns true if every element satisfies the predicate.
----@param predicate fun(v: any, k: any): boolean
+---@param predicate fun(v: any): boolean
 ---@return boolean
 function t:All(predicate)
-    for k, v in pairs(self.tbl) do
-        if not predicate(v, k) then
+    for _, v in pairs(self.tbl) do
+        if not predicate(v) then
             return false
         end
     end
@@ -287,9 +296,9 @@ function t:Chunk(size)
     local chunk = {}
     local num = #self.tbl
     for i = 1, num do
-        table.insert(chunk, self.tbl[i])
+        chunk[#chunk + 1] = self.tbl[i]
         if i % size == 0 or i == num then
-            table.insert(result, chunk)
+            result[#result + 1] = chunk
             chunk = {}
         end
     end
@@ -309,7 +318,7 @@ end
 function t:Reverse()
     local tbl = {}
     for i = #self.tbl, 1, -1 do
-        table.insert(tbl, self.tbl[i])
+        tbl[#tbl + 1] = self.tbl[i]
     end
     self.tbl = tbl
     return self
@@ -319,9 +328,11 @@ end
 ---@return self
 function t:Distinct()
     local tbl = {}
-    for k, v in pairs(self.tbl) do
-        if not table.HasValue(tbl, v) then
-            table.insert(tbl, v)
+    local seen = {}
+    for _, v in pairs(self.tbl) do
+        if not seen[v] then
+            seen[v] = true
+            tbl[#tbl + 1] = v
         end
     end
     self.tbl = tbl
@@ -332,9 +343,14 @@ end
 ---@param tbl LINQ
 ---@return self
 function t:Union(tbl)
+    local seen = {}
+    for _, v in pairs(self.tbl) do
+        seen[v] = true
+    end
     for _, v in pairs(tbl.tbl) do
-        if not table.HasValue(self.tbl, v) then
-            table.insert(self.tbl, v)
+        if not seen[v] then
+            seen[v] = true
+            self.tbl[#self.tbl + 1] = v
         end
     end
     return self
@@ -344,26 +360,27 @@ end
 ---@param tbl LINQ
 ---@return self
 function t:Intersect(tbl)
+    local set = {}
+    for _, v in pairs(tbl.tbl) do
+        set[v] = true
+    end
     local newTbl = {}
     for _, v in pairs(self.tbl) do
-        if table.HasValue(tbl.tbl, v) then
-            table.insert(newTbl, v)
+        if set[v] then
+            newTbl[#newTbl + 1] = v
         end
     end
     self.tbl = newTbl
     return self
 end
 
---- Pairs elements from both sequences and combines them using the combiner function.
+--- Appends all elements from another LINQ sequence, keeping duplicates.
 ---@param tbl LINQ
----@param combiner fun(a: any, b: any): any
 ---@return self
-function t:Zip(tbl, combiner)
-    local newTbl = {}
-    for i = 1, math.min(#self.tbl, #tbl.tbl) do
-        table.insert(newTbl, combiner(self.tbl[i], tbl.tbl[i]))
+function t:Concat(tbl)
+    for _, v in pairs(tbl.tbl) do
+        self.tbl[#self.tbl + 1] = v
     end
-    self.tbl = newTbl
     return self
 end
 
@@ -374,10 +391,12 @@ function t:GroupBy(keySelector)
     local tbl = {}
     for k, v in pairs(self.tbl) do
         local key = keySelector(v, k)
-        if not tbl[key] then
-            tbl[key] = {}
+        local bucket = tbl[key]
+        if not bucket then
+            bucket = {}
+            tbl[key] = bucket
         end
-        table.insert(tbl[key], v)
+        bucket[#bucket + 1] = v
     end
     self.tbl = tbl
     return self
@@ -389,7 +408,7 @@ end
 function t:Skip(n)
     local tbl = {}
     for i = n + 1, #self.tbl do
-        table.insert(tbl, self.tbl[i])
+        tbl[#tbl + 1] = self.tbl[i]
     end
     self.tbl = tbl
     return self
@@ -401,24 +420,24 @@ end
 function t:SkipLast(n)
     local tbl = {}
     for i = 1, #self.tbl - n do
-        table.insert(tbl, self.tbl[i])
+        tbl[#tbl + 1] = self.tbl[i]
     end
     self.tbl = tbl
     return self
 end
 
 --- Skips elements from the start as long as the predicate holds, then keeps the rest.
----@param predicate fun(v: any, k: any): boolean
+---@param predicate fun(v: any): boolean
 ---@return self
 function t:SkipWhile(predicate)
     local tbl = {}
     local skip = true
-    for k, v in pairs(self.tbl) do
-        if skip and not predicate(v, k) then
+    for _, v in pairs(self.tbl) do
+        if skip and not predicate(v) then
             skip = false
         end
         if not skip then
-            table.insert(tbl, v)
+            tbl[#tbl + 1] = v
         end
     end
     self.tbl = tbl
@@ -431,7 +450,7 @@ end
 function t:Take(n)
     local tbl = {}
     for i = 1, n do
-        table.insert(tbl, self.tbl[i])
+        tbl[#tbl + 1] = self.tbl[i]
     end
     self.tbl = tbl
     return self
@@ -443,7 +462,7 @@ end
 function t:TakeLast(n)
     local tbl = {}
     for i = math.max(1, #self.tbl - n + 1), #self.tbl do
-        table.insert(tbl, self.tbl[i])
+        tbl[#tbl + 1] = self.tbl[i]
     end
     self.tbl = tbl
     return self
@@ -458,7 +477,7 @@ function t:TakeWhile(predicate)
         if not predicate(v, k) then
             break
         end
-        table.insert(tbl, v)
+        tbl[#tbl + 1] = v
     end
     self.tbl = tbl
     return self

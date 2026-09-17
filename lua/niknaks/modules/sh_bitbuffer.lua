@@ -95,7 +95,7 @@ local function create(data, little_endian)
 end
 
 NikNaks.BitBuffer.Create = create
-setmetatable(NikNaks.BitBuffer, {
+setmetatable(NikNaks.BitBuffer --[[@as table]], {
 	__call = function(_, data, little_endian) return create(data, little_endian) end
 })
 

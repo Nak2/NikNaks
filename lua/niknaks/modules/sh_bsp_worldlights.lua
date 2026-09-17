@@ -9,6 +9,7 @@ local format = string.format
 local meta = NikNaks.__metatables["BSP"]
 
 local WORLDLIGHT_SIZE_BITS = 704  -- 88 bytes
+
 --- @class BSPWorldLight
 --- @field origin Vector         # World-space origin of the light source
 --- @field intensity Vector      # Pre-scaled RGB intensity
@@ -27,7 +28,6 @@ local WORLDLIGHT_SIZE_BITS = 704  -- 88 bytes
 --- @field texinfo number        # Texture info index (-1 if none)
 --- @field owner number          # Source entity index (-1 if world)
 --- @field __map BSPObject
-
 local meta_light = {}
 meta_light.__index = meta_light
 meta_light.__tostring = function( self )
@@ -119,20 +119,23 @@ function meta:FindNearestLight( position, hdr )
 	return bestLight
 end
 
+local function lightMatchesType( wl, emitType )
+	return wl.type == emitType
+end
+
+local function lightInRadius( wl, position, radiusSqr )
+	return wl.origin:DistToSqr( position ) <= radiusSqr
+end
+
 --- Returns all world lights of a given emit type.
 --- @param emitType LightEmissionType
 --- @param hdr boolean?   # If true, uses HDR data. Default is LDR.
 --- @return BSPWorldLight[]
 function meta:FindLightsByType( emitType, hdr )
 	local lights = hdr and self:GetWorldLightsHDR() or self:GetWorldLights()
-	local t, n  = {}, 1
-	for _, wl in pairs( lights ) do
-		if wl.type == emitType then
-			t[n] = wl
-			n    = n + 1
-		end
-	end
-	return t
+	return NikNaks.LINQ( lights )
+		:Where( lightMatchesType, emitType )
+		:ToTable()
 end
 
 --- Returns all world lights within the given radius of a position.
@@ -141,16 +144,11 @@ end
 --- @param hdr boolean? # If true, uses HDR data. Default is LDR.
 --- @return BSPWorldLight[]
 function meta:FindLightsInRadius( position, radius, hdr )
-	local lights   = hdr and self:GetWorldLightsHDR() or self:GetWorldLights()
+	local lights    = hdr and self:GetWorldLightsHDR() or self:GetWorldLights()
 	local radiusSqr = radius * radius
-	local t, n     = {}, 1
-	for _, wl in pairs( lights ) do
-		if wl.origin:DistToSqr( position ) <= radiusSqr then
-			t[n] = wl
-			n    = n + 1
-		end
-	end
-	return t
+	return NikNaks.LINQ( lights )
+		:Where( lightInRadius, position, radiusSqr )
+		:ToTable()
 end
 
 -- BSPWorldLight methods -------------------------------------------------------

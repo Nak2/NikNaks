@@ -1,4 +1,4 @@
-local band, brshift, blshift, bor, bswap = bit.band, bit.rshift, bit.lshift, bit.bor, bit.bswap
+local band, brshift, blshift, bor, bxor, bswap = bit.band, bit.rshift, bit.lshift, bit.bor, bit.bxor, bit.bswap
 
 ---@class BigNumber
 ---@field x number
@@ -217,20 +217,26 @@ end
 
 --#endregion
 
--- Carry-ripple addition. Operates on unsigned magnitudes — callers must strip the sign bit first.
+-- Word-wise carry-propagate addition.
 local function add(self, bNumber)
-	self         = stripSign(self)
-	bNumber      = stripSign(bNumber)
-	local carry  = self:__band(bNumber)
-	local result = self:__bxor(bNumber)
-	local i      = 128
-	while (carry.x ~= 0 or carry.y ~= 0 or carry.w ~= 0 or carry.z ~= 0) and i > 0 do
-		local shiftedcarry = carry:__shl(1)
-		carry = result:__band(shiftedcarry)
-		result = result:__bxor(shiftedcarry)
-		i = i - 1
-	end
-	return result
+	self    = stripSign(self)
+	bNumber = stripSign(bNumber)
+
+	local ax, ay, az, aw = self.x % 0x100000000, self.y % 0x100000000, self.z % 0x100000000, magW(self.w)
+	local bx, by, bz, bw = bNumber.x % 0x100000000, bNumber.y % 0x100000000, bNumber.z % 0x100000000, magW(bNumber.w)
+
+	local s, c
+	s = ax + bx;     local rx = s % 0x100000000; c = math.floor(s / 0x100000000)
+	s = ay + by + c; local ry = s % 0x100000000; c = math.floor(s / 0x100000000)
+	s = az + bz + c; local rz = s % 0x100000000; c = math.floor(s / 0x100000000)
+	local rw = aw + bw + c
+
+	if rx >= 0x80000000 then rx = rx - 0x100000000 end
+	if ry >= 0x80000000 then ry = ry - 0x100000000 end
+	if rz >= 0x80000000 then rz = rz - 0x100000000 end
+	if rw >= 0x80000000 then rw = rw - 0x100000000 end
+
+	return setmetatable({ x = rx, y = ry, z = rz, w = rw }, meta)
 end
 
 ---Unsigned less-than comparison (ignores sign bit; compares raw magnitude).
@@ -284,14 +290,22 @@ function meta:__add(bNumber)
 		result.w = resultNeg and bor(magW(result.w), SIGN_BIT) or magW(result.w)
 		return result
 	end
-	return add(self, bNumber)
+	local result = add(self, bNumber)
+	if isNeg(self) then
+		result.w = bor(magW(result.w), SIGN_BIT)
+	end
+	return result
 end
 
 ---'-' operator
 ---@param bNumber BigNumber|number
 ---@return BigNumber
 function meta:__sub(bNumber)
-	return sub(self, bNumber)
+	if isnumber(bNumber) then
+		bNumber = NikNaks.BigNumber(bNumber --[[@as number]])
+	end
+	local negated = setmetatable({ x = bNumber.x, y = bNumber.y, z = bNumber.z, w = bxor(bNumber.w, SIGN_BIT) }, meta)
+	return self:__add(negated)
 end
 
 local function umul32(a, b)
@@ -721,6 +735,7 @@ end
 ---@return BigNumber
 function meta:Add(number)
 	if (isstring(number)) then
+		---@cast number string
 		number = NikNaks.BigNumber(number)
 	end
 	return self:__add(number --[[@as BigNumber|number]])
@@ -731,6 +746,7 @@ end
 ---@return BigNumber
 function meta:Sub(number)
 	if (isstring(number)) then
+		---@cast number string
 		number = NikNaks.BigNumber(number)
 	end
 	return self:__sub(number --[[@as BigNumber|number]])
@@ -741,6 +757,7 @@ end
 ---@return BigNumber
 function meta:Mul(number)
 	if (isstring(number)) then
+		---@cast number string
 		number = NikNaks.BigNumber(number)
 	end
 	return self:__mul(number --[[@as BigNumber|number]])
@@ -751,6 +768,7 @@ end
 ---@return BigNumber
 function meta:Div(number)
 	if (isstring(number)) then
+		---@cast number string
 		number = NikNaks.BigNumber(number)
 	end
 	return self:__div(number --[[@as BigNumber|number]])
@@ -761,6 +779,7 @@ end
 ---@return BigNumber
 function meta:Pow(number)
 	if (isstring(number)) then
+		---@cast number string
 		number = NikNaks.BigNumber(number)
 	end
 	return self:__pow(number --[[@as BigNumber|number]])
@@ -771,6 +790,7 @@ end
 ---@return BigNumber
 function meta:Mod(number)
 	if (isstring(number)) then
+		---@cast number string
 		number = NikNaks.BigNumber(number)
 	end
 	return self:__mod(number --[[@as BigNumber|number]])
@@ -788,6 +808,15 @@ function meta:To32Bit()
 		return (self.x < 0) and -2147483648 or -self.x
 	end
 	return (self.x < 0) and 2147483647 or self.x
+end
+
+--- Returns the value as four plain 32bit Lua numbers
+---@return number x # Bits 0-31.
+---@return number y # Bits 32-63.
+---@return number z # Bits 64-95.
+---@return number w # Bits 96-127. Bit 31 of this word is the sign flag.
+function meta:ToNumber()
+	return self.x, self.y, self.z, self.w
 end
 
 --- Returns the value as a 32-digit hex string, e.g. `"0x000000000000000000000000000000FF"`.

@@ -6,7 +6,6 @@ local COLOR = FindMetaTable("Color")
 
 local Color, round = Color, math.Round
 local max = math.max
-local string_format, string_sub = string.format, string.sub
 
 -- Color enums
 	NikNaks.SERVER_COLOR= Color(156, 241, 255, 200) -- The color of the server-messages.
@@ -32,11 +31,11 @@ local string_format, string_sub = string.format, string.sub
 -- Hex
 	--- Old function kept for backwards compatibility
 	---@deprecated
-	NikNaks.ColorToHex = COLOR.ToHex
-	
+	NikNaks.ColorToHex = COLOR.ToHex --[[@as function(Color):string]]
+
 	--- Old function kept for backwards compatibility
 	--- @deprecated
-	NikNaks.HexToColor = HexToColor
+	NikNaks.HexToColor = HexToColor --[[@as function(string):Color]]
 
 -- CMYK
 
@@ -57,11 +56,12 @@ local string_format, string_sub = string.format, string.sub
 		return c, m, y, k
 	end
 
+	--- Converts an RGB Color into CMYK components, each in the range 0–1.
 	---@return number c
 	---@return number m
 	---@return number y
 	---@return number k
-	COLOR.ToCMYK = NikNaks.ColorToCMYK
+	COLOR.ToCMYK = COLOR.ToCMYK or NikNaks.ColorToCMYK
 
 	--- Converts CMYK values (each 0–1) into an RGB Color.
 	---@param c number Cyan component (0–1).
@@ -77,23 +77,23 @@ local string_format, string_sub = string.format, string.sub
 	end
 
 -- Color manipulation
+
 	---Inverts the color.
 	---@return Color
-	function COLOR:Invert()
+	COLOR.Invert = COLOR.Invert or function(self)
 		return Color(255 - self.r,255 - self.g,255 - self.b,self.a)
 	end
 
 	---Turns the color into a gray-scale.
 	---@return Color
-	function COLOR:ToGrayscale()
+	COLOR.ToGrayscale =  COLOR.ToGrayscale or function(self)
 		local n = math.Clamp(math.Round(self.r * .299 + self.g * .587 + self.b * .114), 0, 255)
 		return Color(n,n,n,self.a)
 	end
 
 	--- Reduces each channel toward its dominant primary, producing a cartoon-like saturation effect.
-	---@param color Color
 	---@return Color
-	function COLOR:ToCartoon()
+	COLOR.ToCartoon = COLOR.ToCartoon or function(self)
 		local R,G,B = self.r / 255,self.g / 255,self.b / 255
 		local max_gb = max(G,B)
 		local max_rb = max(R,B)
@@ -103,14 +103,14 @@ local string_format, string_sub = string.format, string.sub
 		local green_matter = 1 - max(G - max_rb,0)
 		local blue_matter = 1 - max(B - max_rg,0)
 
-		return Color(R * green_matter * blue_matter * 255,G * red_matter * blue_matter * 255,B * red_matter * green_matter * 255)
+		return Color(R * green_matter * blue_matter * 255,G * red_matter * blue_matter * 255,B * red_matter * green_matter * 255,self.a)
 	end
 
 -- Color functions
 
 	---Returns true if the color is bright. Useful to check if the text infront should be dark.
 	---@return boolean
-	function COLOR:IsBright()
+	COLOR.IsBright = COLOR.IsBright or function(self)
 		return NikNaks.ColorToLuminance(self) >= 127.5
 	end
 

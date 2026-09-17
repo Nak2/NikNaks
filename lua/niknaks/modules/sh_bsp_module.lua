@@ -309,15 +309,16 @@ do
 		return self._gamelump
 	end
 
+	local function gameLumpMatchesId(v, GameLumpID)
+		return v.id == GameLumpID
+	end
+
 	--- Returns the gamelump header matching the ID.
 	--- @param GameLumpID number
 	--- @return BSPGameLumpHeader?
 	function meta:FindGameLump(GameLumpID)
-		for _, v in pairs(self:GetGameLumpHeaders()) do
-			if v.id == GameLumpID then
-				return v
-			end
-		end
+		return NikNaks.LINQ(self:GetGameLumpHeaders())
+			:Single(gameLumpMatchesId, GameLumpID)
 	end
 
 	--- @class BSPGameLump
@@ -1519,20 +1520,25 @@ do
 		return leaf:IsOutsideMap()
 	end
 
+	local function isNotEmpty(v)
+		return v ~= nil and v ~= ""
+	end
+
+	-- Material() returns 2 values (IMaterial, load time), need to wrap it.
+	local function toMaterial(v)
+		return (Material(v))
+	end
+
 	--- Returns a list of all materials used by the map.
 	--- @return IMaterial[]
 	function meta:GetMaterials()
 		if self._materials then return self._materials end
 
 		--- @type IMaterial[]
-		self._materials = {}
-
-		for _, v in pairs(self:GetTextures()) do
-			if v then
-				local m = Material(v)
-				if m then table.insert(self._materials, m) end
-			end
-		end
+		self._materials = NikNaks.LINQ(self:GetTextures())
+			:Where(isNotEmpty)
+			:Select(toMaterial)
+			:ToTable()
 
 		return self._materials
 	end

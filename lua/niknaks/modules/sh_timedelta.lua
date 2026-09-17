@@ -4,6 +4,7 @@
 
 ---@class TimeDelta
 ---@field time number
+---@field year number? The reference year for accurate leap year calculations.
 ---@operator add:TimeDelta|DateTime
 ---@operator sub:TimeDelta|DateTime
 ---@operator mul:TimeDelta
@@ -29,12 +30,12 @@ TimeDelta._steps = { "Year", "Day", "Hour", "Minute", "Second", "Milisecond" }
 
 setmetatable( TimeDelta, {
 	__index = TimeDelta,
-	__call = function( _, time )
-		return setmetatable( { time = time }, meta )
+	__call = function( _, time, year )
+		return setmetatable( { time = time, year = year }, meta )
 	end
 } )
 
----@overload fun(number:number) : TimeDelta
+---@overload fun(number:number, year:number?) : TimeDelta
 NikNaks.TimeDelta = TimeDelta
 
 do
@@ -61,7 +62,7 @@ do
 
 			if i == 1 then -- Since years aren't whole numbers, we need to round the tiniest amount, or floor is going to count down.
 				local n = 0
-				local y = TimeDelta.Year
+				local y = self.year or NikNaks.DateTime.year
 				local v = isLeapYear( y ) and 31622400 or 31536000
 
 				while num >= v do
@@ -120,9 +121,6 @@ do
 	--- Returns the total duration expressed as a fractional number of weeks.
 	---@return number
 	function meta:GetWeeks() return self:_getter( "Week" ) end
-	--- Returns the total duration expressed as a fractional number of months.
-	---@return number
-	function meta:GetMonths() return self:_getter( "Month" ) end
 	--- Returns the total duration expressed as a fractional number of years.
 	---@return number
 	function meta:GetYears() return self:_getter( "Year" ) end
@@ -170,10 +168,6 @@ do
 	---@param n number
 	---@return TimeDelta
 	function meta:AddWeeks( n ) return self:_adder( "Week", n ) end
-	--- Adds the given number of months to this TimeDelta.
-	---@param n number
-	---@return TimeDelta
-	function meta:AddMonths( n ) return self:_adder( "Month", n ) end
 	--- Adds the given number of years to this TimeDelta.
 	---@param n number
 	---@return TimeDelta
@@ -224,10 +218,6 @@ do
 	---@param n number
 	---@return TimeDelta
 	function meta:SubWeeks( n ) return self:_subtractor( "Week", n ) end
-	--- Subtracts the given number of months from this TimeDelta.
-	---@param n number
-	---@return TimeDelta
-	function meta:SubMonths( n ) return self:_subtractor( "Month", n ) end
 	--- Subtracts the given number of years from this TimeDelta.
 	---@param n number
 	---@return TimeDelta

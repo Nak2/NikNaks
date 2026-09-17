@@ -260,19 +260,23 @@ function meta:GetStaticPropModels()
 	return self._staticprops_mdl
 end
 
+local function propMatchesModel( v, model )
+	return v.PropType == model
+end
+
 --- Returns a list of all static-props, matching the model.
 --- @param model string # The model path to search for.
 --- @return StaticProp[] # List of static-props matching the model.
 function meta:FindStaticByModel( model )
-	local t = {}
+	return NikNaks.LINQ( self:GetStaticProps() )
+		:Where( propMatchesModel, model )
+		:ToTable()
+end
 
-	for _, v in pairs( self:GetStaticProps() ) do
-		if v.PropType == model then
-			t[#t + 1] = v
-		end
-	end
 
-	return t
+local function propInBox( v, boxMins, boxMaxs )
+	local origin = v.Origin
+	return origin ~= nil and origin:WithinAABox( boxMins, boxMaxs )
 end
 
 --- Returns a list of all static-props, within the specified box.
@@ -280,16 +284,14 @@ end
 --- @param boxMaxs Vector # The maximum position of the box.
 --- @return StaticProp[]
 function meta:FindStaticInBox( boxMins, boxMaxs )
-	local t = {}
+	return NikNaks.LINQ( self:GetStaticProps() )
+		:Where( propInBox, boxMins, boxMaxs )
+		:ToTable()
+end
 
-	for _, v in pairs( self:GetStaticProps() ) do
-		local origin = v.Origin
-		if origin and v.Origin:WithinAABox( boxMins, boxMaxs ) then
-			t[#t + 1] = v
-		end
-	end
-
-	return t
+local function propInSphere( v, origin, radiusSqr )
+	local spOrigin = v.Origin
+	return spOrigin ~= nil and spOrigin:DistToSqr( origin ) <= radiusSqr
 end
 
 --- Returns a list of all static-props, within the specified sphere.
@@ -297,17 +299,11 @@ end
 --- @param radius number # The radius of the sphere.
 --- @return StaticProp[]
 function meta:FindStaticInSphere( origin, radius )
-	radius = radius ^ 2
-	local t = {}
+	local radiusSqr = radius ^ 2
 
-	for _, v in pairs( self:GetStaticProps() ) do
-		local spOrigin = v.Origin
-		if spOrigin and spOrigin:DistToSqr( origin ) <= radius then
-			t[#t + 1] = v
-		end
-	end
-
-	return t
+	return NikNaks.LINQ( self:GetStaticProps() )
+		:Where( propInSphere, origin, radiusSqr )
+		:ToTable()
 end
 
 --- Returns the index of the static prop.

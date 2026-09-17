@@ -25,7 +25,7 @@ local function getClusters( vis, offset, PVS )
 	local pvs_buffer = vis._bytebuff
 	local num_clusters = vis.num_clusters
 
-	while c <= num_clusters do
+	while c < num_clusters do
 		if pvs_buffer[v] == 0 then
 			v = v + 1
 			c = c + 8 * pvs_buffer[v]

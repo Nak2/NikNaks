@@ -159,51 +159,49 @@ function meta:GetEntity( index )
 	return self:GetEntities()[index]
 end
 
+local function entMatchesClass( v, class )
+	local vClass = v.classname
+	return vClass ~= nil and class ~= nil and string.match( vClass, class ) ~= nil
+end
+
 --- Returns a list of BSPEntities, matching the class.
 --- @param class string
 --- @return BSPEntity[]
 function meta:FindByClass( class )
-	local t = {}
+	return NikNaks.LINQ( self:GetEntities() )
+		:Where( entMatchesClass, class )
+		:ToTable()
+end
 
-	for _, v in pairs( self:GetEntities() ) do
-		local vClass = v.classname
-		if vClass == nil then continue end
-		if class and string.match( vClass, class ) then
-			t[#t + 1] = v
-		end
-	end
-
-	return t
+local function entMatchesModel( v, model )
+	return v.model == model
 end
 
 --- Returns a list of BSPEntities, matching the model.
 --- @param model string
 --- @return BSPEntity[]
 function meta:FindByModel( model )
-	local t = {}
+	return NikNaks.LINQ( self:GetEntities() )
+		:Where( entMatchesModel, model )
+		:ToTable()
+end
 
-	for _, v in pairs( self:GetEntities() ) do
-		if v.model == model then
-			t[#t + 1] = v
-		end
-	end
-
-	return t
+local function entMatchesName( v, name )
+	return v.targetname == name
 end
 
 --- Returns a list of entity data, matching the targetname.
 --- @param name string
 --- @return BSPEntity[]
 function meta:FindByName( name )
-	local t = {}
+	return NikNaks.LINQ( self:GetEntities() )
+		:Where( entMatchesName, name )
+		:ToTable()
+end
 
-	for _, v in pairs( self:GetEntities() ) do
-		if v.targetname == name then
-			t[#t + 1] = v
-		end
-	end
-
-	return t
+local function entInBox( v, boxMins, boxMaxs )
+	local origin = v.origin
+	return origin ~= nil and origin:WithinAABox( boxMins, boxMaxs )
 end
 
 --- Returns a list of entity data, within the specified box. Note: This (I think) is slower than ents.FindInBox
@@ -211,15 +209,14 @@ end
 --- @param boxMaxs Vector
 --- @return BSPEntity[]
 function meta:FindInBox( boxMins, boxMaxs )
-	local t = {}
-	for _, v in pairs( self:GetEntities() ) do
-		local origin = v.origin
-		if origin and v.origin:WithinAABox( boxMins, boxMaxs ) then
-			t[#t + 1] = v
-		end
-	end
+	return NikNaks.LINQ( self:GetEntities() )
+		:Where( entInBox, boxMins, boxMaxs )
+		:ToTable()
+end
 
-	return t
+local function entInSphere( v, origin, radiusSqr )
+	local vOrigin = v.origin
+	return vOrigin ~= nil and vOrigin:DistToSqr( origin ) <= radiusSqr
 end
 
 --- Returns a list of entity data, within the specified sphere. Note: This (I think) is slower than ents.FindInSphere
@@ -227,16 +224,9 @@ end
 --- @param radius number
 --- @return BSPEntity[]
 function meta:FindInSphere( origin, radius )
-	radius = radius ^ 2
+	local radiusSqr = radius ^ 2
 
-	local t = {}
-
-	for _, v in pairs( self:GetEntities() ) do
-		local vOrigin = v.origin
-		if vOrigin and vOrigin:DistToSqr( origin ) <= radius then
-			t[#t + 1] = v
-		end
-	end
-
-	return t
+	return NikNaks.LINQ( self:GetEntities() )
+		:Where( entInSphere, origin, radiusSqr )
+		:ToTable()
 end

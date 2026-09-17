@@ -24,6 +24,10 @@ NikNaks.BSP_ERROR = {
     FILENOTFOUND  = 3, -- This error is thrown when the file isn't found.
 }
 
+-- Static prop bitflags.
+---@alias STATIC_PROP_FLAG integer
+---@alias STATIC_PROP_FLAG_EX integer
+
 -- The type of the world-light.
 ---@enum LightEmissionType
 NikNaks.LIGHTEMISSIONTYPE = {

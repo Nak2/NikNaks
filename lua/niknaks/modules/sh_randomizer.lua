@@ -43,7 +43,7 @@ function NikNaks.Randomizer.GetSecureNumber()
     local seed = os.time() -- Seed with current time
     seed = bit.bxor(seed, bit.lshift(seed, 11))
     seed = bit.bxor(seed, bit.rshift(seed, 8))
-    seed = bit.bxor(seed, tonumber(tostring({}):sub(8), 16)) -- Mix in memory address as hexadecimal
+    seed = bit.bxor(seed, math.floor((SysTime() % 1) * 0xFFFFFFFF))
     seed = xor_shift(seed) -- Further mixing with xor_shift
     seed = bit.bxor(seed, bit.lshift(seed, 11))
     seed = bit.bxor(seed, bit.rshift(seed, 8))
@@ -74,6 +74,32 @@ end
 ---@return number
 function NikNaks.Randomizer.GetFloatRange(min, max)
     return NikNaks.Randomizer.GetFloat() * (max - min) + min
+end
+
+---Returns true with the given probability.
+---@param probability number? A value from 0 (never) to 1 (always). Default 0.5 (a coin flip).
+---@return boolean
+function NikNaks.Randomizer.Chance(probability)
+    return NikNaks.Randomizer.GetFloat() < (probability or 0.5)
+end
+
+---Returns a random boolean (50/50).
+---@return boolean
+function NikNaks.Randomizer.GetBool()
+    return NikNaks.Randomizer.Chance(0.5)
+end
+
+---Shuffles a table in-place using the Fisher-Yates algorithm. Only shuffles the
+---array part (1..#tbl); returns the same table for convenience.
+---@generic T: table
+---@param tbl T
+---@return T
+function NikNaks.Randomizer.Shuffle(tbl)
+    for i = #tbl, 2, -1 do
+        local j = NikNaks.Randomizer.GetInt(1, i)
+        tbl[i], tbl[j] = tbl[j], tbl[i]
+    end
+    return tbl
 end
 
 --- Creates a new PRNG seeded with the given value, using a Mersenne Twister-style algorithm.
@@ -154,4 +180,30 @@ end
 function meta_prng:CreateNew()
     local rndVal = bit.bxor(self:Random(), bit.lshift(self:Random(), 16))
     return NikNaks.Randomizer.CreatePRNG(rndVal)
+end
+
+---Returns true with the given probability.
+---@param probability number? A value from 0 (never) to 1 (always). Default 0.5 (a coin flip).
+---@return boolean
+function meta_prng:Chance(probability)
+    return self:RandomFloat() < (probability or 0.5)
+end
+
+---Returns a random boolean (50/50).
+---@return boolean
+function meta_prng:GetBool()
+    return self:Chance(0.5)
+end
+
+---Shuffles a table in-place using the Fisher-Yates algorithm. Only shuffles the
+---array part (1..#tbl); returns the same table for convenience.
+---@generic T: table
+---@param tbl T
+---@return T
+function meta_prng:Shuffle(tbl)
+    for i = #tbl, 2, -1 do
+        local j = self:RandomRange(1, i)
+        tbl[i], tbl[j] = tbl[j], tbl[i]
+    end
+    return tbl
 end
