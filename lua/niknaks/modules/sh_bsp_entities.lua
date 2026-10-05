@@ -17,6 +17,7 @@
 --- @field world_maxs? string
 --- @field scale? number
 --- @field coldworld? number
+--- @field hammerId number
 
 --- Locates the next enter-token
 --- @param data string
@@ -49,7 +50,7 @@ end
 
 --- Convert a few things to make it easier to read entities.
 --- @param t BSPEntity
-local function postEntParse( t )
+local function postEntParse( t, index )
 
 	t.origin = util.StringToType( t.origin or "0 0 0" --[[@as string]], "Vector" )
 	t.angles = util.StringToType( t.angles or "0 0 0" --[[@as string]], "Angle" )
@@ -63,6 +64,8 @@ local function postEntParse( t )
 	if t.ontrigger and type( t.ontrigger ) ~= "table" then
 		t.ontrigger = { t.ontrigger }
 	end
+
+	t.hammerId = index + 1234
 end
 
 -- A list of data-keys that can have multiple entries.
@@ -78,7 +81,7 @@ local _tableTypes = {
 }
 
 --- @return BSPEntity
-local function ParseEntity( str )
+local function ParseEntity( str, index )
 	--- @class BSPEntity
 	local t = {}
 
@@ -97,7 +100,7 @@ local function ParseEntity( str )
 		end
 	end
 
-	postEntParse( t )
+	postEntParse( t, index )
 
 	return t
 end
@@ -128,7 +131,7 @@ local function parseEntityData( data )
 
 	local tab = {}
 	for id, str in pairs( tabData ) do
-		local t = ParseEntity( str )
+		local t = ParseEntity( str, id )
 		tab[id - 1] = t
 	end
 
@@ -228,5 +231,18 @@ function meta:FindInSphere( origin, radius )
 
 	return NikNaks.LINQ( self:GetEntities() )
 		:Where( entInSphere, origin, radiusSqr )
+		:ToTable()
+end
+
+local function entMatchesHammerId( v, id )
+	return v.hammerId == id
+end
+
+--- Returns a list of BSPEntities, matching the hammerId.
+--- @param hammerId number
+--- @return BSPEntity[]
+function meta:FindByHammerId( hammerId )
+	return NikNaks.LINQ( self:GetEntities() )
+		:Where( entMatchesHammerId, hammerId )
 		:ToTable()
 end
