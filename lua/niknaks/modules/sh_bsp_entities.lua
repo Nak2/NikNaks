@@ -240,9 +240,9 @@ end
 
 --- Returns a list of BSPEntities, matching the hammerId.
 --- @param hammerId number
---- @return BSPEntity[]
+--- @return BSPEntity?
 function meta:FindByHammerID( hammerId )
 	return NikNaks.LINQ( self:GetEntities() )
 		:Where( entMatchesHammerId, hammerId )
-		:ToTable()
+		:First()
 end
