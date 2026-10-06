@@ -17,6 +17,7 @@
 --- @field world_maxs? string
 --- @field scale? number
 --- @field coldworld? number
+--- @field mapCreationId number Same as Entity:MapCreationID()
 --- @field hammerId number
 
 --- Locates the next enter-token
@@ -65,7 +66,9 @@ local function postEntParse( t, index )
 		t.ontrigger = { t.ontrigger }
 	end
 
-	t.hammerId = index + 1234
+	t.index = index
+	t.mapCreationId = index + 1234
+	t.hammerId = t.mapCreationId -- Deprecated misnomer, kept for backwards compatibility.
 end
 
 -- A list of data-keys that can have multiple entries.
@@ -176,8 +179,19 @@ function meta:FindByClass( class )
 		:ToTable()
 end
 
-local function entMatchesModel( v, model )
-	return v.model == model
+local function entMatchesField( v, field, value )
+	return v[field] == value
+end
+
+--- Returns a list of BSPEntities, matching the given key/value pair. Works with any parsed
+--- entity key, not just classname/model/targetname (e.g. "target", "spawnflags", "parentname").
+--- @param key string
+--- @param value any
+--- @return BSPEntity[]
+function meta:FindByKeyValue( key, value )
+	return NikNaks.LINQ( self:GetEntities() )
+		:Where( entMatchesField, key, value )
+		:ToTable()
 end
 
 --- Returns a list of BSPEntities, matching the model.
@@ -185,12 +199,8 @@ end
 --- @return BSPEntity[]
 function meta:FindByModel( model )
 	return NikNaks.LINQ( self:GetEntities() )
-		:Where( entMatchesModel, model )
+		:Where( entMatchesField, "model", model )
 		:ToTable()
-end
-
-local function entMatchesName( v, name )
-	return v.targetname == name
 end
 
 --- Returns a list of entity data, matching the targetname.
@@ -198,7 +208,7 @@ end
 --- @return BSPEntity[]
 function meta:FindByName( name )
 	return NikNaks.LINQ( self:GetEntities() )
-		:Where( entMatchesName, name )
+		:Where( entMatchesField, "targetname", name )
 		:ToTable()
 end
 
@@ -234,15 +244,16 @@ function meta:FindInSphere( origin, radius )
 		:ToTable()
 end
 
-local function entMatchesHammerId( v, id )
-	return v.hammerId == id
-end
-
---- Returns a list of BSPEntities, matching the hammerId.
---- @param hammerId number
+--- Returns the BSPEntity, matching the map creation ID (same as Entity:MapCreationID()).
+--- @param mapCreationId number
 --- @return BSPEntity?
-function meta:FindByHammerID( hammerId )
+function meta:FindByMapCreationID( mapCreationId )
 	return NikNaks.LINQ( self:GetEntities() )
-		:Where( entMatchesHammerId, hammerId )
+		:Where( entMatchesField, "mapCreationId", mapCreationId )
 		:First()
 end
+
+--- Returns the BSPEntity, matching the map creation ID.
+--- Note: this is NOT the Hammer "hammerid" keyvalue.
+---@deprecated This function is deprecated. Use FindByMapCreationID instead.
+meta.FindByHammerID = meta.FindByMapCreationID
