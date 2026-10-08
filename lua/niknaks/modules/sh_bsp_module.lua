@@ -1152,7 +1152,7 @@ do
 		local brushes = self:GetBrushes()
 
 		for i = 1, math.min(data:Size() / 16, MAX_MAP_LEAFBRUSHES) do
-			self._leafbrush[i] = brushes[data:ReadUShort()]
+			self._leafbrush[i] = brushes[data:ReadUShort() + 1]
 		end
 
 		self:ClearLump(17)
