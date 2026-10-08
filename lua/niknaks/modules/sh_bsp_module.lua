@@ -1357,13 +1357,16 @@ do
 			q.MapFace = data:ReadUShort()
 			verify(38)
 
+			data:Skip( 2 * 8 ) -- Align the following 32-bit offsets.
+			verify(40)
+
 			-- 4 bytes
 			q.LightmapAlphaStart = data:ReadLong()
-			verify(42)
+			verify(44)
 
 			-- 4 bytes
 			q.LightmapSamplePositionStart = data:ReadLong()
-			verify(46)
+			verify(48)
 
 			data:Skip(88 * 8)
 			-- -- 48 bytes
@@ -1372,7 +1375,7 @@ do
 
 			-- -- 40 bytes
 			-- q.CornerNeighbors = CDispCornerNeighbors( data )
-			verify(134)
+			verify(136)
 
 			-- 4 bytes * 10 = 40 bytes
 			q.allowedVerts = {}
@@ -1380,9 +1383,7 @@ do
 				q.allowedVerts[v] = data:ReadLong()
 			end
 			assert(table.Count(q.allowedVerts) == 10, table.Count(q.allowedVerts))
-			verify(174)
-
-			data:Skip(8 * 2)
+			verify(176)
 
 			local offset = i * m_Ddispinfo_t
 			q.offset = offset
