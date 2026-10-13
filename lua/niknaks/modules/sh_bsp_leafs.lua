@@ -215,7 +215,7 @@ function meta_leaf:GetBrushes()
 	local leafBrushes = self.__map:GetLeafBrushes()
 	local c = self.firstleafbrush
 	for i = 0, self.numleafbrushes - 1 do
-		local f_id = leafBrushes[ i + c ]
+		local f_id = leafBrushes[ i + c + 1 ]
 		self._brushes[i + 1] = f_id
 	end
 
@@ -302,7 +302,7 @@ function meta_leaf:GetFaces(includeDisplacment)
 		local c = self.firstleafface
 
 		for i = 0, self.numleaffaces - 1 do
-			local f_id = leafFace[ i + c ]
+			local f_id = leafFace[ i + c + 1 ]
 			self._faces[i + 1] = faces[f_id]
 		end
 	end
