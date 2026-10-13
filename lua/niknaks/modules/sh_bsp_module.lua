@@ -1125,8 +1125,8 @@ do
 
 	local MAX_MAP_LEAFFACES = 65536
 
-	--- Returns the leaf_face array. This is used to return a list of faces from a leaf.
-	--- FaceID = LeafFace[ Leaf.firstleafface + [0 -> Leaf.numleaffaces - 1] ]
+	--- Returns the leaf_face array (1-indexed). This is used to return a list of faces from a leaf.
+	--- FaceID = LeafFace[ Leaf.firstleafface + 1 + [0 -> Leaf.numleaffaces - 1] ]
 	--- @return number[]
 	function meta:GetLeafFaces()
 		if self._leaffaces then return self._leaffaces end
@@ -1145,7 +1145,8 @@ do
 
 	local MAX_MAP_LEAFBRUSHES = 65536
 
-	--- Returns an array of leafbrush-data.
+	--- Returns an array of leafbrush-data (1-indexed).
+	--- Brush = LeafBrush[ Leaf.firstleafbrush + 1 + [0 -> Leaf.numleafbrushes - 1] ]
 	--- @return BSPBrushObject[]
 	function meta:GetLeafBrushes()
 		if self._leafbrush then return self._leafbrush end
