@@ -453,13 +453,14 @@ function meta_leaf:GetBoundaryPlanes()
 		local node = nodes[nodeIndex]
 		local plane = node.plane
 		if( node.children[1] == child ) then
-			table.insert(list, plane)
+			list[#list + 1] = plane
 		else
-			table.insert(list, setmetatable({
+			list[#list + 1] = setmetatable({
 				dist = -plane.dist,
 				normal = -plane.normal,
+				nx = -plane.nx, ny = -plane.ny, nz = -plane.nz,
 				type = plane.type
-			}, planeMeta))
+			}, planeMeta)
 		end
 
 		child = nodeIndex
@@ -468,29 +469,26 @@ function meta_leaf:GetBoundaryPlanes()
 	return list
 end
 
-local function locateBoxLeaf( iNode, tab, mins, maxs, nodes, planes, leafs )
-	local cornerMin, cornerMax = Vector(0,0,0), Vector(0,0,0)
+local function locateBoxLeaf( iNode, tab, minX, minY, minZ, maxX, maxY, maxZ, nodes, planes, leafs )
 	while iNode >= 0 do
 		local node = nodes[ iNode ]
 		local plane = planes[ node.planenum ]
-		for i = 1, 3 do
-			if( plane.normal[i] >= 0) then
-				cornerMin[i] = mins[i]
-				cornerMax[i] = maxs[i]
-			else
-				cornerMin[i] = maxs[i]
-				cornerMax[i] = mins[i]
-			end
-		end
-		if plane.normal:Dot(cornerMax) - plane.dist <= -TEST_EPSILON  then
+		local nx, ny, nz = plane.nx, plane.ny, plane.nz
+		-- The box corner furthest along the normal (cornerMax) and furthest against it (cornerMin)
+		local loX, hiX, loY, hiY, loZ, hiZ
+		if nx >= 0 then loX, hiX = minX, maxX else loX, hiX = maxX, minX end
+		if ny >= 0 then loY, hiY = minY, maxY else loY, hiY = maxY, minY end
+		if nz >= 0 then loZ, hiZ = minZ, maxZ else loZ, hiZ = maxZ, minZ end
+		local dist = plane.dist
+		if nx * hiX + ny * hiY + nz * hiZ - dist <= -TEST_EPSILON then
 			iNode = node.children[2]
-		elseif plane.normal:Dot(cornerMin) - plane.dist >= TEST_EPSILON then
+		elseif nx * loX + ny * loY + nz * loZ - dist >= TEST_EPSILON then
 			iNode = node.children[1]
 		else
-			if not locateBoxLeaf(node.children[1], tab, mins, maxs, nodes, planes, leafs) then
+			if not locateBoxLeaf( node.children[1], tab, minX, minY, minZ, maxX, maxY, maxZ, nodes, planes, leafs ) then
 				return false
 			end
-			return locateBoxLeaf(node.children[2], tab, mins, maxs, nodes, planes, leafs)
+			return locateBoxLeaf( node.children[2], tab, minX, minY, minZ, maxX, maxY, maxZ, nodes, planes, leafs )
 		end
 	end
 	tab[#tab + 1] = leafs[ -1 -iNode ]
@@ -505,10 +503,13 @@ end
 --- @return BSPLeafObject[]
 function meta:AABBInLeafs( iNode, point, point2, add )
 	add = add or 0
-	local mins = Vector(min(point.x, point2.x) - add, min(point.y, point2.y) - add, min(point.z, point2.z) - add)
-	local maxs = Vector(max(point.x, point2.x) + add, max(point.y, point2.y) + add, max(point.z, point2.z) + add)
+	local x1, y1, z1 = point.x, point.y, point.z
+	local x2, y2, z2 = point2.x, point2.y, point2.z
 	local tab = {}
-	locateBoxLeaf(iNode or 0, tab, mins, maxs, self:GetNodes(), self:GetPlanes(), self:GetLeafs())
+	locateBoxLeaf( iNode or 0, tab,
+		min( x1, x2 ) - add, min( y1, y2 ) - add, min( z1, z2 ) - add,
+		max( x1, x2 ) + add, max( y1, y2 ) + add, max( z1, z2 ) + add,
+		self:GetNodes(), self:GetPlanes(), self:GetLeafs() )
 	return tab
 end
 
@@ -523,19 +524,20 @@ function meta:IsAABBOutsideMap( position, position2 )
 	return false
 end
 
-local function locateSphereLeaf( iNode, tab, origin, radius, nodes, planes, leafs)
+local function locateSphereLeaf( iNode, tab, ox, oy, oz, radius, nodes, planes, leafs)
 	while iNode >= 0 do
 		local node = nodes[ iNode ]
 		local plane = planes[ node.planenum ]
-		if plane.normal:Dot(origin) + radius - plane.dist <= -TEST_EPSILON then
+		local d = plane.nx * ox + plane.ny * oy + plane.nz * oz - plane.dist
+		if d + radius <= -TEST_EPSILON then
 			iNode = node.children[2]
-		elseif plane.normal:Dot(origin) - radius - plane.dist >= TEST_EPSILON then
+		elseif d - radius >= TEST_EPSILON then
 			iNode = node.children[1]
 		else
-			if not locateSphereLeaf( node.children[1], tab, origin, radius, nodes, planes, leafs ) then
+			if not locateSphereLeaf( node.children[1], tab, ox, oy, oz, radius, nodes, planes, leafs ) then
 				return false
 			end
-			return locateSphereLeaf( node.children[2], tab, origin, radius, nodes, planes, leafs )
+			return locateSphereLeaf( node.children[2], tab, ox, oy, oz, radius, nodes, planes, leafs )
 		end
 	end
 	tab[#tab + 1] = leafs[ -1 -iNode ]
@@ -549,7 +551,7 @@ end
 --- @return BSPLeafObject[]
 function meta:SphereInLeafs(iNode, origin, radius)
 	local tab = {}
-	locateSphereLeaf(iNode, tab, origin, radius, self:GetNodes(), self:GetPlanes(), self:GetLeafs())
+	locateSphereLeaf(iNode, tab, origin.x, origin.y, origin.z, radius, self:GetNodes(), self:GetPlanes(), self:GetLeafs())
 	return tab
 end
 
@@ -572,37 +574,39 @@ end
 --- @param startPos Vector
 --- @param endPos Vector
 --- @param tab table
-local function locateLineLeaf(self, nodeIndex, startFraction, endFraction, startPos, endPos, tab)
+local function locateLineLeaf(nodes, leafs, nodeIndex, startFraction, endFraction, sx, sy, sz, ex, ey, ez, tab)
 	if nodeIndex < 0 then
-		local leaf = self:GetLeafs()[ -nodeIndex - 1]
-		table.insert(tab, leaf)
+		tab[#tab + 1] = leafs[ -nodeIndex - 1 ]
+		return
 	end
 
-	local node = self:GetNodes()[nodeIndex]
+	local node = nodes[nodeIndex]
 	if not node then return end
 	local plane = node.plane
 	if not plane then return end
 
-	local start_dist, end_dist = 0,0
+	local start_dist, end_dist
+	local ptype, pdist = plane.type, plane.dist
 
-	if plane.type == 0 then
-		start_dist = startPos.x - plane.dist
-		end_dist = endPos.x - plane.dist
-	elseif plane.type == 1 then
-		start_dist = startPos.y - plane.dist
-		end_dist = endPos.y - plane.dist
-	elseif plane.type == 2 then
-		start_dist = startPos.z - plane.dist
-		end_dist = endPos.z - plane.dist
+	if ptype == 0 then
+		start_dist = sx - pdist
+		end_dist = ex - pdist
+	elseif ptype == 1 then
+		start_dist = sy - pdist
+		end_dist = ey - pdist
+	elseif ptype == 2 then
+		start_dist = sz - pdist
+		end_dist = ez - pdist
 	else
-		start_dist = startPos:Dot( plane.normal ) - plane.dist
-		end_dist = endPos:Dot( plane.normal ) - plane.dist
+		local nx, ny, nz = plane.nx, plane.ny, plane.nz
+		start_dist = sx * nx + sy * ny + sz * nz - pdist
+		end_dist = ex * nx + ey * ny + ez * nz - pdist
 	end
 
 	if start_dist >= 0 and end_dist >= 0 then
-		locateLineLeaf(self, node.children[1], startFraction, endFraction, startPos, endPos, tab)
+		locateLineLeaf(nodes, leafs, node.children[1], startFraction, endFraction, sx, sy, sz, ex, ey, ez, tab)
 	elseif start_dist < 0 and end_dist < 0 then
-		locateLineLeaf(self, node.children[2], startFraction, endFraction, startPos, endPos, tab)
+		locateLineLeaf(nodes, leafs, node.children[2], startFraction, endFraction, sx, sy, sz, ex, ey, ez, tab)
 	else
 		local side_id, fraction_first, fraction_second, fraction_middle;
 		if start_dist < end_dist then
@@ -635,15 +639,16 @@ local function locateLineLeaf(self, nodeIndex, startFraction, endFraction, start
 			fraction_second = 1
 		end
 
-		fraction_middle = startFraction + ( endFraction - startFraction ) * fraction_first
-		local middle = startPos + fraction_first * ( endPos - startPos )
+		local dx, dy, dz = ex - sx, ey - sy, ez - sz
 
-		locateLineLeaf( self, node.children[side_id], startFraction, fraction_middle, startPos, middle, tab)
+		fraction_middle = startFraction + ( endFraction - startFraction ) * fraction_first
+		locateLineLeaf( nodes, leafs, node.children[side_id], startFraction, fraction_middle,
+			sx, sy, sz, sx + fraction_first * dx, sy + fraction_first * dy, sz + fraction_first * dz, tab )
 
 		fraction_middle = startFraction + ( endFraction - startFraction ) * fraction_second
-		middle = startPos + fraction_second * ( endPos - startPos )
 		side_id = (side_id == 1) and 2 or 1
-		locateLineLeaf( self, node.children[side_id], fraction_middle, endFraction, middle, endPos, tab)
+		locateLineLeaf( nodes, leafs, node.children[side_id], fraction_middle, endFraction,
+			sx + fraction_second * dx, sy + fraction_second * dy, sz + fraction_second * dz, ex, ey, ez, tab )
 	end
 end
 
@@ -654,7 +659,8 @@ end
 --- @return BSPLeafObject[]
 function meta:LineInLeafs(iNode, startPos, endPos)
 	local tab = {}
-	locateLineLeaf(self, iNode or 0, 0, 1, startPos, endPos, tab)
+	locateLineLeaf( self:GetNodes(), self:GetLeafs(), iNode or 0, 0, 1,
+		startPos.x, startPos.y, startPos.z, endPos.x, endPos.y, endPos.z, tab )
 	return tab
 end
 

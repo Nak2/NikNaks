@@ -17,6 +17,8 @@ local MATRIX_A = 0x9908B0DF
 local TEMPERING_MASK_B = 0x9D2C5680
 local TEMPERING_MASK_C = 0xEFC60000
 
+local bxor, lshift, rshift = bit.bxor, bit.lshift, bit.rshift
+
 local function xor_shift(seed)
     seed = bit.bxor(seed, bit.lshift(seed, 13))
     seed = bit.bxor(seed, bit.rshift(seed, 17))
@@ -137,17 +139,19 @@ end
 ---Generates 32bit signed int from -2147483648 to 2147483647
 ---@return number
 function meta_prng:Random()
-	local a, b, c, d = self.state[self.index], self.state[(self.index + 13) % 16], self.state[(self.index + 9) % 16], self.state[(self.index + 5) % 16]
-    local value = bit.bxor(a, bit.lshift(b, 16)) -- Construct a 32-bit value from two 16-bit parts
-    local t = bit.bxor(c, bit.rshift(d, 4))
-    local y1, y2 = bit.bxor(a, t), bit.bxor(bit.lshift(b, 11), bit.rshift(t, 7))
+	local state, i = self.state, self.index
+	local i13, i9, i5 = (i + 13) % 16, (i + 9) % 16, (i + 5) % 16
+	local a, b, c, d = state[i], state[i13], state[i9], state[i5]
+    local value = bxor(a, lshift(b, 16)) -- Construct a 32-bit value from two 16-bit parts
+    local t = bxor(c, rshift(d, 4))
+    local y1, y2 = bxor(a, t), bxor(lshift(b, 11), rshift(t, 7))
 
-    self.state[self.index] = y2
-    self.state[(self.index + 13) % 16] = y1
-    self.state[(self.index + 9) % 16] = bit.bxor(t, bit.lshift(y1, 2))
-    self.state[(self.index + 5) % 16] = bit.bxor(d, bit.rshift(y2, 8))
+    state[i] = y2
+    state[i13] = y1
+    state[i9] = bxor(t, lshift(y1, 2))
+    state[i5] = bxor(d, rshift(y2, 8))
 
-    self.index = (self.index + 15) % 16 -- Move to the next state
+    self.index = (i + 15) % 16 -- Move to the next state
 
     return value
 end

@@ -876,7 +876,9 @@ do
 		for i = 0, data:Size() / 160 - 1 do
 			--- @class BSPPlane
 			local t = {}
-			t.normal = data:ReadVector() -- Normal vector
+			local normal = data:ReadVector() -- Normal vector
+			t.normal = normal
+			t.nx, t.ny, t.nz = normal.x, normal.y, normal.z
 			t.dist = data:ReadFloat() -- Distance from origin
 			t.type = data:ReadLong() -- Plane axis identifier
 			setmetatable(t, planeMeta)
@@ -1045,18 +1047,19 @@ do
 		local nodes  = self:GetNodes()
 		local planes = self:GetPlanes()
 		local leafs  = self:GetLeafs()
+		local px, py, pz = point.x, point.y, point.z
 
 		while iNode >= 0 do
 			local node  = nodes[iNode]
 			local plane = planes[node.planenum]
-			local d     = dot(point, plane.normal) - plane.dist
+			local d     = plane.nx * px + plane.ny * py + plane.nz * pz - plane.dist
 
 			if d > TEST_EPSILON then
 				iNode = node.children[1]
 			elseif d < -TEST_EPSILON then
 				iNode = node.children[2]
 			else
-				-- Point lies exactly on the splitting plane — try both sides.
+				-- Point lies exactly on the splitting plane - try both sides.
 				-- This is rare; short recursive calls are fine here.
 				local pTest = self:PointInLeaf(node.children[1], point)
 				if pTest.cluster ~= -1 then return pTest end
@@ -1102,6 +1105,7 @@ do
 		local node = 0
 		local nodes = self:GetNodes()
 		local planes = self:GetPlanes()
+		local px, py, pz = position.x, position.y, position.z
 
 		while node > 0 do
 			--- @type MapNode
@@ -1109,7 +1113,7 @@ do
 			--- @type BSPPlane
 			local p = planes[n.planenum]
 
-			if dot(position, p.normal) < p.dist then
+			if p.nx * px + p.ny * py + p.nz * pz < p.dist then
 				node = n.children[2]
 			else
 				node = n.children[1]
@@ -1225,9 +1229,9 @@ do
 		if not data or data:Size() == 0 then return self._dispMultiBlend end
 
 		-- dDispMultiBlend_t layout (all floats, IEEE 754):
-		--   Vector4D multiblend         (4 × float = 16 bytes) — per-layer blend weights [0..1]
-		--   Vector4D alphablend         (4 × float = 16 bytes) — per-layer alpha weights [0..1]
-		--   Vector   multiblendcolors[4](4 × 3 floats = 48 bytes) — per-layer tint colors
+		--   Vector4D multiblend         (4 × float = 16 bytes) - per-layer blend weights [0..1]
+		--   Vector4D alphablend         (4 × float = 16 bytes) - per-layer alpha weights [0..1]
+		--   Vector   multiblendcolors[4](4 × 3 floats = 48 bytes) - per-layer tint colors
 		-- Full struct: 80 bytes = 640 bits.
 		-- Some stripped BSPs omit the color block: 32 bytes = 256 bits.
 		-- dDispMultiBlend_t layout (Source SDK bspfile.h):

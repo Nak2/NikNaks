@@ -14,7 +14,7 @@ local meta_leaf = NikNaks.__metatables["BSP Leaf"]
 --[[The data is stored as an array of bit-vectors; for each cluster, a list of which other clusters are visible 
 	from it are stored as individual bits (1 if visible, 0 if occluded) in an array, with the nth bit position 
 	corresponding to the nth cluster. ]]
-local band = bit.band
+local band, rshift = bit.band, bit.rshift
 
 --- @param vis VisibilityInfo
 --- @param offset number
@@ -26,20 +26,21 @@ local function getClusters( vis, offset, PVS )
 	local num_clusters = vis.num_clusters
 
 	while c < num_clusters do
-		if pvs_buffer[v] == 0 then
+		local byte = pvs_buffer[v]
+		if byte == 0 then
 			v = v + 1
 			c = c + 8 * pvs_buffer[v]
 		else
-			local b = 1
-
-			while b ~= 0 do
-				if band( pvs_buffer[v], b ) ~= 0 then
-					PVS[c] = true
+			-- Walk the set bits, lowest first, and stop once none are left in this byte
+			local cb = c
+			while byte ~= 0 do
+				if band( byte, 1 ) ~= 0 then
+					PVS[cb] = true
 				end
-
-				b = band( b * 2, 0xFF )
-				c = c + 1
+				byte = rshift( byte, 1 )
+				cb = cb + 1
 			end
+			c = c + 8
 		end
 
 		v = v + 1
@@ -55,8 +56,6 @@ do
 	meta_pvs.__tostring = function() return "BSP PVS" end
 	meta_pvs.MetaName = "BSP PVS"
 	NikNaks.__metatables["BSP PVS"] = meta_pvs
-
-	local DVIS_PVS = 1
 
 	--- Creates a new empty PVS-object. Potentially Visible Set
 	--- @return PVSObject

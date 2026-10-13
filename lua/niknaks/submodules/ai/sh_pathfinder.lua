@@ -55,7 +55,7 @@ local HULL_MAXS = {
 
 local GROUND_TRACE_OFFSET = Vector(0, 0, 8)
 
--- Persistent trace tables — reused every call to avoid per-trace table allocation.
+-- Persistent trace tables - reused every call to avoid per-trace table allocation.
 local _canSkipA   = Vector()
 local _canSkipB   = Vector()
 local _canSkipSmp = Vector()
@@ -126,7 +126,7 @@ local function canSkip(a, b, hull, isFlying, filter)
 end
 
 
--- Persistent A* scratch tables — reused across calls to avoid per-call GC pressure.
+-- Persistent A* scratch tables - reused across calls to avoid per-call GC pressure.
 -- _touched tracks every node written this run for O(explored) cleanup.
 local _g          = {}
 local _parent     = {}
@@ -391,7 +391,7 @@ function meta:FindPathByNodes(startNode, goalNode, isFlying, settings)
     return nil
 end
 
--- Persistent position proxy — reused in FindPath to avoid a table+closure alloc per call.
+-- Persistent position proxy - reused in FindPath to avoid a table+closure alloc per call.
 -- Update _proxyVec's components before passing _proxy to canSkip.
 local _proxyVec = Vector(0, 0, 0)
 local _proxy    = { GetPos = function() return _proxyVec end }
@@ -489,20 +489,20 @@ function meta:SmoothPath(path, hull, isFlying, settings)
         local best_i   = j - 1        -- fallback: one step back
         local bestMove = moves[j - 1]
 
-        for i = 1, j - 2 do
+        -- All segments from i to j-1 must be ground or fly, so i can't be at or before the last segment that isn't
+        local firstI = 1
+        for k = j - 1, 1, -1 do
+            if moves[k] ~= GROUND and moves[k] ~= FLY then
+                firstI = k + 1
+                break
+            end
+        end
+
+        local jPos = maxDistSqr and nodes[j]:GetPos()
+        for i = firstI, j - 2 do
             -- Distance cap: skip i values that are too far from j
-            if maxDistSqr and nodes[i]:GetPos():DistToSqr(nodes[j]:GetPos()) > maxDistSqr then
-                -- no continue keyword; handled by else below
-            else
-                -- All intermediate segments must be ground or fly
-                local canSmooth = true
-                for k = i, j - 1 do
-                    if moves[k] ~= GROUND and moves[k] ~= FLY then
-                        canSmooth = false
-                        break
-                    end
-                end
-                if canSmooth and canSkip(nodes[i], nodes[j], hull, isFlying, filter) then
+            if not maxDistSqr or nodes[i]:GetPos():DistToSqr(jPos) <= maxDistSqr then
+                if canSkip(nodes[i], nodes[j], hull, isFlying, filter) then
                     best_i   = i
                     bestMove = smoothMove
                     break   -- earliest reachable node found; stop scanning
@@ -557,7 +557,7 @@ function meta:UpdatePath(state, newGoal, isFlying, settings)
     local pathNodes = state.path.nodes
 
     -- Find the furthest node ahead in the current path that is still
-    -- a good branching point — closest node to the new goal
+    -- a good branching point - closest node to the new goal
     local bestIndex = state.currentIndex
     local bestDist  = math.huge
     for i = state.currentIndex, #pathNodes do

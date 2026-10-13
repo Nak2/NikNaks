@@ -168,16 +168,20 @@ do
 	local nodes = {}
 	local leafs = {}
 
-	local middle = Vector()
-	---@param self BSPObject
+	-- The segment is passed as six numbers instead of Vectors. The old shared "middle" Vector was handed down as
+	-- startPos/endPos and then overwritten by the recursion below it, corrupting the parent's second half.
 	---@param nodeIndex number
 	---@param startFraction number
 	---@param endFraction number
-	---@param startPos Vector
-	---@param endPos Vector
+	---@param sx number
+	---@param sy number
+	---@param sz number
+	---@param ex number
+	---@param ey number
+	---@param ez number
 	---@param trace table
 	---@param mask number? The surface flags to check for. (SURF_*)
-	local function rayCastNode( self, nodeIndex, startFraction, endFraction, startPos, endPos, trace, mask )
+	local function rayCastNode( nodeIndex, startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask )
 		local traceFraction = trace.Fraction
 		if traceFraction <= startFraction then return end
 
@@ -185,8 +189,11 @@ do
 			---@type BSPLeafObject
 			local leaf = leafs[ -nodeIndex - 1]
 			if trace.StartSolid or traceFraction < 1 then return end
-			for _, face in ipairs(leaf:GetFaces()) do
-				if dot(face.plane.normal,trace.Normal) < 0 then
+			local normal = trace.Normal
+			local faces = leaf:GetFaces()
+			for i = 1, #faces do
+				local face = faces[i]
+				if dot(face.plane.normal, normal) < 0 then
 					-- Check mask
 					if mask and bit.band(face:GetTexInfo().flags, mask) == 0 then continue end
 					rayCastFace(face, trace)
@@ -197,29 +204,33 @@ do
 
 		--- @type MapNode
 		local node = nodes[nodeIndex]
-		if not node or not node.plane then return end
+		if not node then return end
 
 		local plane = node.plane
-		local start_dist, end_dist = 0,0
+		if not plane then return end
 
-		if plane.type == 0 then
-			start_dist = startPos.x - plane.dist
-			end_dist = endPos.x - plane.dist
-		elseif plane.type == 1 then
-			start_dist = startPos.y - plane.dist
-			end_dist = endPos.y - plane.dist
-		elseif plane.type == 2 then
-			start_dist = startPos.z - plane.dist
-			end_dist = endPos.z - plane.dist
+		local start_dist, end_dist
+		local ptype, pdist = plane.type, plane.dist
+
+		if ptype == 0 then
+			start_dist = sx - pdist
+			end_dist = ex - pdist
+		elseif ptype == 1 then
+			start_dist = sy - pdist
+			end_dist = ey - pdist
+		elseif ptype == 2 then
+			start_dist = sz - pdist
+			end_dist = ez - pdist
 		else
-			start_dist = dot(startPos, plane.normal) - plane.dist
-			end_dist = dot(endPos, plane.normal) - plane.dist
+			local nx, ny, nz = plane.nx, plane.ny, plane.nz
+			start_dist = sx * nx + sy * ny + sz * nz - pdist
+			end_dist = ex * nx + ey * ny + ez * nz - pdist
 		end
 
 		if start_dist >= 0 and end_dist >= 0 then
-			rayCastNode(self, node.children[1], startFraction, endFraction, startPos, endPos, trace, mask)
+			rayCastNode(node.children[1], startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask)
 		elseif start_dist < 0 and end_dist < 0 then
-			rayCastNode(self, node.children[2], startFraction, endFraction, startPos, endPos, trace, mask)
+			rayCastNode(node.children[2], startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask)
 		else
 			local side_id, fraction_first, fraction_second = 0, 0, 0
 			local inversed_distance = 1 / (start_dist - end_dist)
@@ -239,24 +250,17 @@ do
 
 			fraction_first = min(1, max(0, fraction_first))
 			fraction_second = min(1, max(0, fraction_second))
-			local difX = endPos.x - startPos.x
-			local difY = endPos.y - startPos.y
-			local difZ = endPos.z - startPos.z
+			local difX, difY, difZ = ex - sx, ey - sy, ez - sz
 
 			local fraction_middle = startFraction + (endFraction - startFraction) * fraction_first
-			middle.x = startPos.x + fraction_first * difX
-			middle.y = startPos.y + fraction_first * difY
-			middle.z = startPos.z + fraction_first * difZ
-
-			rayCastNode(self, node.children[side_id], startFraction, fraction_middle, startPos, middle, trace, mask)
+			rayCastNode(node.children[side_id], startFraction, fraction_middle, sx, sy, sz,
+				sx + fraction_first * difX, sy + fraction_first * difY, sz + fraction_first * difZ, trace, mask)
 
 			fraction_middle = startFraction + (endFraction - startFraction) * fraction_second
-			middle.x = startPos.x + fraction_second * difX
-			middle.y = startPos.y + fraction_second * difY
-			middle.z = startPos.z + fraction_second * difZ
 			side_id = (side_id == 1) and 2 or 1
 
-			rayCastNode(self, node.children[side_id], fraction_middle, endFraction, middle, endPos, trace, mask)
+			rayCastNode(node.children[side_id], fraction_middle, endFraction,
+				sx + fraction_second * difX, sy + fraction_second * difY, sz + fraction_second * difZ, ex, ey, ez, trace, mask)
 		end
 	end
 
@@ -272,7 +276,7 @@ do
 		local trace = newTrace( startPos, endPos )
 		nodes = self:GetNodes()
 		leafs = self:GetLeafs()
-		rayCastNode(self, 0, 0, 1, startPos, endPos, trace, mask)
+		rayCastNode(0, 0, 1, startPos.x, startPos.y, startPos.z, endPos.x, endPos.y, endPos.z, trace, mask)
 		if trace.Fraction < 1 then
 			trace.Hit = true
 		end
