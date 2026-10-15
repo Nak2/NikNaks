@@ -431,6 +431,10 @@ end
 --- @field binormal Vector
 --- @field userdata table<number, number>
 
+--- Shared white Colors keyed by alpha, used for displacement vertices.
+--- @type table<number, Color>
+local alphaColors = {}
+
 --- @return PolygonMeshVertex[]
 local function GetDisplacementVertexs(self, faceVertexData )
 	local dispInfo = self:GetDisplacementInfo()
@@ -485,18 +489,21 @@ local function GetDisplacementVertexs(self, faceVertexData )
 	end
 
 	local A, B, C, D = unpack( rotated( baseQuad ) )
-	local AD = D - A
-	local BC = C - B
+	local Ax, Ay, Az = A:Unpack()
+	local Bx, By, Bz = B:Unpack()
+	local ADx, ADy, ADz = ( D - A ):Unpack()
+	local BCx, BCy, BCz = ( C - B ):Unpack()
 
+	-- Texture and lightmap UVs are interpolated exactly like the positions (A->D along one edge,
+	-- B->C along the other, then between the two), but as plain numbers: no Vector allocations per vertex.
 	local quad = rotated( baseVerts )
-
-	local uvA, uvB, uvC, uvD = extractUVVecs( quad )
-	local uvAD = uvD - uvA
-	local uvBC = uvC - uvB
-
-	local uv2A, uv2B, uv2C, uv2D = extractUVVecs( quad, "u1", "v1" )
-	local uv2AD = uv2D - uv2A
-	local uv2BC = uv2C - uv2B
+	local q1, q2, q3, q4 = quad[1], quad[2], quad[3], quad[4]
+	local uA, vA, uB, vB = q1.u, q1.v, q2.u, q2.v
+	local uAD, vAD = q4.u - uA, q4.v - vA
+	local uBC, vBC = q3.u - uB, q3.v - vB
+	local lA, mA, lB, mB = q1.u1, q1.v1, q2.u1, q2.v1
+	local lAD, mAD = q4.u1 - lA, q4.v1 - mA
+	local lBC, mBC = q3.u1 - lB, q3.v1 - mB
 
 	local power = dispInfo.power
 	local power2 = 2 ^ power
@@ -505,37 +512,44 @@ local function GetDisplacementVertexs(self, faceVertexData )
 	local vertEnd = vertStart + vertCount
 
 	local vertices = {}
+	local px, py, pz = {}, {}, {} -- Final positions as numbers, used by the normal pass below
 	do
-	    local LerpVector = LerpVector
-	    local math_floor = math.floor
-	    local math_Clamp = math.Clamp
-	    local table_insert = table.insert
+		local math_floor = math.floor
+		local math_Clamp = math.Clamp
 
 		local dispVertices = self.__map:GetDispVerts()
 		local dispMultiBlend = self.__map:GetDispMultiBlend()
 		local isMultiBlend = self:IsLightmapped4WayBlend()
-		local vertex, t1, t2, baryVert, dispVert, trueVert, textureUV, lightmapUV
 		local normal = baseVerts[1].normal
 
 		local tangent = normal:Cross( vector_up ):Cross( normal ):GetNormalized()
 		local tangentUD = { tangent.x, tangent.y, tangent.z, 1 }
 
+		local stride = power2 + 1
 		local index = 0
 		for v = vertStart, vertEnd - 1 do
-			vertex = dispVertices[v]
+			local vertex = dispVertices[v]
 			if not vertex then
 			    print( "Unexpected end of vertex", "Start: " .. vertStart, "End: " .. vertEnd, "Current: " .. v )
 			    break
 			end
 
-			t1 = index % ( power2 + 1 ) / power2
-			t2 = math_floor( index / ( power2 + 1 ) ) / power2
+			local t1 = index % stride / power2
+			local t2 = math_floor( index / stride ) / power2
 
-			baryVert = LerpVector( t2, A + ( AD * t1 ), B + ( BC * t1 ) )
-			dispVert = vertex.vec * vertex.dist
-			trueVert = baryVert + dispVert
-			textureUV = LerpVector( t2, uvA + ( uvAD * t1 ), uvB + ( uvBC * t1 ) )
-			lightmapUV = LerpVector( t2, uv2A + ( uv2AD * t1 ), uv2B + ( uv2BC * t1 ) )
+			-- Position: lerp along both edges (t1), between the edges (t2), then add the displacement.
+			local p0x, p0y, p0z = Ax + ADx * t1, Ay + ADy * t1, Az + ADz * t1
+			local p1x, p1y, p1z = Bx + BCx * t1, By + BCy * t1, Bz + BCz * t1
+			local dx, dy, dz = vertex.vec:Unpack()
+			local dist = vertex.dist
+			local x = p0x + ( p1x - p0x ) * t2 + dx * dist
+			local y = p0y + ( p1y - p0y ) * t2 + dy * dist
+			local z = p0z + ( p1z - p0z ) * t2 + dz * dist
+
+			local tu0, tv0 = uA + uAD * t1, vA + vAD * t1
+			local tu1, tv1 = uB + uBC * t1, vB + vBC * t1
+			local lu0, lv0 = lA + lAD * t1, mA + mAD * t1
+			local lu1, lv1 = lB + lBC * t1, mB + mBC * t1
 
 			-- For Lightmapped_4WayBlend, pass lump-63 weights as vertex RGBA:
 			--   A = blend[1] (layer 1→2),  R = blend[2] (layer 3),  G = blend[3] (layer 4),  B = blend[4] (unused).
@@ -551,30 +565,38 @@ local function GetDisplacementVertexs(self, faceVertexData )
 					math_Clamp( blend[1] * 255, 0, 255 )
 				)
 			else
-				color = Color( 255, 255, 255, vertex.alpha )
+				-- Shared per alpha value: displacements have thousands of vertices but only a few distinct alphas.
+				local alpha = vertex.alpha
+				color = alphaColors[alpha]
+				if not color then
+					color = Color( 255, 255, 255, alpha )
+					alphaColors[alpha] = color
+				end
 			end
 
-			table_insert( vertices, {
-				pos = trueVert,
+			index = index + 1
+			px[index], py[index], pz[index] = x, y, z
+			vertices[index] = {
+				pos = Vector( x, y, z ),
 				normal = normal,
-				u = textureUV.x,
-				v = textureUV.y,
-				u1 = lightmapUV.x,
-				v1 = lightmapUV.y,
+				u = tu0 + ( tu1 - tu0 ) * t2,
+				v = tv0 + ( tv1 - tv0 ) * t2,
+				u1 = lu0 + ( lu1 - lu0 ) * t2,
+				v1 = lv0 + ( lv1 - lv0 ) * t2,
 				userdata = tangentUD,
 				color = color,
-			} )
-
-			index = index + 1
+			}
 		end
 	end
 
+	-- Smooth normals: accumulate each quad's triangle normals onto its corners (plain numbers, no Vectors).
 	do
-		local accum = {}
-		for k = 1, #vertices do accum[k] = Vector( 0, 0, 0 ) end
+		local count = #vertices
+		local ax, ay, az = {}, {}, {}
+		for k = 1, count do ax[k], ay[k], az[k] = 0, 0, 0 end
 
 		local gridSize = power2 + 1
-		local baseNormal = baseVerts[1].normal
+		local bnx, bny, bnz = baseVerts[1].normal:Unpack()
 
 		for row = 0, power2 - 1 do
 			for col = 0, power2 - 1 do
@@ -582,34 +604,48 @@ local function GetDisplacementVertexs(self, faceVertexData )
 				local i2 = ( row + 1 ) * gridSize + col + 1
 				local i3 = ( row + 1 ) * gridSize + col + 2
 				local i4 = row * gridSize + col + 2
-				local p1, p2, p3, p4 = vertices[i1].pos, vertices[i2].pos, vertices[i3].pos, vertices[i4].pos
+				local x1, y1, z1 = px[i1], py[i1], pz[i1]
+				local x2, y2, z2 = px[i2], py[i2], pz[i2]
+				local x3, y3, z3 = px[i3], py[i3], pz[i3]
+				local x4, y4, z4 = px[i4], py[i4], pz[i4]
 
-				local na, nb
 				if ( row + col ) % 2 == 0 then
-					na = ( p2 - p1 ):Cross( p3 - p1 )
-					nb = ( p3 - p1 ):Cross( p4 - p1 )
-					accum[i1] = accum[i1] + na + nb
-					accum[i2] = accum[i2] + na
-					accum[i3] = accum[i3] + na + nb
-					accum[i4] = accum[i4] + nb
+					-- na = ( p2 - p1 ) x ( p3 - p1 ),  nb = ( p3 - p1 ) x ( p4 - p1 )
+					local ux, uy, uz = x2 - x1, y2 - y1, z2 - z1
+					local wx, wy, wz = x3 - x1, y3 - y1, z3 - z1
+					local sx, sy, sz = x4 - x1, y4 - y1, z4 - z1
+					local nax, nay, naz = uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx
+					local nbx, nby, nbz = wy * sz - wz * sy, wz * sx - wx * sz, wx * sy - wy * sx
+					ax[i1], ay[i1], az[i1] = ax[i1] + nax + nbx, ay[i1] + nay + nby, az[i1] + naz + nbz
+					ax[i2], ay[i2], az[i2] = ax[i2] + nax,       ay[i2] + nay,       az[i2] + naz
+					ax[i3], ay[i3], az[i3] = ax[i3] + nax + nbx, ay[i3] + nay + nby, az[i3] + naz + nbz
+					ax[i4], ay[i4], az[i4] = ax[i4] + nbx,       ay[i4] + nby,       az[i4] + nbz
 				else
-					na = ( p2 - p1 ):Cross( p4 - p1 )
-					nb = ( p3 - p2 ):Cross( p4 - p2 )
-					accum[i1] = accum[i1] + na
-					accum[i2] = accum[i2] + na + nb
-					accum[i3] = accum[i3] + nb
-					accum[i4] = accum[i4] + na + nb
+					-- na = ( p2 - p1 ) x ( p4 - p1 ),  nb = ( p3 - p2 ) x ( p4 - p2 )
+					local ux, uy, uz = x2 - x1, y2 - y1, z2 - z1
+					local wx, wy, wz = x4 - x1, y4 - y1, z4 - z1
+					local sx, sy, sz = x3 - x2, y3 - y2, z3 - z2
+					local rx, ry, rz = x4 - x2, y4 - y2, z4 - z2
+					local nax, nay, naz = uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx
+					local nbx, nby, nbz = sy * rz - sz * ry, sz * rx - sx * rz, sx * ry - sy * rx
+					ax[i1], ay[i1], az[i1] = ax[i1] + nax,       ay[i1] + nay,       az[i1] + naz
+					ax[i2], ay[i2], az[i2] = ax[i2] + nax + nbx, ay[i2] + nay + nby, az[i2] + naz + nbz
+					ax[i3], ay[i3], az[i3] = ax[i3] + nbx,       ay[i3] + nby,       az[i3] + nbz
+					ax[i4], ay[i4], az[i4] = ax[i4] + nax + nbx, ay[i4] + nay + nby, az[i4] + naz + nbz
 				end
 			end
 		end
 
-		for k = 1, #vertices do
-			local n = accum[k]
-			if n:LengthSqr() > 0 then
-				n = n:GetNormalized()
+		local sqrt = math.sqrt
+		for k = 1, count do
+			local nx, ny, nz = ax[k], ay[k], az[k]
+			local lenSqr = nx * nx + ny * ny + nz * nz
+			if lenSqr > 0 then
+				local inv = 1 / sqrt( lenSqr )
+				nx, ny, nz = nx * inv, ny * inv, nz * inv
 				-- Ensure the computed normal faces the same side as the base face.
-				if n:Dot( baseNormal ) < 0 then n = -n end
-				vertices[k].normal = n
+				if nx * bnx + ny * bny + nz * bnz < 0 then nx, ny, nz = -nx, -ny, -nz end
+				vertices[k].normal = Vector( nx, ny, nz )
 			end
 		end
 	end
@@ -654,43 +690,50 @@ function meta_face:GenerateVertexData()
 	-- Move the faces to match func_brushes (If any)
 	local bNum = self.__bmodel
 	local exPos, exAng
+	local zeroAngle, zeroVector -- Only needed for faces on a brush entity
 	if bNum > 0 then
 		-- Get funch_brushes and their location
 		local func_brush = __findEntityUsingBrush( self.__map )[bNum]
 		if func_brush then
 			exPos = func_brush.origin
 			exAng = func_brush.angles
+			zeroAngle  = Angle( 0, 0, 0 )
+			zeroVector = Vector( 0, 0, 0 )
 		end
 	end
 
 	local luxelW = self.LightmapTextureSizeInLuxels[1] + 1
 	local luxelH = self.LightmapTextureSizeInLuxels[2] + 1
 
-	-- Cache brush-offset helpers outside the loop to avoid recreating zero
-	-- Angle/Vector on every iteration when the face belongs to a brush entity.
-	local zeroAngle  = Angle( 0, 0, 0 )
-	local zeroVector = Vector( 0, 0, 0 )
+	-- Same lookup as BSPObject:GetSurfEdgesIndex, done once per face instead of once per vertex.
+	local map = self.__map
+	local surfEdges, edges = map:GetSurfEdges(), map:GetEdges()
+	local firstedge = self.firstedge
+	local abs = math.abs
 
 	for i = 0, self.numedges - 1 do
-		--- @class PolygonMeshVertex
-		local vert = {}
-		local a = self.__map:GetSurfEdgesIndex( self.firstedge + i )
-		vert.pos = a
-		if bNum > 0 and exAng and exPos then -- WorldPos -> Entity Brush
-			local localA = WorldToLocal( a, zeroAngle, zeroVector, exAng )
-			vert.pos = localA + exPos
+		local surf = surfEdges[firstedge + i]
+		local edge = edges[abs( surf )]
+		local a = surf >= 0 and edge[1] or edge[2]
+		local pos = a
+		if exAng and exPos then -- WorldPos -> Entity Brush
+			pos = WorldToLocal( a, zeroAngle, zeroVector, exAng ) + exPos
 		end
-		vert.normal   = n
-		vert.tangent  = tangent
-		vert.binormal = binormal
-		-- UV & LV
-		vert.u  = ( tv00 * a.x + tv01 * a.y + tv02 * a.z + tv03 ) / mat_w
-		vert.v  = ( tv10 * a.x + tv11 * a.y + tv12 * a.z + tv13 ) / mat_h
-		vert.u1 = ( lv00 * a.x + lv01 * a.y + lv02 * a.z + lv03 - lm1 ) / luxelW
-		vert.v1 = ( lv10 * a.x + lv11 * a.y + lv12 * a.z + lv13 - lm2 ) / luxelH
-
-		vert.userdata = tangentUD
-		t[i + 1] = vert
+		local ax, ay, az = a:Unpack()
+		-- Built in one go: filling an empty table field by field makes it resize several times.
+		--- @class PolygonMeshVertex
+		t[i + 1] = {
+			pos       = pos,
+			normal    = n,
+			tangent   = tangent,
+			binormal  = binormal,
+			-- UV & LV
+			u         = ( tv00 * ax + tv01 * ay + tv02 * az + tv03 ) / mat_w,
+			v         = ( tv10 * ax + tv11 * ay + tv12 * az + tv13 ) / mat_h,
+			u1        = ( lv00 * ax + lv01 * ay + lv02 * az + lv03 - lm1 ) / luxelW,
+			v1        = ( lv10 * ax + lv11 * ay + lv12 * az + lv13 - lm2 ) / luxelH,
+			userdata  = tangentUD,
+		}
 	end
 
 	if self:IsDisplacement() then
