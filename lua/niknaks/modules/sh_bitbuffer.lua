@@ -52,7 +52,7 @@ local function unsaferawdata(self, str)
 	for i = 1, whole, 4 do
 		local a, b, c, d = s_byte(str, i, i + 3)
 		p = p + 1
-		self._data[p] = bor(lshift(a, 24), lshift(b, 16), lshift(c, 8), d)
+		self._data[p] = bor(blshift(a, 24), blshift(b, 16), blshift(c, 8), d)
 	end
 
 	self._tell = lshift(p, 5)
@@ -535,6 +535,13 @@ do
 	--- Reads a byte. ( 0 - 255 )
 	---@return number
 	function meta:ReadByte()
+		-- Fast path: the byte sits inside one word (a byte needs no endian swap).
+		local tell = self._tell
+		local bitPos = band(tell, 31)
+		if bitPos <= 24 then
+			self._tell = tell + 8
+			return band(brshift(self._data[brshift(tell, 5) + 1] or 0x0, 24 - bitPos), 0xFF)
+		end
 		return readraw(self, 8)
 	end
 end
@@ -552,7 +559,9 @@ do
 	--- Reads a signed byte. ( -128 - 127 )
 	---@return number
 	function meta:ReadSignedByte()
-		return to_signed(readraw(self, 8), 8)
+		local n = self:ReadByte()
+		if n >= 0x80 then return n - 0x100 end
+		return n
 	end
 end
 
@@ -569,6 +578,14 @@ do
 	--- Reads an unsigned 2 byte number. ( 0 - 65535 )
 	---@return number
 	function meta:ReadUShort()
+		-- Fast path: little-endian and the short sits inside one word.
+		local tell = self._tell
+		local bitPos = band(tell, 31)
+		if self._little_endian and bitPos <= 16 then
+			self._tell = tell + 16
+			local x = band(brshift(self._data[brshift(tell, 5) + 1] or 0x0, 16 - bitPos), 0xFFFF)
+			return brshift(bswap(x), 16)
+		end
 		return readraw(self, 16)
 	end
 end
@@ -586,7 +603,9 @@ do
 	--- Reads a 2-byte signed number. ( -32768 - 32767 )
 	---@return number
 	function meta:ReadShort()
-		return to_signed(readraw(self, 16), 16)
+		local n = self:ReadUShort()
+		if n >= 0x8000 then return n - 0x10000 end
+		return n
 	end
 end
 
@@ -603,7 +622,12 @@ do
 	--- Reads an unsigned 4 byte number ( 0 - 4294967295 )
 	---@return number
 	function meta:ReadULong()
-		local n = readraw(self, 32)
+		local n
+		if self._little_endian then
+			n = bswap(readraw32(self))
+		else
+			n = readraw(self, 32)
+		end
 		if n > -1 then return n end
 		return n + pow32
 	end
@@ -622,6 +646,10 @@ do
 	--- Reads a 4 byte number. ( -2147483648 - 2147483647 )
 	---@return number
 	function meta:ReadLong()
+		-- bswap already returns a signed 32-bit value.
+		if self._little_endian then
+			return bswap(readraw32(self))
+		end
 		return to_signed(readraw(self, 32), 32)
 	end
 end
@@ -720,9 +748,15 @@ do
 	--- Reads an IEEE 754 little-endian float.
 	---@return number
 	function meta:ReadFloat()
-		local n = self:ReadULong()
+		-- Same bits as ReadULong, but skips the unsigned conversion and an extra call.
+		local n
+		if self._little_endian then
+			n = bswap(readraw32(self))
+		else
+			n = readraw(self, 32)
+		end
 		local sign = band(0x80000000, n) == 0 and 1 or -1
-		local ex = band(rshift(n, 23), 0xFF)
+		local ex = band(brshift(n, 23), 0xFF)
 		local man = band(n, 0x007FFFFF) / _23pow
 
 		if ex == 0 and man == 0 then
