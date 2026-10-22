@@ -131,13 +131,55 @@ local function __readColorRGBExp32 ( data )
 	return NikNaks.ColorRGBExp32ToColor( sample ), sample.exponent
 end
 
+local LUMP_FACES_HDR = 58
+local LUMP_LIGHTING_HDR = 53
+
+--- @class BSPFaceLightingHDR
+--- @field lightofs number # Byte offset into the HDR lighting lump (53). -1 if the face has no lightmap.
+--- @field styles number[] # The 4 light styles of the face (255 = unused)
+
+--- Returns where each face's HDR lightmap is stored, from the HDR face lump (58).
+--- The HDR faces have their own `lightofs` and `styles`, since the HDR lighting is compiled separately.
+--- Same order as BSPObject:GetFaces() (0-based). Empty if the map has no HDR lighting.
+--- @return table<number, BSPFaceLightingHDR>
+function meta:GetFacesHDRLighting()
+	if self._facesHDRLight then return self._facesHDRLight end
+
+	local out = {}
+	self._facesHDRLight = out
+
+	local header = self._lumpheader[LUMP_FACES_HDR]
+	if not header or header.filelen <= 0 then return out end
+
+	-- Same 56 byte layout as GetFaces(). styles start at bit 128, lightofs follows them.
+	local data = self:GetLump( LUMP_FACES_HDR )
+	for i = 0, math.min( data:Size() / 448, MAX_MAP_FACES ) - 1 do
+		data:Seek( i * 448 + 128 )
+		local s1, s2, s3, s4 = data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte()
+		out[i] = { styles = { s1, s2, s3, s4 }, lightofs = data:ReadLong() }
+	end
+
+	self:ClearLump( LUMP_FACES_HDR )
+	return out
+end
+
 --- Returns the lightmap samples for the face.
+--- @param hdr boolean? # If true, reads the HDR lightmap (lumps 58 and 53) instead of the LDR one (lumps 7 and 8). Returns nil if the map has no HDR lighting.
 --- @return table<string, LightmapSample[]>?
-function meta_face:GetLightmapSamples()
-	local lightofs = self.lightofs
+function meta_face:GetLightmapSamples( hdr )
+	local lightofs, styles, lumpId, cacheKey
+
+	if hdr then
+		local record = self.__map:GetFacesHDRLighting()[self.__id]
+		local header = self.__map._lumpheader[LUMP_LIGHTING_HDR]
+		if not record or not header or header.filelen <= 0 then return end
+		lightofs, styles, lumpId, cacheKey = record.lightofs, record.styles, LUMP_LIGHTING_HDR, "_lightmap_samples_hdr"
+	else
+		lightofs, styles, lumpId, cacheKey = self.lightofs, self.styles, 8, "_lightmap_samples"
+	end
 
 	if lightofs == -1 then return end
-	if self._lightmap_samples then return self._lightmap_samples end
+	if self[cacheKey] then return self[cacheKey] end
 
 	--- @class LightmapSample
 	--- @field color Color
@@ -150,14 +192,14 @@ function meta_face:GetLightmapSamples()
 	local average = {}
 
 	local samples = { average = average, full = full }
-	self._lightmap_samples = samples
+	self[cacheKey] = samples
 
 	local mat = self:GetMaterial()
 	local has_bumpmap = mat:GetString( "$bumpmap" ) ~= nil
 	local luxel_count = ( self.LightmapTextureSizeInLuxels[1] + 1 ) * ( self.LightmapTextureSizeInLuxels[2] + 1 )
 
 	local lightstyle_count = 0
-	for _, v in ipairs( self.styles ) do
+	for _, v in ipairs( styles ) do
 		if v ~= 255 then lightstyle_count = lightstyle_count + 1 end
 	end
 
@@ -165,7 +207,7 @@ function meta_face:GetLightmapSamples()
 	local sample_count = lightstyle_count * luxel_count
 	if has_bumpmap then sample_count = sample_count * 4 end
 
-	local data = self.__map:GetLump( 8 )
+	local data = self.__map:GetLump( lumpId )
 
 	-- Get the average samples
 	-- "Immediately preceeding the lightofs-referenced sample group,
@@ -191,6 +233,89 @@ function meta_face:GetLightmapSamples()
 	end
 
 	return samples
+end
+
+do
+	local floor, min, max = math.floor, math.min, math.max
+
+	---Bilinear sample of a luxel grid. The grid is row-major, 1-based, and w x h luxels big.
+	---@return number? r
+	---@return number? g
+	---@return number? b
+	local function sampleGrid( full, w, h, u, v )
+		-- u / v = s / gridSize, with s already in luxel units: sample 0 is at s = 0 (no half-luxel shift).
+		local fx = max( 0, min( u * w, w - 1 ) )
+		local fy = max( 0, min( v * h, h - 1 ) )
+		local x0, y0 = floor( fx ), floor( fy )
+		local x1, y1 = min( x0 + 1, w - 1 ), min( y0 + 1, h - 1 )
+		local tx, ty = fx - x0, fy - y0
+
+		local a, b = full[y0 * w + x0 + 1], full[y0 * w + x1 + 1]
+		local c, d = full[y1 * w + x0 + 1], full[y1 * w + x1 + 1]
+		if not ( a and b and c and d ) then return end
+		a, b, c, d = a.color, b.color, c.color, d.color
+
+		-- The colors are vertex-light colors where 0.5 means "1x". The engine doubles them (2x overbright), so we do too.
+		-- Anything brighter than 1x is clamped to 255.
+		local r1, g1, b1 = a.r + ( b.r - a.r ) * tx, a.g + ( b.g - a.g ) * tx, a.b + ( b.b - a.b ) * tx
+		local r2, g2, b2 = c.r + ( d.r - c.r ) * tx, c.g + ( d.g - c.g ) * tx, c.b + ( d.b - c.b ) * tx
+		return min( ( r1 + ( r2 - r1 ) * ty ) * 2, 255 ),
+			min( ( g1 + ( g2 - g1 ) * ty ) * 2, 255 ),
+			min( ( b1 + ( b2 - b1 ) * ty ) * 2, 255 )
+	end
+
+	---Returns the baked light color at a lightmap UV on the face (bilinear), as r, g, b in 0-255.
+	---Returns nil if the face has no lightmap, or the map has no HDR lighting and hdr is true.
+	--- @param u1 number # Lightmap U, as in the u1 of GenerateVertexData()
+	--- @param v1 number # Lightmap V, as in the v1 of GenerateVertexData()
+	--- @param hdr boolean? # Use the HDR lightmap
+	--- @return number? r
+	--- @return number? g
+	--- @return number? b
+	function meta_face:SampleLightmap( u1, v1, hdr )
+		local samples = self:GetLightmapSamples( hdr )
+		if not samples or #samples.full == 0 then return end
+		return sampleGrid( samples.full, self.LightmapTextureSizeInLuxels[1] + 1, self.LightmapTextureSizeInLuxels[2] + 1, u1, v1 )
+	end
+
+	---Returns a baked light color for each vertex, in the same order as the vertices given. [Not Cached]
+	---Each color is a table { r, g, b } in 0-255 (see BSPFaceObject:SampleLightmap for what the numbers mean).
+	---Vertices outside the sampled grid get white. Returns nil if the face has no lightmap, or hdr is true and the map has no HDR lighting.
+	--- @param verts PolygonMeshVertex[]? # Defaults to face:GenerateVertexTriangleData()
+	--- @param hdr boolean? # Use the HDR lightmap
+	--- @return { r: number, g: number, b: number }[]?
+	function meta_face:GenerateLightColors( verts, hdr )
+		-- GetLightmapSamples keeps every luxel on the face (two tables per luxel). Since this function isn't cached,
+		-- don't leave that behind unless it was already there: it adds up to hundreds of MB on a big map.
+		local cacheKey = hdr and "_lightmap_samples_hdr" or "_lightmap_samples"
+		local wasCached = self[cacheKey] ~= nil
+
+		local samples = self:GetLightmapSamples( hdr )
+		if not samples then return end
+		local full = samples.full
+
+		local colors
+		verts = verts or self:GenerateVertexTriangleData()
+		if verts and #full > 0 then
+			local w, h = self.LightmapTextureSizeInLuxels[1] + 1, self.LightmapTextureSizeInLuxels[2] + 1
+			colors = {}
+			for i = 1, #verts do
+				local vert = verts[i]
+				local r, g, b = sampleGrid( full, w, h, vert.u1, vert.v1 )
+				colors[i] = { r = r or 255, g = g or 255, b = b or 255 }
+			end
+		end
+
+		if not wasCached then self[cacheKey] = nil end
+		return colors
+	end
+end
+
+---Frees the geometry cached on the face by GenerateVertexTriangleData() and GetVertexs(). It is generated again when needed.
+---Useful after building something from a lot of faces, since the cache is several tables per vertex.
+function meta_face:ClearMeshData()
+	self._vertTriangleData = nil
+	self._vertex = nil
 end
 
 --- Returns the face-index. Will return -1 if none.
@@ -239,7 +364,8 @@ end
 --- @return boolean
 function meta_face:IsLightmapped4WayBlend()
 	if self._is4wayblend ~= nil then return self._is4wayblend end
-	self._is4wayblend = self:GetMaterial():GetShader() == "Lightmapped_4WayBlend"
+	-- GetShader() gives the implementation name, with the DirectX version: "Lightmapped_4WayBlend_DX9" and the like
+	self._is4wayblend = string.gsub( self:GetMaterial():GetShader(), "_DX%d+$", "" ) == "Lightmapped_4WayBlend"
 	return self._is4wayblend
 end
 
@@ -312,8 +438,10 @@ end
 --- Returns the DisplacmentInfo for the face.
 ---@return DispInfo?
 function meta_face:GetDisplacementInfo()
-	local _, t = self.__map:GetDispInfo()
-	return t[self.__id]
+	-- The face's own dispinfo index is the source of truth. The dispinfo's MapFace (which points back at the face)
+	-- is only used if that index doesn't lead anywhere.
+	local list, byFace = self.__map:GetDispInfo()
+	return list[self.dispinfo] or byFace[self.__id]
 end
 
 --- Returns the vertex positions for the face. [Not Cached]
@@ -443,21 +571,6 @@ local function GetDisplacementVertexs(self, faceVertexData )
 	local baseVerts = faceVertexData
 	assert( #baseVerts == 4 )
 
-	---Extracts the u and v params from each point in vData and returns them as Vectors (u->x, v->y, z->0)
-	local function extractUVVecs( vData, u, v )
-		u = u or "u"
-		v = v or "v"
-		local uvs = {}
-
-		local point
-		for i = 1, #vData do
-			point = vData[i]
-			table.insert( uvs, Vector( point[u], point[v], 0 ) )
-		end
-
-		return unpack( uvs )
-	end
-
 	local baseQuad = {}
 	local startIdx = 1
 	do
@@ -501,9 +614,11 @@ local function GetDisplacementVertexs(self, faceVertexData )
 	local uA, vA, uB, vB = q1.u, q1.v, q2.u, q2.v
 	local uAD, vAD = q4.u - uA, q4.v - vA
 	local uBC, vBC = q3.u - uB, q3.v - vB
-	local lA, mA, lB, mB = q1.u1, q1.v1, q2.u1, q2.v1
-	local lAD, mAD = q4.u1 - lA, q4.v1 - mA
-	local lBC, mBC = q3.u1 - lB, q3.v1 - mB
+	-- The lightmap of a displacement is not projected onto it like a flat face's: it is a grid with a luxel for
+	-- every vertex (2^power + 1 on each side), in the same order as the vertices. So the lightmap coordinates
+	-- come from the position in the grid, not from the corners of the flat face.
+	local lightW, lightH = self.LightmapTextureSizeInLuxels[1] + 1, self.LightmapTextureSizeInLuxels[2] + 1
+	local lightU, lightV = ( lightW - 1 ) / lightW, ( lightH - 1 ) / lightH
 
 	local power = dispInfo.power
 	local power2 = 2 ^ power
@@ -548,8 +663,6 @@ local function GetDisplacementVertexs(self, faceVertexData )
 
 			local tu0, tv0 = uA + uAD * t1, vA + vAD * t1
 			local tu1, tv1 = uB + uBC * t1, vB + vBC * t1
-			local lu0, lv0 = lA + lAD * t1, mA + mAD * t1
-			local lu1, lv1 = lB + lBC * t1, mB + mBC * t1
 
 			-- For Lightmapped_4WayBlend, pass lump-63 weights as vertex RGBA:
 			--   A = blend[1] (layer 1→2),  R = blend[2] (layer 3),  G = blend[3] (layer 4),  B = blend[4] (unused).
@@ -567,6 +680,7 @@ local function GetDisplacementVertexs(self, faceVertexData )
 			else
 				-- Shared per alpha value: displacements have thousands of vertices but only a few distinct alphas.
 				local alpha = vertex.alpha
+				if alpha ~= alpha then alpha = 0 end -- NaN (a broken vertex in the lump): can't be a table key
 				color = alphaColors[alpha]
 				if not color then
 					color = Color( 255, 255, 255, alpha )
@@ -581,8 +695,9 @@ local function GetDisplacementVertexs(self, faceVertexData )
 				normal = normal,
 				u = tu0 + ( tu1 - tu0 ) * t2,
 				v = tv0 + ( tv1 - tv0 ) * t2,
-				u1 = lu0 + ( lu1 - lu0 ) * t2,
-				v1 = lv0 + ( lv1 - lv0 ) * t2,
+				-- t1 / t2 run 0 to 1 over the grid: luxel x = t1 * ( width - 1 ), luxel y = t2 * ( height - 1 )
+				u1 = t1 * lightU,
+				v1 = t2 * lightV,
 				userdata = tangentUD,
 				color = color,
 			}
@@ -683,22 +798,27 @@ function meta_face:GenerateVertexData()
 	local lm2 = self.LightmapTextureMinsInLuxels[2]
 
 	-- Tangent/binormal are constant for the face (normal is uniform).
-	local tangent  = n:Cross( vector_up ):Cross( n ):GetNormalized()
-	local binormal = n:Cross( tangent )
-	local tangentUD = { tangent.x, tangent.y, tangent.z, 0 }
+	-- tangent = normalize( ( n x up ) x n ), written out for up = (0, 0, 1) with plain numbers.
+	-- Same result as the Vector version, without three temporary Vectors per face.
+	local nx, ny, nz = n:Unpack()
+	local tx, ty, tz = -nx * nz, -ny * nz, nx * nx + ny * ny
+	local tlen = ( tx * tx + ty * ty + tz * tz ) ^ 0.5
+	if tlen > 0 then tx, ty, tz = tx / tlen, ty / tlen, tz / tlen end
+	local tangent  = Vector( tx, ty, tz )
+	local binormal = Vector( ny * tz - nz * ty, nz * tx - nx * tz, nx * ty - ny * tx ) -- n x tangent
+	local tangentUD = { tx, ty, tz, 0 }
 
 	-- Move the faces to match func_brushes (If any)
 	local bNum = self.__bmodel
 	local exPos, exAng
-	local zeroAngle, zeroVector -- Only needed for faces on a brush entity
+	local zeroAngle -- Only needed for faces on a brush entity
 	if bNum > 0 then
 		-- Get funch_brushes and their location
 		local func_brush = __findEntityUsingBrush( self.__map )[bNum]
 		if func_brush then
 			exPos = func_brush.origin
 			exAng = func_brush.angles
-			zeroAngle  = Angle( 0, 0, 0 )
-			zeroVector = Vector( 0, 0, 0 )
+			zeroAngle = Angle( 0, 0, 0 )
 		end
 	end
 
@@ -717,7 +837,7 @@ function meta_face:GenerateVertexData()
 		local a = surf >= 0 and edge[1] or edge[2]
 		local pos = a
 		if exAng and exPos then -- WorldPos -> Entity Brush
-			pos = WorldToLocal( a, zeroAngle, zeroVector, exAng ) + exPos
+			pos = ( LocalToWorld( a, zeroAngle, exPos, exAng ) )
 		end
 		local ax, ay, az = a:Unpack()
 		-- Built in one go: filling an empty table field by field makes it resize several times.
