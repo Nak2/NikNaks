@@ -213,6 +213,29 @@ function NikNaks.Physics.MeshBounds( mesh )
 	return Vector( x0, y0, z0 ), Vector( x1, y1, z1 )
 end
 
+---Converts a mesh into the format Entity:PhysicsInitMultiConvex takes.
+--- @param mesh PhysMesh
+--- @return Vector[][]
+function NikNaks.Physics.ToMultiConvex( mesh )
+	local points = mesh.points
+	local out = {}
+	for _, ledge in ipairs( mesh.ledges ) do
+		local seen, hull, n = {}, {}, 0
+		for _, tri in ipairs( ledge.tris ) do
+			for k = 1, 3 do
+				local index = tri[k]
+				if not seen[index] then
+					seen[index] = true
+					n = n + 1
+					hull[n] = points[index]
+				end
+			end
+		end
+		if n >= 4 then out[#out + 1] = hull end
+	end
+	return out
+end
+
 --- @class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
