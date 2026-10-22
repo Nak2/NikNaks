@@ -798,9 +798,8 @@ function meta:GetLeafAmbientLightingHDR()
 end
 
 --- Returns the ambient lighting samples for this leaf.
---- Each sample has a 6-directional color cube and a sub-leaf position (x, y, z: 0–255).
+--- Each sample has a 6-directional color cube and a sub-leaf position (x, y, z: 0 - 255).
 --- Cube face order: 1=+X, 2=-X, 3=+Y, 4=-Y, 5=+Z, 6=-Z.
---- Colors use BSPColorRGBExp32: actual value = channel * 2^exp.
 --- @param hdr boolean? # If true, uses HDR data (lump 55). Default is LDR (lump 56).
 --- @return BSPAmbientSample[]
 function meta_leaf:GetAmbientLighting(hdr)

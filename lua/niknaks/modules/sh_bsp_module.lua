@@ -1252,8 +1252,8 @@ do
 		for i = 0, count - 1 do
 			data:Seek(i * ENTRY_BITS)
 			--- @class DispMultiBlend
-			--- @field multiblend number[]  -- [1..4] blend weights (0–1) per texture layer
-			--- @field alphablend number[]  -- [1..4] alpha weights (0–1) per texture layer
+			--- @field multiblend number[]  -- [1..4] blend weights (0 - 1) per texture layer
+			--- @field alphablend number[]  -- [1..4] alpha weights (0 - 1) per texture layer
 			local t = {
 				multiblend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
 				alphablend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
