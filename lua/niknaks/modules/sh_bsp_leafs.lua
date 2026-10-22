@@ -912,6 +912,56 @@ end
 
 
 
+--- Returns the ambient light cube at a position in the leaf: the light that arrives from each of the 6 directions.
+--- This is what the engine lights models with.
+--- @param position Vector
+--- @param hdr boolean? # Use the HDR ambient light
+--- @return Color[]?
+function meta_leaf:CalculateAmbientCube( position, hdr )
+	local samples = self:GetAmbientLighting( hdr )
+	if not samples or #samples == 0 then return nil end
+
+	-- How much each sample counts: all of the first if there is one, else inverse distance (in the 0-255 leaf space)
+	local weights, total = {}, 0
+	if #samples == 1 then
+		weights[1], total = 1, 1
+	else
+		local mins, maxs = self.mins, self.maxs
+		local sx, sy, sz = maxs.x - mins.x, maxs.y - mins.y, maxs.z - mins.z
+		local px = sx > 0 and clamp( ( position.x - mins.x ) / sx, 0, 1 ) * 255 or 0
+		local py = sy > 0 and clamp( ( position.y - mins.y ) / sy, 0, 1 ) * 255 or 0
+		local pz = sz > 0 and clamp( ( position.z - mins.z ) / sz, 0, 1 ) * 255 or 0
+
+		for i, sample in ipairs( samples ) do
+			local dx, dy, dz = px - sample.x, py - sample.y, pz - sample.z
+			weights[i] = 1 / ( dx * dx + dy * dy + dz * dz + 1 )
+			total = total + weights[i]
+		end
+	end
+
+	local cube = {}
+	for f = 1, 6 do
+		local r, g, b = 0, 0, 0
+		for i, sample in ipairs( samples ) do
+			local c = sample.cube[f]
+			local scale = 2 ^ c.exponent / 255 * ( weights[i] / total ) -- RGBExp32 to linear light
+			r, g, b = r + c.r * scale, g + c.g * scale, b + c.b * scale
+		end
+		cube[f] = Color(r, g, b)
+	end
+	return cube
+end
+
+--- Returns the ambient light cube at a position (see BSPLeafObject:CalculateAmbientCube).
+--- @param position Vector
+--- @param hdr boolean? # Use the HDR ambient light
+--- @return Color[]?
+function meta:CalculateAmbientCube( position, hdr )
+	local leaf = self:PointInLeaf( 0, position )
+	if not leaf then return nil end
+	return leaf:CalculateAmbientCube( position, hdr )
+end
+
 if CLIENT then
 	--- Builds and caches an IMesh for the leaf volume.
 	--- @param col Color? Tint color (default white)
