@@ -47,7 +47,7 @@ local function unsaferawdata(self, str)
 
 	local len = #str
 	local p = #self._data
-	local whole = lshift(rshift(len - 4, 2), 2) -- Bytes
+	local whole = len >= 4 and lshift(rshift(len - 4, 2), 2) or 0
 
 	for i = 1, whole, 4 do
 		local a, b, c, d = s_byte(str, i, i + 3)
@@ -335,6 +335,9 @@ do
 	function writeraw(self, int, bits)
 		if self._little_endian and bits % 8 == 0 then
 			int = swap(int, bits)
+		elseif bits < 32 then
+			-- Only the low `bits` bits are the value.
+			int = band(int, brshift(b_mask, 32 - bits))
 		end
 
 		local tell = self._tell
@@ -908,15 +911,29 @@ do
 	---@param bytes number
 	---@return string
 	local function readBytesRaw(self, bytes)
-		local q = lshift(rshift(bytes, 2), 2)
+		local q = bytes - bytes % 4
 		local parts, n = {}, 0
 
-		-- Pull a whole 4-byte group in one raw 32-bit read instead of 4 separate
-		-- ReadByte calls, then unpack it locally (same trick as IntToString).
-		for _ = 1, q, 4 do
+		-- Pull whole 4-byte groups in raw 32-bit reads instead of separate ReadByte calls and unpack them locally (same
+		-- trick as IntToString).
+		local i = 1
+		local sixteen = q - q % 16
+		while i <= sixteen do
+			local w1, w2, w3, w4 = readraw32(self), readraw32(self), readraw32(self), readraw32(self)
+			n = n + 1
+			parts[n] = s_char(
+				brshift(w1, 24), band(brshift(w1, 16), 0xFF), band(brshift(w1, 8), 0xFF), band(w1, 0xFF),
+				brshift(w2, 24), band(brshift(w2, 16), 0xFF), band(brshift(w2, 8), 0xFF), band(w2, 0xFF),
+				brshift(w3, 24), band(brshift(w3, 16), 0xFF), band(brshift(w3, 8), 0xFF), band(w3, 0xFF),
+				brshift(w4, 24), band(brshift(w4, 16), 0xFF), band(brshift(w4, 8), 0xFF), band(w4, 0xFF))
+			i = i + 16
+		end
+
+		while i <= q do
 			local w = readraw32(self)
 			n = n + 1
 			parts[n] = s_char(brshift(w, 24), band(brshift(w, 16), 0xFF), band(brshift(w, 8), 0xFF), band(w, 0xFF))
+			i = i + 4
 		end
 
 		local ReadByte = meta.ReadByte
