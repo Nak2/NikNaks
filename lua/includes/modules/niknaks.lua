@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.94
+local version = 0.96
 if NikNaks and NikNaks.VERSION > version then return end
 
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
@@ -37,7 +37,7 @@ function NikNaks.AutoInclude( str )
 		_type = "sh_"
 	end
 	if SERVER then
-		if _type == "cl_" or _type == "sh_" then		
+		if _type == "cl_" or _type == "sh_" then
 			AddCSLuaFile(str)
 		end
 		if _type ~= "cl_" then
@@ -90,10 +90,12 @@ NikNaks.AutoInclude("niknaks/modules/sh_bsp_leafs.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_brushes.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_pvspas.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_staticprops.lua")
+NikNaks.AutoInclude("niknaks/modules/sh_bsp_detailprops.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_worldlights.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_trace.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_physics.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_physmesh.lua")
+NikNaks.AutoInclude("niknaks/modules/cl_mesh_builder.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_sound_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_datapackage.lua")
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
