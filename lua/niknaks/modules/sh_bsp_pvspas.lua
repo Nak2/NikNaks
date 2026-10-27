@@ -78,9 +78,9 @@ do
 		if cluster < 0 then return PVS end -- Empty cluster position.
 
 		local vis = self:GetVisibility()
-		local visofs = vis.VisData[cluster].PVS
-
-		getClusters( vis, visofs, PVS )
+		local visD = vis.VisData[cluster]
+		if not visD then return PVS end -- Fallback
+		getClusters( vis, visD.PVS, PVS )
 
 		return PVS
 	end
