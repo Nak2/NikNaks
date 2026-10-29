@@ -45,6 +45,8 @@ local BLEND_SHADERS = {
 	Lightmapped_4WayBlend = true, -- the vertex color / alpha are the weights of the 4 textures (the weights of lump 63)
 }
 
+local FLAT_BLEND = Color( 255, 255, 255, 0 )
+
 ---Does the material blend textures by the vertex data? GetShader() gives the implementation name, with the DirectX
 ---version in it ("WorldVertexTransition_DX9").
 ---@param material IMaterial
@@ -122,6 +124,7 @@ NikNaks.MeshBuilder = setmetatable( { Create = create, BlendsWithBackground = bl
 ---@class MeshBuilderOptions
 ---@field light boolean? # Add the baked lightmap as a second mesh, multiplied over the material when drawn. Faces without a lightmap are in it too, as white: unchanged, but they hide the light of faces behind them. Default false.
 ---@field hdr boolean? # Use the HDR lightmap. Default false.
+---@field lightToggle (boolean|table<number, number>|fun( style: number ): number)? # Which light styles of a face are added. A face has a lightmap per style: 0, the animated ones (1-31) and the lights with a name (32 and up, such as a light_environment called "sun_light", which an entity switches). nil / true = the defaults (0 and 32+ on, the animated at half), false = the first lightmap only, a table or function (style -> weight, 0 = off, 1 = on) = your own. Used with `light` and `lightColors` of this builder, not with `lightUV` (that light is yours).
 ---@field lightColors fun( face: BSPFaceObject, verts: PolygonMeshVertex[] ): table[]? # Your own light: a { r, g, b } (0-255) per vertex, used instead of the BSP lightmap. Return nil for no light on that face.
 ---@field material IMaterial? # Draw the faces with this material instead of their own, e.g. a flat material for a minimap.
 ---@field lightUV fun( face: BSPFaceObject, verts: PolygonMeshVertex[] ): number[], number[] # Your own lightmap coordinates, instead of the u1 / v1 of the vertices: returns two arrays (u and v), one number per vertex. For drawing with a lightmap of your own (MeshObjectDrawOptions.lightmap).
@@ -149,17 +152,21 @@ function builder_meta:AddFace( face, options )
 
 	-- A displacement with a material that blends textures: the weights are in the color of its vertices, where the
 	-- shader of the material reads them
-	local blend = face:IsDisplacement() and blendsTextures( material )
-	if blend or batch.colors then
+	-- (A face that is not a displacement has no weights to give: alpha 0, the first texture. White would be alpha 255, the shader's second
+	-- texture, which is what a flat face with a blend material, such as a sea floor with a $basetexture2 of water fog, would show as a whole.)
+	local blends = blendsTextures( material )
+	local blend = blends and face:IsDisplacement()
+	local flat = ( blends and string.gsub( material:GetShader(), "_DX%d+$", "" ) == "WorldVertexTransition" ) and FLAT_BLEND or color_white
+	if blends or batch.colors then
 		local colors = batch.colors
 		if not colors then
 			colors = {}
-			for i = 1, n do colors[i] = color_white end
+			for i = 1, n do colors[i] = flat end
 			batch.colors = colors
 		end
 
 		for i = 1, #verts do
-			colors[n + i] = blend and verts[i].color or color_white
+			colors[n + i] = blend and verts[i].color or flat
 		end
 	end
 	-- Own lightmap coordinates. The vertices are the face's cache and are not changed: the numbers are kept beside them.
@@ -186,7 +193,7 @@ function builder_meta:AddFace( face, options )
 		if custom then
 			colors = custom( face, verts )
 		else
-			colors = face:GenerateLightColors( verts, options.hdr )
+			colors = face:GenerateLightColors( verts, options.hdr, options.lightToggle )
 		end
 
 		local lightVerts, lightColors = self._lightVerts, self._lightColors

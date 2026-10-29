@@ -203,6 +203,13 @@ function meta_face:GetLightmapSamples( hdr )
 		if v ~= 255 then lightstyle_count = lightstyle_count + 1 end
 	end
 
+	-- How `full` is laid out: for each light style (in the order of `styles`) one block of `luxels` luxels, or `sets` times as many with bumpmapped
+	-- lighting (the flat set first, then the three directional ones). SampleLightmap / GenerateLightColors use this to add the styles together.
+	samples.styles, samples.sets, samples.luxels = {}, has_bumpmap and 4 or 1, luxel_count
+	for _, v in ipairs( styles ) do
+		if v ~= 255 then samples.styles[#samples.styles + 1] = v end
+	end
+
 	-- "For faces with bumpmapped textures, there are four times the usual number of lightmap samples"
 	local sample_count = lightstyle_count * luxel_count
 	if has_bumpmap then sample_count = sample_count * 4 end
@@ -264,18 +271,81 @@ do
 			min( ( b1 + ( b2 - b1 ) * ty ) * 2, 255 )
 	end
 
+	-- How much of a light style is on: style 0 always; a light with a name (a light_environment called "sun_light", say) gets a style of 32 or more so
+	-- it can be switched, and starts on; the animated styles 1-31 are on part of the time.
+	local function styleWeight( style )
+		if style > 0 and style < 32 then return 0.5 end
+		return 1
+	end
+
+	---The weight function a lightToggle asks for: nil / true = the default above, a table = its weight for a style (the default for the styles it
+	---doesn't have), a function = style -> weight (0 = off, 1 = on, 0.5 = half the light ...). Whatever controls a light (its "style", "pattern"
+	---and "spawnflags" in the entities, what a map does with the light's inputs) is up to the caller.
+	---@return fun( style: number ): number
+	local function styleWeights( lightToggle )
+		if isfunction( lightToggle ) then return lightToggle end
+		if istable( lightToggle ) then
+			return function( style ) return lightToggle[style] or styleWeight( style ) end
+		end
+		return styleWeight
+	end
+
+	---Does a lightToggle ask for the lightmaps of the styles to be added (and not the first one only)?
+	local function addsStyles( samples, lightToggle )
+		if lightToggle == false then return false end
+		return #samples.styles > 1 or isfunction( lightToggle ) or istable( lightToggle )
+	end
+
+	---Like sampleGrid, but adds the lightmaps of all the light styles of the face, in linear light (the engine adds them). A face has up to 4 blocks of
+	---luxels in `full`, one per style (see GetLightmapSamples). Returns r, g, b in 0-255 like sampleGrid.
+	local function sampleGridStyles( samples, w, h, u, v, weightOf )
+		local full = samples.full
+		local fx = max( 0, min( u * w, w - 1 ) )
+		local fy = max( 0, min( v * h, h - 1 ) )
+		local x0, y0 = floor( fx ), floor( fy )
+		local x1, y1 = min( x0 + 1, w - 1 ), min( y0 + 1, h - 1 )
+		local tx, ty = fx - x0, fy - y0
+
+		local stride = w * h * samples.sets
+		local sumR, sumG, sumB, any = 0, 0, 0, false
+		for slot, style in ipairs( samples.styles ) do
+			local base = ( slot - 1 ) * stride
+			local a, b = full[base + y0 * w + x0 + 1], full[base + y0 * w + x1 + 1]
+			local c, d = full[base + y1 * w + x0 + 1], full[base + y1 * w + x1 + 1]
+			if a and b and c and d then
+				any = true
+				a, b, c, d = a.color, b.color, c.color, d.color
+
+				-- The stored colors are the light halved and gamma encoded (see NikNaks.ColorRGBExp32ToColor): back to linear light to add them
+				local r1, g1, b1 = a.r + ( b.r - a.r ) * tx, a.g + ( b.g - a.g ) * tx, a.b + ( b.b - a.b ) * tx
+				local r2, g2, b2 = c.r + ( d.r - c.r ) * tx, c.g + ( d.g - c.g ) * tx, c.b + ( d.b - c.b ) * tx
+				local weight = weightOf( style )
+				sumR = sumR + weight * ( ( r1 + ( r2 - r1 ) * ty ) * 2 / 255 ) ^ 2.2
+				sumG = sumG + weight * ( ( g1 + ( g2 - g1 ) * ty ) * 2 / 255 ) ^ 2.2
+				sumB = sumB + weight * ( ( b1 + ( b2 - b1 ) * ty ) * 2 / 255 ) ^ 2.2
+			end
+		end
+
+		if not any then return end
+		return min( 255 * sumR ^ ( 1 / 2.2 ), 255 ), min( 255 * sumG ^ ( 1 / 2.2 ), 255 ), min( 255 * sumB ^ ( 1 / 2.2 ), 255 )
+	end
+
 	---Returns the baked light color at a lightmap UV on the face (bilinear), as r, g, b in 0-255.
 	---Returns nil if the face has no lightmap, or the map has no HDR lighting and hdr is true.
 	--- @param u1 number # Lightmap U, as in the u1 of GenerateVertexData()
 	--- @param v1 number # Lightmap V, as in the v1 of GenerateVertexData()
 	--- @param hdr boolean? # Use the HDR lightmap
+	--- @param lightToggle (boolean|table<number, number>|fun( style: number ): number)? # Which light styles are added. A face has a lightmap per light style (up to 4): style 0, the animated ones (1-31) and the lights with a name (32 and up, which an entity switches). nil / true = the defaults: style 0 and 32+ on, the animated ones at half. false = the first lightmap of the face only. A table (style -> weight) or a function (style -> weight) = your own: 0 is off, 1 is on, anything between dims it.
 	--- @return number? r
 	--- @return number? g
 	--- @return number? b
-	function meta_face:SampleLightmap( u1, v1, hdr )
+	function meta_face:SampleLightmap( u1, v1, hdr, lightToggle )
 		local samples = self:GetLightmapSamples( hdr )
 		if not samples or #samples.full == 0 then return end
-		return sampleGrid( samples.full, self.LightmapTextureSizeInLuxels[1] + 1, self.LightmapTextureSizeInLuxels[2] + 1, u1, v1 )
+
+		local w, h = self.LightmapTextureSizeInLuxels[1] + 1, self.LightmapTextureSizeInLuxels[2] + 1
+		if addsStyles( samples, lightToggle ) then return sampleGridStyles( samples, w, h, u1, v1, styleWeights( lightToggle ) ) end
+		return sampleGrid( samples.full, w, h, u1, v1 )
 	end
 
 	---Returns a baked light color for each vertex, in the same order as the vertices given. [Not Cached]
@@ -283,8 +353,9 @@ do
 	---Vertices outside the sampled grid get white. Returns nil if the face has no lightmap, or hdr is true and the map has no HDR lighting.
 	--- @param verts PolygonMeshVertex[]? # Defaults to face:GenerateVertexTriangleData()
 	--- @param hdr boolean? # Use the HDR lightmap
+	--- @param lightToggle (boolean|table<number, number>|fun( style: number ): number)? # Which light styles are added (see SampleLightmap). Default: the defaults.
 	--- @return { r: number, g: number, b: number }[]?
-	function meta_face:GenerateLightColors( verts, hdr )
+	function meta_face:GenerateLightColors( verts, hdr, lightToggle )
 		-- GetLightmapSamples keeps every luxel on the face (two tables per luxel). Since this function isn't cached,
 		-- don't leave that behind unless it was already there: it adds up to hundreds of MB on a big map.
 		local cacheKey = hdr and "_lightmap_samples_hdr" or "_lightmap_samples"
@@ -298,10 +369,17 @@ do
 		verts = verts or self:GenerateVertexTriangleData()
 		if verts and #full > 0 then
 			local w, h = self.LightmapTextureSizeInLuxels[1] + 1, self.LightmapTextureSizeInLuxels[2] + 1
+			local addStyles = addsStyles( samples, lightToggle )
+			local weightOf = addStyles and styleWeights( lightToggle )
 			colors = {}
 			for i = 1, #verts do
 				local vert = verts[i]
-				local r, g, b = sampleGrid( full, w, h, vert.u1, vert.v1 )
+				local r, g, b
+				if addStyles then
+					r, g, b = sampleGridStyles( samples, w, h, vert.u1, vert.v1, weightOf )
+				else
+					r, g, b = sampleGrid( full, w, h, vert.u1, vert.v1 )
+				end
 				colors[i] = { r = r or 255, g = g or 255, b = b or 255 }
 			end
 		end
