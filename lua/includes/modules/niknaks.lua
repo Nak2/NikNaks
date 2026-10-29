@@ -3,7 +3,7 @@
 
 AddCSLuaFile()
 -- Make sure to use the newest version of NikNaks.
-local version = 0.96
+local version = 0.97
 if NikNaks and NikNaks.VERSION > version then return end
 
 local file_Find, MsgC, unpack = file.Find, MsgC, unpack
@@ -96,6 +96,7 @@ NikNaks.AutoInclude("niknaks/modules/sh_bsp_trace.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_physics.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_bsp_physmesh.lua")
 NikNaks.AutoInclude("niknaks/modules/cl_mesh_builder.lua")
+NikNaks.AutoInclude("niknaks/modules/cl_lightmap_atlas.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_sound_module.lua")
 NikNaks.AutoInclude("niknaks/modules/sh_datapackage.lua")
 NikNaks.AutoInclude("niknaks/framework/sh_localbsp.lua")
