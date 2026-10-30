@@ -39,6 +39,9 @@ local TRI_BITS = 16 * 8
 --- @field ledges PhysLedge[] # Convex pieces
 --- @field triCount number
 --- @field virtualCount number
+--- @field solidIndex number? # 1-based, which solid of the .phy file this is (NikNaks.Physics.Load only)
+--- @field surfaceprop string? # The surface property of the solid, e.g. "wood" (NikNaks.Physics.Load only)
+--- @field keys table<string, string>? # All the key-values of the solid: mass, damping, surfaceprop ... (NikNaks.Physics.Load only)
 
 local cache = {} -- path -> PhysMesh[], or { error = reason } if it failed
 
@@ -74,18 +77,40 @@ function NikNaks.Physics.Load( model )
 
 	local meshes, firstError = {}, nil
 	local pos = headerSize * 8
-	for _ = 1, solidCount do
+	for solid = 1, solidCount do
 		if pos + 32 > data:Size() then break end
 		data:Seek( pos )
 		local size = data:ReadLong()
 		if size <= 0 or pos + 32 + size * 8 > data:Size() then break end
 
 		local mesh, err = NikNaks.Physics.ParseSolid( data, pos + 32, size )
-		if mesh then meshes[#meshes + 1] = mesh else firstError = firstError or err end
+		if mesh then
+			mesh.solidIndex = solid
+			meshes[#meshes + 1] = mesh
+		else
+			firstError = firstError or err
+		end
 		pos = pos + 32 + size * 8
 	end
 
 	if #meshes == 0 then return fail( firstError or "no readable solid" ) end
+
+	-- The key-value text after the solids:  solid { "index" "0" "surfaceprop" "wood" ... }
+	local text = string.sub( raw, pos / 8 + 1 )
+	for name, body in text:gmatch( '([%w_]+)%s*(%b{})' ) do
+		if name == "solid" then
+			local keys = {}
+			for k, v in body:gmatch( '"([^"]*)"%s*"([^"]*)"' ) do keys[k] = v end
+
+			local index = tonumber( keys.index )
+			for _, mesh in ipairs( meshes ) do
+				if index and mesh.solidIndex == index + 1 then
+					mesh.keys, mesh.surfaceprop = keys, keys.surfaceprop
+				end
+			end
+		end
+	end
+
 	cache[path] = meshes
 	return meshes
 end
