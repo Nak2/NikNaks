@@ -49,6 +49,8 @@ function meta:GetNodes()
 	if self._node then return self._node end
 	self._node = {}
 	local data = self:GetLump( 5 )
+	local nodes = self._node
+	local planes = self:GetPlanes()
 
 	for i = 0, math.min( data:Size() / 256, MAX_MAP_NODES ) - 1 do
 		--- @class MapNode
@@ -62,18 +64,20 @@ function meta:GetNodes()
 		--- @field area number
 		--- @field padding number
 		--- @field parentNode number
-		local t = {}
-			t.planenum = data:ReadLong()
-			t.plane = self:GetPlanes()[ t.planenum ]
-			t.children = { data:ReadLong(), data:ReadLong() }
-			t.mins = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() )
-			t.maxs = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() )
-			t.firstFace = data:ReadUShort()
-			t.numFaces = data:ReadUShort()
-			t.area = data:ReadShort()
-			t.padding = data:ReadShort()
-			t.parentNode = -1
-		self._node[i] = t
+
+		local planenum = data:ReadLong()
+		nodes[i] = {
+			planenum = planenum,
+			plane = planes[ planenum ],
+			children = { data:ReadLong(), data:ReadLong() },
+			mins = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ),
+			maxs = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ),
+			firstFace = data:ReadUShort(),
+			numFaces = data:ReadUShort(),
+			area = data:ReadShort(),
+			padding = data:ReadShort(),
+			parentNode = -1,
+		}
 	end
 
 	self:ClearLump( 5 )
@@ -94,6 +98,8 @@ function meta:GetLeafs()
 
 	local lumpversion = self:GetLumpVersion( 10 )
 	local data = self:GetLump( 10 )
+	local leafs = self._leafs
+	local band, rshift = bit.band, bit.rshift
 	local size = 240  -- version
 
 	if lumpversion == 0 then
@@ -109,34 +115,33 @@ function meta:GetLeafs()
 		--- @class BSPLeafObject
 		--- @field mins Vector
 		--- @field maxs Vector
-		local t = {}
-			t.contents = data:ReadLong() 	-- 32	32	4
-			t.cluster = data:ReadShort() 	-- 16	48	6
+		local contents = data:ReadLong() 	-- 32	32	4
+		local cluster = data:ReadShort() 	-- 16	48	6
+		if cluster + 1 > n then n = cluster + 1 end
+		local d = data:ReadUShort()
 
-			n = math.max( t.cluster + 1, n )
+		local t = setmetatable( {
+			contents = contents,
+			cluster = cluster,
+			area = band( d, 0x1FF ),		-- 16	64	8
+			flags = rshift( d, 9 ),			-- 16	80	10
+			mins = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ), -- 16 x 3 ( 48 )	128		16
+			maxs = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ), -- 16 x 3 ( 48 )	176		22
+			firstleafface 	= data:ReadUShort(),	-- 16	192		24
+			numleaffaces 	= data:ReadUShort(),	-- 16	208		26
+			firstleafbrush 	= data:ReadUShort(),	-- 16	224		28
+			numleafbrushes 	= data:ReadUShort(),	-- 16	240		30
+			leafWaterDataID = data:ReadShort(),	-- 16	256		32
+			__id = i,
+			__map = self,
+			parentNode = -1,
+		}, meta_leaf )
 
-			local d = data:ReadUShort()
-			t.area = bit.band( d, 0x1FF )		-- 16	64	8
-			t.flags = bit.rshift( d, 9 )		-- 16	80	10
-			
-			t.mins = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ) -- 16 x 3 ( 48 )	128		16
-			t.maxs = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ) -- 16 x 3 ( 48 )	176		22
-			t.firstleafface 	= data:ReadUShort()	-- 16	192		24
-			t.numleaffaces 		= data:ReadUShort()	-- 16	208		26
-			t.firstleafbrush 	= data:ReadUShort()	-- 16	224		28
-			t.numleafbrushes 	= data:ReadUShort()	-- 16	240		30
-			t.leafWaterDataID 	= data:ReadShort()	-- 16	256		32
-			t.__id = i
-			t.__map = self
-			t.parentNode = -1
+		if t.leafWaterDataID > -1 then
+			t.leafWaterData = self:GetLeafWaterData()[t.leafWaterDataID]
+		end
 
-			if t.leafWaterDataID > -1 then
-				t.leafWaterData = self:GetLeafWaterData()[t.leafWaterDataID]
-			end
-
-			setmetatable( t, meta_leaf )
-
-		self._leafs[i] = t
+		leafs[i] = t
 	end
 
 	self._leafs_num_clusters = n
