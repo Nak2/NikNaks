@@ -31,7 +31,7 @@ TimeDelta._steps = { "Year", "Day", "Hour", "Minute", "Second", "Milisecond" }
 setmetatable( TimeDelta, {
 	__index = TimeDelta,
 	__call = function( _, time, year )
-		return setmetatable( { time = time, year = year }, meta )
+		return ( setmetatable( { time = time, year = year }, meta ) )
 	end
 } )
 

@@ -31,7 +31,7 @@ local WORLDLIGHT_SIZE_BITS = 704  -- 88 bytes
 local meta_light = {}
 meta_light.__index = meta_light
 meta_light.__tostring = function( self )
-	return format( obj_tostring, "WorldLight", self.__id )
+	return ( format( obj_tostring, "WorldLight", self.__id ) )
 end
 meta_light.MetaName = "BSP WorldLight"
 NikNaks.__metatables["BSP WorldLight"] = meta_light

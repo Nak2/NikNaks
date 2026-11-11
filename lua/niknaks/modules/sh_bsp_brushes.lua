@@ -11,7 +11,7 @@ local meta = NikNaks.__metatables["BSP"]
 --- @class BSPBrushObject
 local meta_brush = {}
 meta_brush.__index = meta_brush
-meta_brush.__tostring = function( self ) return format( obj_tostring, "BSP Brush", self.__id ) end
+meta_brush.__tostring = function( self ) return ( format( obj_tostring, "BSP Brush", self.__id ) ) end
 meta_brush.MetaName = "BSP Brush"
 NikNaks.__metatables["BSP Brush"] = meta_brush
 

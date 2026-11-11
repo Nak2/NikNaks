@@ -340,8 +340,8 @@ function meta:SetLinkMove(node, hull, move, enable)
     if not node._links[self] then node._links[self] = {} end
 
     local op = enable
-        and function(cur) return bit.bor(cur, move) end
-        or  function(cur) return bit.band(cur, bit.bnot(move)) end
+        and function(cur) return ( bit.bor(cur, move) ) end
+        or  function(cur) return ( bit.band(cur, bit.bnot(move)) ) end
 
     local hullMin = hull or 0
     local hullMax = hull or (NUM_HULLS - 1)

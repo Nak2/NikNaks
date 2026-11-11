@@ -23,7 +23,7 @@ local conMaxTime = CreateConVar( "niknaks_datapackage_maxtime", "1", FCVAR_ARCHI
 --- Returns the max size of a data package in longs.
 ---@return number
 local function getMaxConSize()
-    return math.floor( conMaxSize:GetInt() * 256 )
+    return ( math.floor( conMaxSize:GetInt() * 256 ) )
 end
 
 

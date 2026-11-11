@@ -15,11 +15,11 @@ local function isNeg(bn)
 	return bn.w < 0
 end
 local function magW(w)
-	return band(w, 0x7FFFFFFF)
+	return ( band(w, 0x7FFFFFFF) )
 end
 local function stripSign(bn)
 	if bn.w >= 0 then return bn end
-	return setmetatable({ x = bn.x, y = bn.y, z = bn.z, w = magW(bn.w) }, meta)
+	return ( setmetatable({ x = bn.x, y = bn.y, z = bn.z, w = magW(bn.w) }, meta) )
 end
 
 --#region Compare operators
@@ -74,7 +74,7 @@ end
 ---@return integer
 local function rshift(int, shift)
 	if shift > 31 then return 0x0 end
-	return brshift(int, shift)
+	return ( brshift(int, shift) )
 end
 
 ---Shifts the bits to the left by the given amount.
@@ -83,7 +83,7 @@ end
 ---@return integer
 local function lshift(int, shift)
 	if shift > 31 then return 0x0 end
-	return blshift(int, shift)
+	return ( blshift(int, shift) )
 end
 
 ---Double-precision right shift: shifts `lo` right by `shift`, filling from `hi`.
@@ -94,7 +94,7 @@ end
 local function shrd(lo, hi, shift)
 	if shift == 0 then return lo end
 	if shift > 31 then return 0x0 end
-	return bor(rshift(lo, shift), blshift(hi, 32 - shift))
+	return ( bor(rshift(lo, shift), blshift(hi, 32 - shift)) )
 end
 
 ---'<<' operator
@@ -236,7 +236,7 @@ local function add(self, bNumber)
 	if rz >= 0x80000000 then rz = rz - 0x100000000 end
 	if rw >= 0x80000000 then rw = rw - 0x100000000 end
 
-	return setmetatable({ x = rx, y = ry, z = rz, w = rw }, meta)
+	return ( setmetatable({ x = rx, y = ry, z = rz, w = rw }, meta) )
 end
 
 ---Unsigned less-than comparison (ignores sign bit; compares raw magnitude).
@@ -408,7 +408,7 @@ function meta:__pow(exp)
 
 	if e <= 0 then
 		local v = e == 0 and 1 or 0
-		return setmetatable({ x = v, y = 0, z = 0, w = 0 }, meta)
+		return ( setmetatable({ x = v, y = 0, z = 0, w = 0 }, meta) )
 	end
 
 	-- Binary exponentiation: O(log e) multiplications.
@@ -471,7 +471,7 @@ local function divmod(a, b)
 		if wx >= 0x80000000 then wx = wx - 0x100000000 end
 		if wy >= 0x80000000 then wy = wy - 0x100000000 end
 		if wz >= 0x80000000 then wz = wz - 0x100000000 end
-		return setmetatable({ x = wx, y = wy, z = wz, w = ww }, meta)
+		return ( setmetatable({ x = wx, y = wy, z = wz, w = ww }, meta) )
 	end
 
 	local vraw = unpack16(b)
@@ -663,7 +663,7 @@ local function BigNumber(number32Bit)
 			local wy = h2i(hex:sub(#hex - 15, #hex - 8))        -- bits 32-63
 			local wx = h2i(hex:sub(#hex - 7,  #hex))            -- bits 0-31
 			if minus then ww = bor(ww, SIGN_BIT) end
-			return setmetatable({ x = wx, y = wy, z = wz, w = ww }, meta)
+			return ( setmetatable({ x = wx, y = wy, z = wz, w = ww }, meta) )
 		end
 
 		-- Decimal string
@@ -725,7 +725,7 @@ function NikNaks.BigNumber.ReadFromNET()
 	if t.y >= 0x80000000 then t.y = t.y - 0x100000000 end
 	if t.z >= 0x80000000 then t.z = t.z - 0x100000000 end
 	if t.w >= 0x80000000 then t.w = t.w - 0x100000000 end
-	return setmetatable(t, meta)
+	return ( setmetatable(t, meta) )
 end
 
 -- Helper meta functions
@@ -827,7 +827,7 @@ function meta:ToHex()
 	local wz = self.z % 0x100000000
 	local ww = magW(self.w)
 	local sign = isNeg(self) and "-" or ""
-	return string.format("%s0x%08X%08X%08X%08X", sign, ww, wz, wy, wx)
+	return ( string.format("%s0x%08X%08X%08X%08X", sign, ww, wz, wy, wx) )
 end
 
 ---Returns true if the value equals zero.
@@ -845,11 +845,11 @@ end
 ---Returns a new BigNumber with the absolute value.
 ---@return BigNumber
 function meta:Abs()
-	return setmetatable({ x = self.x, y = self.y, z = self.z, w = magW(self.w) }, meta)
+	return ( setmetatable({ x = self.x, y = self.y, z = self.z, w = magW(self.w) }, meta) )
 end
 
 ---Returns a copy of this BigNumber.
 ---@return BigNumber
 function meta:Copy()
-	return setmetatable({ x = self.x, y = self.y, z = self.z, w = self.w }, meta)
+	return ( setmetatable({ x = self.x, y = self.y, z = self.z, w = self.w }, meta) )
 end

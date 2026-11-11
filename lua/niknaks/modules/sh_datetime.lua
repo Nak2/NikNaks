@@ -144,32 +144,32 @@ do
 		-- count, otherwise callers doing e.g. tonumber(dt:ToDate(...)) would
 		-- silently receive it as tonumber's second (base) argument.
 		return ((format or "%Y-%m-%d %H:%M:%S"):gsub("%%(.)", function(f)
-			if f == "Y" then return tostring(c.year)
-			elseif f == "y" then return string.format("%02d", c.year % 100)
-			elseif f == "m" then return string.format("%02d", c.month)
-			elseif f == "d" then return string.format("%02d", c.day)
-			elseif f == "e" then return string.format("%2d", c.day)
-			elseif f == "H" then return string.format("%02d", c.hour)
+			if f == "Y" then return ( tostring(c.year) )
+			elseif f == "y" then return ( string.format("%02d", c.year % 100) )
+			elseif f == "m" then return ( string.format("%02d", c.month) )
+			elseif f == "d" then return ( string.format("%02d", c.day) )
+			elseif f == "e" then return ( string.format("%2d", c.day) )
+			elseif f == "H" then return ( string.format("%02d", c.hour) )
 			elseif f == "I" then
 				local h12 = c.hour % 12
-				return string.format("%02d", h12 == 0 and 12 or h12)
-			elseif f == "M" then return string.format("%02d", c.min)
-			elseif f == "S" then return string.format("%02d", c.sec)
+				return ( string.format("%02d", h12 == 0 and 12 or h12) )
+			elseif f == "M" then return ( string.format("%02d", c.min) )
+			elseif f == "S" then return ( string.format("%02d", c.sec) )
 			elseif f == "p" then return c.hour < 12 and "AM" or "PM"
 			elseif f == "A" then return day_names[c.wday]
 			elseif f == "a" then return day_names[c.wday]:sub(1, 3)
-			elseif f == "w" then return tostring(c.wday - 1) -- 0=Sunday..6=Saturday
+			elseif f == "w" then return ( tostring(c.wday - 1) ) -- 0=Sunday..6=Saturday
 			elseif f == "B" then return month_names[c.month]
 			elseif f == "b" then return month_names[c.month]:sub(1, 3)
 			elseif f == "j" then
 				local yearStart = NikNaks.DateTime.ToUnix(c.year, 1, 1, 0, 0, 0)
-				return string.format("%03d", math.floor((unix - yearStart) / 86400) + 1)
+				return ( string.format("%03d", math.floor((unix - yearStart) / 86400) + 1) )
 			elseif f == "n" then return "\n"
 			elseif f == "t" then return "\t"
 			elseif f == "z" then
 				local oh = offsetHours or 0
 				local totalMin = math.floor(math.abs(oh) * 60 + 0.5)
-				return string.format("%s%02d%02d", oh < 0 and "-" or "+", math.floor(totalMin / 60), totalMin % 60)
+				return ( string.format("%s%02d%02d", oh < 0 and "-" or "+", math.floor(totalMin / 60), totalMin % 60) )
 			elseif f == "c" then return manual_format("%a %b %e %H:%M:%S %Y", unix, offsetHours)
 			elseif f == "x" then return manual_format("%m/%d/%y", unix, offsetHours)
 			elseif f == "X" then return manual_format("%H:%M:%S", unix, offsetHours)
@@ -448,7 +448,7 @@ function NikNaks.DateTime.Get(var, t_zone)
 	else
 		t.timezone = t_zone --[[@as number]]
 	end
-	return setmetatable(t, datetime_obj)
+	return ( setmetatable(t, datetime_obj) )
 end
 
 --- Constructs a DateTime directly from calendar components.
@@ -568,19 +568,19 @@ end
 
 --- Returns the year
 ---@return number
-function datetime_obj:GetYear() return tonumber(self:ToDate("%Y")) --[[@as number]] end
+function datetime_obj:GetYear() return ( tonumber(self:ToDate("%Y")) ) --[[@as number]] end
 
 --- Returns the month (1-12).
 ---@return number 1-12.
-function datetime_obj:GetMonth() return tonumber(self:ToDate("%m")) --[[@as number]] end
+function datetime_obj:GetMonth() return ( tonumber(self:ToDate("%m")) ) --[[@as number]] end
 
 --- Returns the day of the month (1-31).
 ---@return number 1-31.
-function datetime_obj:GetDay() return tonumber(self:ToDate("%d")) --[[@as number]] end
+function datetime_obj:GetDay() return ( tonumber(self:ToDate("%d")) ) --[[@as number]] end
 
 --- Returns the hour (0-23).
 ---@return number 0-23.
-function datetime_obj:GetHour()	return tonumber(self:ToDate("%H")) --[[@as number]] end
+function datetime_obj:GetHour()	return ( tonumber(self:ToDate("%H")) ) --[[@as number]] end
 
 --- Returns the hour in 12-hour format (1-12).
 ---@return number 1-12.
@@ -592,19 +592,19 @@ function datetime_obj:GetAMPM() return self:ToDate("%p") end
 
 --- Returns the minute (0-59).
 ---@return number 0-59.
-function datetime_obj:GetMinute() return tonumber(self:ToDate("%M")) --[[@as number]] end
+function datetime_obj:GetMinute() return ( tonumber(self:ToDate("%M")) ) --[[@as number]] end
 
 --- Returns the second (0-59).
 ---@return number 0-59.
-function datetime_obj:GetSecond() return tonumber(self:ToDate("%S")) --[[@as number]] end
+function datetime_obj:GetSecond() return ( tonumber(self:ToDate("%S")) ) --[[@as number]] end
 
 --- Returns the day of the week as a number, 0=Sunday..6=Saturday.
 ---@return number Weekday as a number, 0=Sunday..6=Saturday.
-function datetime_obj:GetDayOfWeek() return tonumber(self:ToDate("%w")) --[[@as number]] end
+function datetime_obj:GetDayOfWeek() return ( tonumber(self:ToDate("%w")) ) --[[@as number]] end
 
 --- Returns the day of the year as a number, 1-366.
 ---@return number Day of the year, 1-366.
-function datetime_obj:GetDayOfYear() return tonumber(self:ToDate("%j")) --[[@as number]] end
+function datetime_obj:GetDayOfYear() return ( tonumber(self:ToDate("%j")) ) --[[@as number]] end
 
 --- Returns a new DateTime set to midnight of its timezone.
 --- @return DateTime

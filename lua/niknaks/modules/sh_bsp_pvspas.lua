@@ -189,7 +189,7 @@ do
 	function meta:CreatePAS()
 		local t = {}
 		t.__map = self
-		return setmetatable( t, meta_pas )
+		return ( setmetatable( t, meta_pas ) )
 	end
 
 	--- Creates a new PAS-object and adds the position to it.

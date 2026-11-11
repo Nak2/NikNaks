@@ -70,7 +70,7 @@ local atlas_meta = {}
 atlas_meta.__index = atlas_meta
 atlas_meta.MetaName = "LightmapAtlas"
 atlas_meta.__tostring = function( self )
-	return string.format( "LightmapAtlas [ %dx%d, %d faces, %d animated, x%d ]", self._width, self._height, self._count, #self._animated, self._scale )
+	return ( string.format( "LightmapAtlas [ %dx%d, %d faces, %d animated, x%d ]", self._width, self._height, self._count, #self._animated, self._scale ) )
 end
 
 ---@class LightmapAtlasOptions
@@ -313,7 +313,7 @@ local fillAt, fillR, fillG, fillB = {}, {}, {}, {}
 
 ---Half of the color: the shader doubles the lightmap.
 local function toPixel( light )
-	return min( floor( 127.5 * ( light / 255 ) + 0.5 ), 255 )
+	return ( min( floor( 127.5 * ( light / 255 ) + 0.5 ), 255 ) )
 end
 
 ---VRAD writes a luxel it has no sample for as black, or as a huge red with -rederrors.

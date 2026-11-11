@@ -49,7 +49,7 @@ function NikNaks.UUID.V4()
 end
 
 local function unixMillis()
-	return math.floor(os.time() * 1000 + (SysTime() % 1) * 1000)
+	return ( math.floor(os.time() * 1000 + (SysTime() % 1) * 1000) )
 end
 
 local function timestampBytes(ms)

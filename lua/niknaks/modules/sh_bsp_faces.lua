@@ -36,7 +36,7 @@ local meta = NikNaks.__metatables["BSP"]
 --- @field _vertex table
 local meta_face = {}
 meta_face.__index = meta_face
-meta_face.__tostring = function( self ) return format( obj_tostring, "Faces", self.__id ) end
+meta_face.__tostring = function( self ) return ( format( obj_tostring, "Faces", self.__id ) ) end
 meta_face.MetaName = "BSP Faces"
 NikNaks.__metatables["BSP Faces"] = meta_face
 

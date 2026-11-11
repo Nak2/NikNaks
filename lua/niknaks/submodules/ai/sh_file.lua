@@ -46,7 +46,7 @@ meta.__index = meta
 
 local obj_tostring = "AI Network [%s nodes]"
 meta.__tostring = function(self)
-    return format(obj_tostring, table.Count(self._nodes))
+    return ( format(obj_tostring, table.Count(self._nodes)) )
 end
 
 ---Reads a node from a bitbuffer

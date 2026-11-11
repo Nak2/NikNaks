@@ -95,7 +95,7 @@ do
     local function readUInt32BE(fil)
         local b1, b2, b3, b4 = fil:ReadByte(), fil:ReadByte(), fil:ReadByte(), fil:ReadByte()
         if not b4 then return nil end
-        return bit.bor(bit.lshift(b1, 24), bit.lshift(b2, 16), bit.lshift(b3, 8), b4)
+        return ( bit.bor(bit.lshift(b1, 24), bit.lshift(b2, 16), bit.lshift(b3, 8), b4) )
     end
 
     -- https://github.com/id3/ID3v2.4/blob/master/id3v2.4.0-frames.txt

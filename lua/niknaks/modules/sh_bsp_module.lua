@@ -589,7 +589,7 @@ do
 	local ovmeta = {}
 	ovmeta.__index = ovmeta
 	ovmeta.__tostring = function(self)
-		return format(obj_tostring, "Overlay", "Id: " .. self.id)
+		return ( format(obj_tostring, "Overlay", "Id: " .. self.id) )
 	end
 	NikNaks.__metatables["BSP Overlay"] = ovmeta
 

@@ -51,7 +51,7 @@ function NikNaks.Randomizer.GetSecureNumber()
     seed = bit.bxor(seed, bit.rshift(seed, 8))
     seed = bit.bxor(seed, lava)
 
-    return math.abs(seed % 0x7FFFFFFF)
+    return ( math.abs(seed % 0x7FFFFFFF) )
 end
 
 lava = cookie.GetNumber("niknaks.lavalamp", NikNaks.Randomizer.GetSecureNumber())
@@ -61,7 +61,7 @@ lava = cookie.GetNumber("niknaks.lavalamp", NikNaks.Randomizer.GetSecureNumber()
 ---@param max integer
 ---@return integer
 function NikNaks.Randomizer.GetInt(min, max)
-    return math.min(max, math.max(min, math.floor(NikNaks.Randomizer.GetSecureNumber() % (max - min + 1) + min)))
+    return ( math.min(max, math.max(min, math.floor(NikNaks.Randomizer.GetSecureNumber() % (max - min + 1) + min))) )
 end
 
 ---Generates a float from 0 to 1
@@ -161,7 +161,7 @@ end
 ---@param max number
 ---@return number
 function meta_prng:RandomRange(min, max)
-	return math.min(max, self:Random() % (max - min + 1) + min)
+	return ( math.min(max, self:Random() % (max - min + 1) + min) )
 end
 
 ---Generates a float from 0 to 1

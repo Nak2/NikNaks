@@ -33,7 +33,7 @@ local object_meta = {}
 object_meta.__index = object_meta
 object_meta.MetaName = "MeshObject"
 object_meta.__tostring = function( self )
-	return string.format( "MeshObject [ %d meshes, %d light meshes, %d triangles ]", #self._meshes, #self._lightMeshes, self._triangles )
+	return ( string.format( "MeshObject [ %d meshes, %d light meshes, %d triangles ]", #self._meshes, #self._lightMeshes, self._triangles ) )
 end
 
 -- Meshes can only hold so many vertices. This is a multiple of 3 and well under the limit.
@@ -112,7 +112,7 @@ end
 ---Creates a new MeshBuilder.
 ---@return MeshBuilder
 local function create()
-	return setmetatable( { _batches = {}, _lightVerts = {}, _lightColors = {}, _lightVertsT = {}, _lightColorsT = {} }, builder_meta )
+	return ( setmetatable( { _batches = {}, _lightVerts = {}, _lightColors = {}, _lightVertsT = {}, _lightColorsT = {} }, builder_meta ) )
 end
 
 --- Creates a new MeshBuilder. Client only.

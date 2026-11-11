@@ -12,7 +12,7 @@ local meta = NikNaks.__metatables["BSP"]
 --- @class BSPLeafObject
 local meta_leaf = {}
 meta_leaf.__index = meta_leaf
-meta_leaf.__tostring = function( self ) return format( obj_tostring, "Leaf", self.__id ) end
+meta_leaf.__tostring = function( self ) return ( format( obj_tostring, "Leaf", self.__id ) ) end
 meta_leaf.MetaName = "BSP Leaf"
 NikNaks.__metatables["BSP Leaf"] = meta_leaf
 
