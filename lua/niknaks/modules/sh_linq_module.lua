@@ -5,6 +5,18 @@ t.__index = t
 t.MetaName = "LINQ"
 NikNaks.__metatables["LINQ"] = t
 
+--- Returns the length of `tbl` if pairs() visits exactly the keys 1, 2, 3 .. n in that order.
+---@param tbl table
+---@return number?
+local function seqLen(tbl)
+    local n = 0
+    for k in pairs(tbl) do
+        n = n + 1
+        if k ~= n then return nil end
+    end
+    return n
+end
+
 ---Creates a new LINQ object.
 ---
 ---**Note**: Table needs to be an array.
@@ -31,10 +43,35 @@ end
 ---@param ... any Extra arguments forwarded to the predicate function.
 ---@return self
 function t:Where(predicate, ...)
-    local tbl = {}
-    for _, v in pairs(self.tbl) do
-        if predicate(v, ...) then
-            tbl[#tbl + 1] = v
+    local src, tbl, n = self.tbl, {}, 0
+    local argc = select("#", ...)
+    local len = seqLen(src)
+    if len and argc <= 1 then
+        -- A plain array and at most one forwarded argument: an indexed loop without `...`, which the JIT compiles.
+        local a = ...
+        if argc == 0 then
+            for i = 1, len do
+                local v = src[i]
+                if predicate(v) then
+                    n = n + 1
+                    tbl[n] = v
+                end
+            end
+        else
+            for i = 1, len do
+                local v = src[i]
+                if predicate(v, a) then
+                    n = n + 1
+                    tbl[n] = v
+                end
+            end
+        end
+    else
+        for _, v in pairs(src) do
+            if predicate(v, ...) then
+                n = n + 1
+                tbl[n] = v
+            end
         end
     end
     self.tbl = tbl
@@ -48,13 +85,36 @@ end
 ---@param ... any Extra arguments forwarded to the selector function.
 ---@return self
 function t:Select(selector, ...)
-    local tbl = {}
-    for _, v in pairs(self.tbl) do
-        local a, b, c, d, e, f = selector(v, ...)
-        if b == nil then
-            tbl[#tbl + 1] = a
-        else
-            tbl[#tbl + 1] = {a, b, c, d, e, f}
+    local src, tbl = self.tbl, {}
+    local argc = select("#", ...)
+    local len = seqLen(src)
+    if len and argc <= 1 then
+        -- See Where(). `tbl[#tbl + 1]` is kept: a selector that returns nil must not leave a hole.
+        local x = ...
+        for i = 1, len do
+            local v = src[i]
+            if v ~= nil then
+                local a, b, c, d, e, f
+                if argc == 0 then
+                    a, b, c, d, e, f = selector(v)
+                else
+                    a, b, c, d, e, f = selector(v, x)
+                end
+                if b == nil then
+                    tbl[#tbl + 1] = a
+                else
+                    tbl[#tbl + 1] = {a, b, c, d, e, f}
+                end
+            end
+        end
+    else
+        for _, v in pairs(src) do
+            local a, b, c, d, e, f = selector(v, ...)
+            if b == nil then
+                tbl[#tbl + 1] = a
+            else
+                tbl[#tbl + 1] = {a, b, c, d, e, f}
+            end
         end
     end
     self.tbl = tbl
@@ -120,7 +180,24 @@ end
 ---@param ... any Extra arguments forwarded to the predicate function.
 ---@return any
 function t:Single(predicate, ...)
-    for _, v in pairs(self.tbl) do
+    local src = self.tbl
+    local argc = select("#", ...)
+    local len = seqLen(src)
+    if len and argc <= 1 then
+        local a = ...
+        for i = 1, len do
+            local v = src[i]
+            if v ~= nil then
+                if argc == 0 then
+                    if predicate(v) then return v end
+                elseif predicate(v, a) then
+                    return v
+                end
+            end
+        end
+        return nil
+    end
+    for _, v in pairs(src) do
         if predicate(v, ...) then
             return v
         end
