@@ -20,32 +20,38 @@
 --- @field mapCreationId number Same as Entity:MapCreationID()
 --- @field hammerId number
 
+local string_find, string_byte = string.find, string.byte
+
 --- Locates the next enter-token
 --- @param data string
 --- @param pos number
 --- @return number
 local function findNextToken( data, pos )
-	for i = pos, #data do
-		if data[i] == "{" then return i end
-	end
-
-	return -1
+	return string_find( data, "{", pos, true ) or -1
 end
 
 --- Locates the next exit-token
 local function findNextExitToken( data, pos )
 	local keypos = 0
-	local ignore = false
+	local i = pos
 
-	for i = pos, #data do
-		if data[i] == "\"" then ignore = not ignore
-		elseif ignore then continue end
+	while true do
+		-- Jump straight to the next character that matters
+		i = string_find( data, '["{}]', i )
+		if not i then return end
 
-		if data[i] == "{" then keypos = keypos + 1
-		elseif data[i] == "}" then
+		local c = string_byte( data, i )
+		if c == 34 then -- '"': braces inside a quoted string don't count, skip to the closing quote
+			i = string_find( data, '"', i + 1, true )
+			if not i then return end
+		elseif c == 123 then -- '{'
+			keypos = keypos + 1
+		else -- '}'
 			keypos = keypos - 1
 			if keypos == 0 then return i end
 		end
+
+		i = i + 1
 	end
 end
 
