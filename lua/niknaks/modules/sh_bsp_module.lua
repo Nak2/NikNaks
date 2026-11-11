@@ -872,17 +872,17 @@ do
 		if self._plane then return self._plane end
 
 		self._plane = {}
+		local planes = self._plane
 		local data = self:GetLump(1)
 		for i = 0, data:Size() / 160 - 1 do
+			local nx, ny, nz = data:ReadFloat(), data:ReadFloat(), data:ReadFloat()
 			--- @class BSPPlane
-			local t = {}
-			local normal = data:ReadVector() -- Normal vector
-			t.normal = normal
-			t.nx, t.ny, t.nz = normal.x, normal.y, normal.z
-			t.dist = data:ReadFloat() -- Distance from origin
-			t.type = data:ReadLong() -- Plane axis identifier
-			setmetatable(t, planeMeta)
-			self._plane[i] = t
+			planes[i] = setmetatable({
+				normal = Vector(nx, ny, nz), -- Normal vector
+				nx = nx, ny = ny, nz = nz,
+				dist = data:ReadFloat(), -- Distance from origin
+				type = data:ReadLong(), -- Plane axis identifier
+			}, planeMeta)
 		end
 
 		for i, t in pairs(self._plane) do

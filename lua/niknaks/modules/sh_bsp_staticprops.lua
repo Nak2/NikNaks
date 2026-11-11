@@ -187,20 +187,11 @@ function meta:GetStaticProps()
 		return self._staticprops
 	end
 
-	local char, match = string.char, string.match
+	local gsub = string.gsub
 	for i = 1, n do
 		-- All model-paths are saved as char[128]. Any overflow are nullbytes.
-		local parts = {}
-		local p = 0
-		for _ = 1, 128 do
-			local c = char( b:ReadByte() )
-			if match( c, "[%w_%-%.%/]" ) then
-				p = p + 1
-				parts[p] = c
-			end
-		end
 
-		self._staticprops_mdl[i] = table.concat( parts )
+		self._staticprops_mdl[i] = ( gsub( b:ReadData( 128 ), "[^%w_%-%.%/]+", "" ) )
 	end
 
 	-- Read the leaf-array. (Unused atm). Prob an index for the static props. However each static-prop already hold said data.

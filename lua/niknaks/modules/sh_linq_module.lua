@@ -17,6 +17,15 @@ local function seqLen(tbl)
     return n
 end
 
+--- Shallow copy, so that operators which reorder or append never touch the table the caller handed in.
+---@param tbl table
+---@return table
+local function copyOf(tbl)
+    local out = {}
+    for k, v in pairs(tbl) do out[k] = v end
+    return out
+end
+
 ---Creates a new LINQ object.
 ---
 ---**Note**: Table needs to be an array.
@@ -386,7 +395,9 @@ end
 ---@param comparer function?
 ---@return self
 function t:OrderBy(comparer)
-    table.sort(self.tbl, comparer)
+    local tbl = copyOf(self.tbl)
+    table.sort(tbl, comparer)
+    self.tbl = tbl
     return self
 end
 
@@ -424,12 +435,14 @@ function t:Union(tbl)
     for _, v in pairs(self.tbl) do
         seen[v] = true
     end
+    local out = copyOf(self.tbl)
     for _, v in pairs(tbl.tbl) do
         if not seen[v] then
             seen[v] = true
-            self.tbl[#self.tbl + 1] = v
+            out[#out + 1] = v
         end
     end
+    self.tbl = out
     return self
 end
 
@@ -455,9 +468,11 @@ end
 ---@param tbl LINQ
 ---@return self
 function t:Concat(tbl)
+    local out = copyOf(self.tbl)
     for _, v in pairs(tbl.tbl) do
-        self.tbl[#self.tbl + 1] = v
+        out[#out + 1] = v
     end
+    self.tbl = out
     return self
 end
 

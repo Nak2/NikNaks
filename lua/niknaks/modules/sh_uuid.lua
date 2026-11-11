@@ -21,14 +21,9 @@ local function fillRandomBytes(b, first, last)
 end
 
 local function toHexString(b)
-	local hex = {}
-	for i = 1, 16 do hex[i] = string.format("%02x", b[i]) end
-
-	return table.concat(hex, "", 1, 4) .. "-" ..
-		table.concat(hex, "", 5, 6) .. "-" ..
-		table.concat(hex, "", 7, 8) .. "-" ..
-		table.concat(hex, "", 9, 10) .. "-" ..
-		table.concat(hex, "", 11, 16)
+	local s = string.format("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15], b[16])
+	return s
 end
 
 local function generateUUIDv4()

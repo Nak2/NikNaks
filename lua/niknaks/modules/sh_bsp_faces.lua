@@ -64,8 +64,9 @@ function meta:GetFaces()
 
 	local data = self:GetLump( 7 )
 	for i = 0, math.min( data:Size() / 448, MAX_MAP_FACES ) - 1 do
-		--- @class BSPFaceObject
 		local planenum = data:ReadUShort()
+
+		--- @class BSPFaceObject
 		local t = setmetatable( {
 			planenum	= planenum,
 			plane		= planes[ planenum ],
@@ -76,11 +77,11 @@ function meta:GetFaces()
 			texinfo		= data:ReadShort(), -- Texture info
 			dispinfo	= data:ReadShort(), -- Displacement info
 			surfaceFogVolumeID	= data:ReadShort(),
-			styles				= { data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte() },
+			styles				= { data:ReadByte(), data:ReadByte(), data:ReadByte(), ( data:ReadByte() ) },
 			lightofs			= data:ReadLong(),
 			area				= data:ReadFloat(),
-			LightmapTextureMinsInLuxels	= { data:ReadLong(), data:ReadLong() },
-			LightmapTextureSizeInLuxels	= { data:ReadLong(), data:ReadLong() },
+			LightmapTextureMinsInLuxels	= { data:ReadLong(), ( data:ReadLong() ) },
+			LightmapTextureSizeInLuxels	= { data:ReadLong(), ( data:ReadLong() ) },
 			origFace		= data:ReadLong(),
 			numPrims		= data:ReadUShort(),
 			firstPrimID		= data:ReadUShort(),
@@ -171,7 +172,7 @@ function meta:GetFacesHDRLighting()
 	for i = 0, math.min( data:Size() / 448, MAX_MAP_FACES ) - 1 do
 		data:Seek( i * 448 + 128 )
 		local s1, s2, s3, s4 = data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte()
-		out[i] = { styles = { s1, s2, s3, s4 }, lightofs = data:ReadLong() }
+		out[i] = { styles = { s1, s2, s3, s4 }, lightofs = ( data:ReadLong() ) }
 	end
 
 	self:ClearLump( LUMP_FACES_HDR )
@@ -409,6 +410,8 @@ end
 function meta_face:ClearMeshData()
 	self._vertTriangleData = nil
 	self._vertex = nil
+	self._vertexFlat = nil
+	self._vertexCount = nil
 end
 
 --- Returns the face-index. Will return -1 if none.
