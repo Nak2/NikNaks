@@ -48,33 +48,48 @@ function meta:GetFaces()
 	if self._faces then return self._faces end
 	self._faces = {}
 
+	local faces = self._faces
+	local planes = self:GetPlanes()
+
+	local faceToBModel = {}
+	local bModels = self:GetBModels()
+	for m = 0, #bModels do
+		local q = bModels[m]
+		if q and q.numfaces >= 0 then
+			for f = q.firstface, q.firstface + q.numfaces - 1 do
+				if faceToBModel[f] == nil then faceToBModel[f] = m end
+			end
+		end
+	end
+
 	local data = self:GetLump( 7 )
 	for i = 0, math.min( data:Size() / 448, MAX_MAP_FACES ) - 1 do
 		--- @class BSPFaceObject
-		local t = {}
-		t.planenum = data:ReadUShort()
-		t.plane 	= self:GetPlanes()[ t.planenum ]
-		t.side 		= data:ReadByte() -- 1 = same direciton as face
-		t.onNode 	= data:ReadByte() -- 1 if on node, 0 if in leaf
-		t.firstedge = data:ReadLong()
-		t.numedges 	= data:ReadShort()
-		t.texinfo 	= data:ReadShort() -- Texture info
-		t.dispinfo	= data:ReadShort() -- Displacement info
-		t.surfaceFogVolumeID	= data:ReadShort()
-		t.styles				= { data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte() }
-		t.lightofs				= data:ReadLong()
-		t.area					= data:ReadFloat()
-		t.LightmapTextureMinsInLuxels	= { data:ReadLong(), data:ReadLong() }
-		t.LightmapTextureSizeInLuxels	= { data:ReadLong(), data:ReadLong() }
-		t.origFace			= data:ReadLong()
-		t.numPrims			= data:ReadUShort()
-		t.firstPrimID		= data:ReadUShort()
-		t.smoothingGroups	= data:ReadULong()
-		t.__bmodel = self:FindBModelIDByFaceIndex( i )
-		t.__map = self
-		t.__id = i
-		setmetatable( t, meta_face )
-		self._faces[i] = t
+		local planenum = data:ReadUShort()
+		local t = setmetatable( {
+			planenum	= planenum,
+			plane		= planes[ planenum ],
+			side		= data:ReadByte(), -- 1 = same direciton as face
+			onNode		= data:ReadByte(), -- 1 if on node, 0 if in leaf
+			firstedge	= data:ReadLong(),
+			numedges	= data:ReadShort(),
+			texinfo		= data:ReadShort(), -- Texture info
+			dispinfo	= data:ReadShort(), -- Displacement info
+			surfaceFogVolumeID	= data:ReadShort(),
+			styles				= { data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte() },
+			lightofs			= data:ReadLong(),
+			area				= data:ReadFloat(),
+			LightmapTextureMinsInLuxels	= { data:ReadLong(), data:ReadLong() },
+			LightmapTextureSizeInLuxels	= { data:ReadLong(), data:ReadLong() },
+			origFace		= data:ReadLong(),
+			numPrims		= data:ReadUShort(),
+			firstPrimID		= data:ReadUShort(),
+			smoothingGroups	= data:ReadULong(),
+			__bmodel = faceToBModel[i] or 0,
+			__map = self,
+			__id = i,
+		}, meta_face )
+		faces[i] = t
 	end
 
 	self:ClearLump( 7 )
