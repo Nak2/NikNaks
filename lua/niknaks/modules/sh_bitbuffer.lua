@@ -3,7 +3,7 @@
 -- License: https://github.com/Nak2/NikNaks/blob/main/LICENSE
 
 local s_char, s_byte, tostring = string.char, string.byte, tostring
-local band, brshift, blshift, bor, bswap = bit.band, bit.rshift, bit.lshift, bit.bor, bit.bswap
+local band, brshift, blshift, bor, bswap, bnot = bit.band, bit.rshift, bit.lshift, bit.bor, bit.bswap, bit.bnot
 local log, ldexp, frexp, floor, ceil, max, setmetatable, source = math.log, math.ldexp, math.frexp, math.floor, math
 	.ceil, math.max, setmetatable, jit.util.funcinfo(NikNaks.AutoInclude)["source"]
 
@@ -30,7 +30,7 @@ end
 ---@return number
 local function rshift(int, shift)
 	if shift > 31 then return 0x0 end
-	return brshift(int, shift)
+	return ( brshift(int, shift) )
 end
 
 ---@param int number
@@ -38,7 +38,7 @@ end
 ---@return number
 local function lshift(int, shift)
 	if shift > 31 then return 0x0 end
-	return blshift(int, shift)
+	return ( blshift(int, shift) )
 end
 
 -- "Crams" the data into the bitbuffer. Ignoring offsets
@@ -107,11 +107,11 @@ do
 	function NikNaks.BitBuffer.StringToInt(str)
 		local a, b, c, d = s_byte(str, 1, 4)
 		if d then
-			return bor(blshift(d, 24), blshift(c, 16), blshift(b, 8), a)
+			return ( bor(blshift(d, 24), blshift(c, 16), blshift(b, 8), a) )
 		elseif c then
-			return bor(blshift(c, 16), blshift(b, 8), a)
+			return ( bor(blshift(c, 16), blshift(b, 8), a) )
 		elseif b then
-			return bor(blshift(b, 8), a)
+			return ( bor(blshift(b, 8), a) )
 		else
 			return a
 		end
@@ -123,7 +123,7 @@ do
 	---@return string
 	function NikNaks.BitBuffer.IntToString(int)
 		local a, b, c, d = brshift(int, 24), band(brshift(int, 16), q), band(brshift(int, 8), q), band(int, q)
-		return s_char(d, c, b, a)
+		return ( s_char(d, c, b, a) )
 	end
 end
 
@@ -236,9 +236,9 @@ do
 		local function fmtBytePos(bitPos)
 			local byte = math.floor(bitPos / 8)
 			if bitOffset == 0 then
-				return string.format("%d", byte)
+				return ( string.format("%d", byte) )
 			else
-				return string.format("%d+%db", byte, bitOffset)
+				return ( string.format("%d+%db", byte, bitOffset) )
 			end
 		end
 
@@ -321,49 +321,40 @@ do
 	-- B |00000000|00000000|00000000|00000000|
 	local b_mask = 0xFFFFFFFF
 
-	---@param int number
-	---@param bits number
-	---@return number
-	local function swap(int, bits)
-		return brshift(bswap(int), 32 - bits)
-	end
-
 	---@param self BitBuffer
 	---@param int number
 	---@param bits number
 	---@return self BitBuffer The BitBuffer that was modified
 	function writeraw(self, int, bits)
-		if self._little_endian and bits % 8 == 0 then
-			int = swap(int, bits)
+		if self._little_endian and band(bits, 7) == 0 then
+			int = brshift(bswap(int), 32 - bits)
 		elseif bits < 32 then
 			-- Only the low `bits` bits are the value.
 			int = band(int, brshift(b_mask, 32 - bits))
 		end
 
 		local tell = self._tell
-		self._tell = tell + bits
-		self._len = max(self._len, self._tell)
+		local newTell = tell + bits
+		self._tell = newTell
+		if newTell > self._len then self._len = newTell end
 
 		-- Retrive data pos
-		local i_word = rshift(tell, 5) + 1 -- [ 1 - length ]
-		local bitPos = tell % 32     -- [[ 0 - 31 ]]
+		local data = self._data
+		local i_word = brshift(tell, 5) + 1 -- [ 1 - length ]
+		local bitPos = band(tell, 31) -- [[ 0 - 31 ]]
 		local ebitPos = bitPos + bits -- The end bit pos
 
-		-- DataMask & Data
-		local mask = bor(lshift(b_mask, 32 - bitPos), rshift(b_mask, ebitPos))
-		local data = band(self._data[i_word] or 0x0, mask)
-
-		-- Write the data
 		if ebitPos <= 32 then
-			self._data[i_word] = bor(data, lshift(int, 32 - ebitPos))
+			-- Fits in one word: clear the `bits` wide window, then drop the value in.
+			local shift = 32 - ebitPos
+			data[i_word] = bor(band(data[i_word] or 0x0, bnot(blshift(brshift(b_mask, 32 - bits), shift))), blshift(int, shift))
 			return self
 		end
 
+		-- Spans two words. bitPos is 1-31 here, so every shift below is in range.
 		local overflow = ebitPos - 32 -- [[ 1, 31 ]]
-		self._data[i_word] = bor(data, rshift(int, overflow))
-
-		data = band(rshift(b_mask, overflow), self._data[i_word + 1] or 0x0)
-		self._data[i_word + 1] = bor(data, lshift(int, 32 - overflow))
+		data[i_word] = bor(band(data[i_word] or 0x0, blshift(b_mask, 32 - bitPos)), brshift(int, overflow))
+		data[i_word + 1] = bor(band(data[i_word + 1] or 0x0, brshift(b_mask, overflow)), blshift(int, 32 - overflow))
 
 		return self
 	end
@@ -376,27 +367,24 @@ do
 		self._tell = tell + bits
 
 		-- Retrive data pos
-		local i_word = rshift(tell, 5) + 1 -- [ 1 - length ]
-		local bitPos = tell % 32     -- [[ 0 - 31 ]]
+		local data = self._data
+		local i_word = brshift(tell, 5) + 1 -- [ 1 - length ]
+		local bitPos = band(tell, 31) -- [[ 0 - 31 ]]
 		local ebitPos = bitPos + bits -- The end bit pos
 
-		-- DataMask & Data
+		local n
 		if ebitPos <= 32 then
-			local data = brshift(self._data[i_word] or 0x0, 32 - ebitPos)
-			if self._little_endian and bits % 8 == 0 then
-				return swap(band(data, brshift(b_mask, 32 - bits)), bits)
-			end
-			return band(data, brshift(b_mask, 32 - bits))
+			n = band(brshift(data[i_word] or 0x0, 32 - ebitPos), brshift(b_mask, 32 - bits))
+		else
+			local over = ebitPos - 32 -- How many bits we're over [[ 1, 31 ]]
+			n = bor(blshift(band(data[i_word] or 0x0, brshift(b_mask, bitPos)), over), brshift(data[i_word + 1] or 0x0, 32 - over))
 		end
 
-		local over = ebitPos - 32 -- How many bits we're over
-		local data1 = lshift(band(self._data[i_word] or 0x0, rshift(b_mask, bitPos)), over)
-		local data2 = rshift(self._data[i_word + 1] or 0x0, 32 - over)
-		if self._little_endian and bits % 8 == 0 then
-			return swap(bor(data1, data2), bits)
+		if self._little_endian and band(bits, 7) == 0 then
+			n = brshift(bswap(n), 32 - bits)
 		end
 
-		return bor(data1, data2)
+		return n
 	end
 
 	-- Raw (endian-agnostic) 32-bit word read/write. Same bit-merge math as readraw/writeraw
@@ -409,39 +397,37 @@ do
 		local tell = self._tell
 		self._tell = tell + 32
 
-		local i_word = rshift(tell, 5) + 1
-		local bitPos = tell % 32
+		local data = self._data
+		local i_word = brshift(tell, 5) + 1
+		local bitPos = band(tell, 31)
 
 		if bitPos == 0 then
-			return self._data[i_word] or 0x0
+			return data[i_word] or 0x0
 		end
 
-		local data1 = lshift(band(self._data[i_word] or 0x0, rshift(b_mask, bitPos)), bitPos)
-		local data2 = rshift(self._data[i_word + 1] or 0x0, 32 - bitPos)
-		return bor(data1, data2)
+		local n = bor(blshift(data[i_word] or 0x0, bitPos), brshift(data[i_word + 1] or 0x0, 32 - bitPos))
+		return n
 	end
 
 	---@param self BitBuffer
 	---@param int number
 	function writeraw32(self, int)
 		local tell = self._tell
-		self._tell = tell + 32
-		self._len = max(self._len, self._tell)
+		local newTell = tell + 32
+		self._tell = newTell
+		if newTell > self._len then self._len = newTell end
 
-		local i_word = rshift(tell, 5) + 1
-		local bitPos = tell % 32
+		local data = self._data
+		local i_word = brshift(tell, 5) + 1
+		local bitPos = band(tell, 31)
 
 		if bitPos == 0 then
-			self._data[i_word] = int
+			data[i_word] = int
 			return
 		end
 
-		local mask = lshift(b_mask, 32 - bitPos)
-		local data = band(self._data[i_word] or 0x0, mask)
-		self._data[i_word] = bor(data, rshift(int, bitPos))
-
-		data = band(rshift(b_mask, bitPos), self._data[i_word + 1] or 0x0)
-		self._data[i_word + 1] = bor(data, lshift(int, 32 - bitPos))
+		data[i_word] = bor(band(data[i_word] or 0x0, blshift(b_mask, 32 - bitPos)), brshift(int, bitPos))
+		data[i_word + 1] = bor(band(data[i_word + 1] or 0x0, brshift(b_mask, bitPos)), blshift(int, 32 - bitPos))
 	end
 
 	if not source:find("niknak") then return end
@@ -453,7 +439,6 @@ meta._readraw = readraw
 
 -- Boolean
 do
-	local b_mask = 0xFFFFFFFF
 	--We don't need to call write/read raw. Since this is 1 bit.
 
 	--- Writes a boolean.
@@ -461,20 +446,19 @@ do
 	---@return self BitBuffer
 	function meta:WriteBoolean(b)
 		local tell = self._tell
-		self._tell = tell + 1
-		self._len = max(self._len, self._tell)
+		local newTell = tell + 1
+		self._tell = newTell
+		if newTell > self._len then self._len = newTell end
 
-		-- Retrive data pos
-		local i_word = rshift(tell, 5) + 1 -- [ 1 - length ]
-		local bitPos = tell % 32     -- [[ 0 - 31 ]]
-		local ebitPos = bitPos + 1
+		local data = self._data
+		local i_word = brshift(tell, 5) + 1 -- [ 1 - length ]
+		local mask = blshift(1, 31 - band(tell, 31)) -- The one bit we own
 
-		-- DataMask & Data
-		local mask = bor(lshift(b_mask, 32 - bitPos), rshift(b_mask, ebitPos))
-		local data = band(self._data[i_word] or 0x0, mask)
-
-		-- Write the data
-		self._data[i_word] = bor(data, lshift(b and 1 or 0, 32 - ebitPos))
+		if b then
+			data[i_word] = bor(data[i_word] or 0x0, mask)
+		else
+			data[i_word] = band(data[i_word] or 0x0, bnot(mask))
+		end
 
 		return self
 	end
@@ -485,15 +469,8 @@ do
 		local tell = self._tell
 		self._tell = tell + 1
 
-		-- Retrive data pos
-		local i_word = rshift(tell, 5) + 1 -- [ 1 - length ]
-		local bitPos = tell % 32     -- [[ 0 - 31 ]]
-		local ebitPos = bitPos + 1   -- The end bit pos
-
-		-- DataMask & Data
-		local data = rshift(self._data[i_word] or 0x0, 32 - ebitPos)
-
-		return band(data, rshift(b_mask, 32 - 1)) == 1
+		local word = self._data[brshift(tell, 5) + 1] or 0x0
+		return band(word, blshift(1, 31 - band(tell, 31))) ~= 0
 	end
 end
 
@@ -507,7 +484,8 @@ do
 	---@param bits number
 	---@return number
 	function meta:ReadInt(bits)
-		return to_signed(readraw(self, bits), bits)
+		local n = to_signed(readraw(self, bits), bits)
+		return n
 	end
 end
 
@@ -531,6 +509,21 @@ do
 	---@param byte number
 	---@return BitBuffer self
 	function meta:WriteByte(byte)
+		-- Fast path: the byte sits inside one word (a byte needs no endian swap).
+		local tell = self._tell
+		local bitPos = band(tell, 31)
+		if bitPos <= 24 then
+			local newTell = tell + 8
+			self._tell = newTell
+			if newTell > self._len then self._len = newTell end
+
+			local data = self._data
+			local i_word = brshift(tell, 5) + 1
+			local shift = 24 - bitPos
+			data[i_word] = bor(band(data[i_word] or 0x0, bnot(blshift(0xFF, shift))), blshift(band(byte, 0xFF), shift))
+			return self
+		end
+
 		writeraw(self, byte, 8)
 		return self
 	end
@@ -541,28 +534,30 @@ do
 		-- Fast path: the byte sits inside one word (a byte needs no endian swap).
 		local tell = self._tell
 		local bitPos = band(tell, 31)
+		local n
 		if bitPos <= 24 then
 			self._tell = tell + 8
-			return band(brshift(self._data[brshift(tell, 5) + 1] or 0x0, 24 - bitPos), 0xFF)
+			n = band(brshift(self._data[brshift(tell, 5) + 1] or 0x0, 24 - bitPos), 0xFF)
+		else
+			n = readraw(self, 8)
 		end
-		return readraw(self, 8)
+		return n
 	end
 end
 
 -- Signed Byte
 do
+	local WriteByte, ReadByte = meta.WriteByte, meta.ReadByte
+
 	--- Writes a signed byte. ( -128 - 127 )
 	---@param byte number
 	---@return BitBuffer self
-	function meta:WriteSignedByte(byte)
-		writeraw(self, byte, 8)
-		return self
-	end
+	meta.WriteSignedByte = WriteByte
 
 	--- Reads a signed byte. ( -128 - 127 )
 	---@return number
 	function meta:ReadSignedByte()
-		local n = self:ReadByte()
+		local n = ReadByte(self)
 		if n >= 0x80 then return n - 0x100 end
 		return n
 	end
@@ -574,6 +569,21 @@ do
 	---@param num number
 	---@return BitBuffer self
 	function meta:WriteUShort(num)
+		-- Fast path: little-endian and the short sits inside one word.
+		local tell = self._tell
+		local bitPos = band(tell, 31)
+		if self._little_endian and bitPos <= 16 then
+			local newTell = tell + 16
+			self._tell = newTell
+			if newTell > self._len then self._len = newTell end
+
+			local data = self._data
+			local i_word = brshift(tell, 5) + 1
+			local shift = 16 - bitPos
+			data[i_word] = bor(band(data[i_word] or 0x0, bnot(blshift(0xFFFF, shift))), blshift(brshift(bswap(num), 16), shift))
+			return self
+		end
+
 		writeraw(self, num, 16)
 		return self
 	end
@@ -584,29 +594,31 @@ do
 		-- Fast path: little-endian and the short sits inside one word.
 		local tell = self._tell
 		local bitPos = band(tell, 31)
+		local n
 		if self._little_endian and bitPos <= 16 then
 			self._tell = tell + 16
 			local x = band(brshift(self._data[brshift(tell, 5) + 1] or 0x0, 16 - bitPos), 0xFFFF)
-			return brshift(bswap(x), 16)
+			n = brshift(bswap(x), 16)
+		else
+			n = readraw(self, 16)
 		end
-		return readraw(self, 16)
+		return n
 	end
 end
 
 -- Short
 do
+	local ReadUShort = meta.ReadUShort
+
 	--- Writes a 2 byte number. ( -32768 - 32767 )
 	---@param num number
 	---@return BitBuffer self
-	function meta:WriteShort(num)
-		writeraw(self, num, 16)
-		return self
-	end
+	meta.WriteShort = meta.WriteUShort
 
 	--- Reads a 2-byte signed number. ( -32768 - 32767 )
 	---@return number
 	function meta:ReadShort()
-		local n = self:ReadUShort()
+		local n = ReadUShort(self)
 		if n >= 0x8000 then return n - 0x10000 end
 		return n
 	end
@@ -618,7 +630,11 @@ do
 	---@param num number
 	---@return self BitBuffer
 	function meta:WriteULong(num)
-		writeraw(self, num, 32)
+		if self._little_endian then
+			writeraw32(self, bswap(num))
+		else
+			writeraw32(self, bor(num, 0))
+		end
 		return self
 	end
 
@@ -641,19 +657,19 @@ do
 	--- Writes a 4 byte number. ( -2147483648 - 2147483647 )
 	---@param num number
 	---@return BitBuffer self
-	function meta:WriteLong(num)
-		writeraw(self, num, 32)
-		return self
-	end
+	meta.WriteLong = meta.WriteULong
 
 	--- Reads a 4 byte number. ( -2147483648 - 2147483647 )
 	---@return number
 	function meta:ReadLong()
 		-- bswap already returns a signed 32-bit value.
+		local n
 		if self._little_endian then
-			return bswap(readraw32(self))
+			n = bswap(readraw32(self))
+		else
+			n = to_signed(readraw(self, 32), 32)
 		end
-		return to_signed(readraw(self, 32), 32)
+		return n
 	end
 end
 
@@ -670,7 +686,8 @@ do
 	--- Reads a 4 bit unsigned number. ( 0 - 15 )
 	---@return number
 	function meta:ReadNibble()
-		return readraw(self, 4)
+		local n = readraw(self, 4)
+		return n
 	end
 end
 
@@ -687,13 +704,30 @@ do
 	--- Reads a 2 bit unsigned number. ( 0 - 3 )
 	---@return number
 	function meta:ReadSnort()
-		return readraw(self, 2)
+		local n = readraw(self, 2)
+		return n
 	end
 end
 
----@param n number
----@return boolean
-local function isNegative(n) return 1 / n == -math.huge end
+local huge = math.huge
+local INV_LN2 = 1 / log(2)
+
+---@param x number
+---@return number m
+---@return number e
+local function frexp2(x)
+	local e = floor(log(x) * INV_LN2) + 1
+	local m = ldexp(x, -e)
+	-- log() can be one off right next to a power of two
+	if m >= 1 then
+		m = m * 0.5
+		e = e + 1
+	elseif m < 0.5 then
+		m = m * 2
+		e = e - 1
+	end
+	return m, e
+end
 
 -- Float
 do
@@ -702,8 +736,7 @@ do
 	---@return self BitBuffer
 	function meta:WriteFloat(num)
 		local sign = 0
-		local man = 0
-		local ex = 0
+		local bits -- exponent and mantissa, without the sign
 
 		-- Mark negative numbers.
 		if num < 0 then
@@ -712,41 +745,39 @@ do
 		end
 
 		if num ~= num then -- Nan
-			ex = 0xFF
-			man = 1
-		elseif num == math.huge then -- Infintiy
-			ex = 0xFF
-			man = 0
+			bits = 0x7F800001
+		elseif num == huge then -- Infintiy
+			bits = 0x7F800000
 		elseif num ~= 0 then -- Anything but 0's
-			man, ex = frexp(num)
-			ex = ex + 0x7F
+			local man, e = frexp2(num)
+			local ex = e + 0x7E
 
 			if ex <= 0 then
-				man = ldexp(man, ex - 1)
-				ex = 0
-			elseif ex >= 0xFF then -- Reached infinity
-				ex = 0xFF
-				man = 0
-			elseif ex == 1 then
-				ex = 0
+				-- Subnormal
+				bits = floor(ldexp(man, ex + 23) + 0.5)
 			else
-				man = man * 2 - 1
-				ex = ex - 1
+				-- Adding (instead of or-ing) carries that into the exponent.
+				bits = ex * 0x800000 + floor((man * 2 - 1) * 0x800000 + 0.5)
+				if bits >= 0x7F800000 then bits = 0x7F800000 end -- Too large for a float: infinity
 			end
-
-			man = floor(ldexp(man, 23) + 0.5)
-		elseif isNegative(num) then -- Minus 0 support
-			sign = 0x80000000
-			man = 0
+		else
+			bits = 0
+			if 1 / num < 0 then sign = 0x80000000 end -- Minus 0 support
 		end
 
-		-- Not tested, but I guess it is faster to write 1 32bit number, than 3x others.
-		self:WriteULong(bor(sign, lshift(band(ex, 0xFF), 23), man))
+		if self._little_endian then
+			writeraw32(self, bswap(sign + bits))
+		else
+			writeraw32(self, bor(sign + bits, 0))
+		end
 
 		return self
 	end
 
-	local _23pow = 2 ^ 23
+	-- pow2f[ex] is the weight of the lowest mantissa bit for the biased exponent ex
+	local pow2f = {}
+	for ex = 1, 254 do pow2f[ex] = ldexp(1, ex - 150) end
+	local subnormal = ldexp(1, -149)
 
 	--- Reads an IEEE 754 little-endian float.
 	---@return number
@@ -758,19 +789,21 @@ do
 		else
 			n = readraw(self, 32)
 		end
-		local sign = band(0x80000000, n) == 0 and 1 or -1
 		local ex = band(brshift(n, 23), 0xFF)
-		local man = band(n, 0x007FFFFF) / _23pow
+		local man = band(n, 0x007FFFFF)
 
-		if ex == 0 and man == 0 then
-			return 0 * sign -- Number 0
-		elseif ex == 255 and man == 0 then
-			return math.huge * sign -- -+inf
-		elseif ex == 255 and man ~= 0 then
-			return 0 / 0   -- nan
+		local v
+		if ex == 0 then
+			v = man * subnormal -- Number 0 and subnormals
+		elseif ex == 255 then
+			if man ~= 0 then return 0 / 0 end -- nan
+			v = huge -- -+inf
 		else
-			return ldexp(1 + man, ex - 127) * sign
+			v = (man + 0x800000) * pow2f[ex]
 		end
+
+		if n < 0 then return -v end
+		return v
 	end
 end
 
@@ -785,10 +818,9 @@ do
 		|Fe|Ff|Fg|Fh| |Fa|Fb|Fc|Fd|
 		|Fa|Fb|Fc|Fd| |Fe|Ff|Fg|Fh|
 	]]
-	local _1022pow = 2^-1022
-	local _52pow = 2 ^ -52
 	local _32pow = 2 ^ 32
-	local _20pow = 2^-20
+	local _52pow = 2 ^ 52
+	local _20pow = 2 ^ 20
 
 	--- Writes an IEEE 754 little-endian double.
 	---@param num number
@@ -796,7 +828,7 @@ do
 	function meta:WriteDouble(num)
 		-- Handle special cases first
 		local sign = 0
-		if num < 0 or (num == 0 and isNegative(num)) then
+		if num < 0 or (num == 0 and 1 / num < 0) then
 			num = -num
 			sign = 0x80000000
 		end
@@ -806,67 +838,68 @@ do
 			ex, man_hi, man_lo = 0, 0, 0
 		elseif num ~= num then -- NaN
 			ex, man_hi, man_lo = 2047, 0, 1
-		elseif num == math.huge then -- Infinity
+		elseif num == huge then -- Infinity
 			ex, man_hi, man_lo = 2047, 0, 0
 		else
-    	local m, e = math.frexp(num)
-		ex = e + 1022
-		if ex >= 2047 then
-			ex, man_hi, man_lo = 2047, 0, 0
-		elseif ex <= 0 then
-			local shift = 1 - ex  -- how many bits to shift mantissa right
-			m = m * 2^(20 - shift)  -- scale to 20-bit hi field with shift applied
-			man_hi = math.floor(m)
-			man_lo = math.floor((m - man_hi) * _32pow + 0.5)
-			ex = 0
-		else
-			m = m * 2 - 1
-			local man_hi_f = math.floor(m * 2^20)
-			local m_frac = m * 2^20 - man_hi_f
-			man_hi = man_hi_f
-			man_lo = math.floor(m_frac * _32pow + 0.5)
+			local m, e = frexp2(num)
+			ex = e + 1022
+			if ex <= 0 then
+				-- Subnormal: the 52 mantissa bits are num / 2^-1074, with no implicit leading 1
+				m = ldexp(m, 20 + ex)
+				ex = 0
+			else
+				m = (m * 2 - 1) * _20pow
+			end
+			man_hi = floor(m)
+			man_lo = floor((m - man_hi) * _32pow + 0.5)
 		end
-	end
 
+		local hi = bor(sign, blshift(ex, 20), man_hi)
 		if self._little_endian then
-			self:WriteULong(man_lo)
-			self:WriteULong(bor(sign, lshift(ex, 20), band(man_hi, 0x000FFFFF)))
+			writeraw32(self, bswap(man_lo))
+			writeraw32(self, bswap(hi))
 		else
-			self:WriteULong(bor(sign, lshift(ex, 20), band(man_hi, 0x000FFFFF)))
-			self:WriteULong(man_lo)
+			writeraw32(self, hi)
+			writeraw32(self, bor(man_lo, 0))
 		end
 
 		return self
 	end
 
+	-- pow2d[ex] is the weight of the lowest mantissa bit for the biased exponent ex
+	local pow2d = {}
+	-- ldexp, not 2 ^ n: LuaJIT works x ^ -n out as 1 / x ^ n, which is 0 once 2 ^ n overflows
+	for ex = 1, 2046 do pow2d[ex] = ldexp(1, ex - 1075) end
+	local subnormal = ldexp(1, -1074)
+
 	--- Reads an IEEE 754 little- or big-endian double.
 	---@return number
 	function meta:ReadDouble()
-		local a, b
+		local hi, lo
 		if self._little_endian then
-			b, a = self:ReadULong(), self:ReadULong()
+			lo = bswap(readraw32(self))
+			hi = bswap(readraw32(self))
 		else
-			a, b = self:ReadULong(), self:ReadULong()
+			hi = readraw(self, 32)
+			lo = readraw(self, 32)
 		end
+		if lo < 0 then lo = lo + _32pow end
 
-		local sign = band(0x80000000, a) == 0 and 1 or -1
-		local ex = rshift(band(0x7FF00000, a), 20)
-		local man_hi = band(a, 0x000FFFFF)
-		local man_lo = band(b, 0xFFFFFFFF)
+		local ex = band(brshift(hi, 20), 0x7FF)
+		local man = band(hi, 0x000FFFFF) * _32pow + lo -- All 52 mantissa bits; exact in a double
 
-		if ex == 0 and man_hi == 0 and man_lo == 0 then
-			return 0 * sign -- ± Zero
-		elseif ex == 0x7FF and man_hi == 0 and man_lo == 0 then
-			return math.huge * sign -- Infinity
+		local v
+		if ex == 0 then
+			v = man * subnormal -- ± Zero and subnormals
 		elseif ex == 0x7FF then
-			return 0 / 0   -- NaN
-		elseif ex == 0 then
-			-- Subnormal: sign * (0.mantissa) * 2^-1022
-			return sign * (man_hi * _20pow + man_lo * _52pow) * _1022pow
+			if man ~= 0 then return 0 / 0 end -- NaN
+			v = huge -- Infinity
 		else
-			-- Normal: sign * (1.mantissa) * 2^(ex-1023)
-			return sign * (1 + man_hi * _20pow + man_lo * _52pow) * 2^(ex - 1023)
+			v = (man + _52pow) * pow2d[ex] -- Normal: (1.mantissa) * 2^(ex-1023)
 		end
+
+		if hi < 0 then return -v end
+		return v
 	end
 end
 
@@ -942,7 +975,7 @@ do
 			parts[n] = s_char(ReadByte(self))
 		end
 
-		return table.concat(parts)
+		return ( table.concat(parts) )
 	end
 
 	--- Writes raw string-data.
@@ -1027,18 +1060,27 @@ do
 
 		if maxLength < 1 then return "" end
 
-		local ReadByte = meta.ReadByte
-		local parts, n = {}, 0
-
-		local c = ReadByte(self)
-		while c ~= 0 and maxLength > 0 do
+		local data, tell = self._data, self._tell
+		local n = 0
+		while n < maxLength do
+			local t = tell + n * 8
+			local bitPos = band(t, 31)
+			local i_word = brshift(t, 5) + 1
+			local c
+			if bitPos <= 24 then
+				c = band(brshift(data[i_word] or 0x0, 24 - bitPos), 0xFF)
+			else
+				local over = bitPos - 24
+				c = band(bor(blshift(data[i_word] or 0x0, over), brshift(data[i_word + 1] or 0x0, 32 - over)), 0xFF)
+			end
+			if c == 0 then break end
 			n = n + 1
-			parts[n] = s_char(c)
-			c = ReadByte(self)
-			maxLength = maxLength - 1
 		end
 
-		return table.concat(parts)
+		local str = self:ReadData(n)
+		self._tell = self._tell + 8 -- The terminator (or the byte after maxLength characters) is consumed as well
+
+		return str
 	end
 
 	--- Writes a Vector.
