@@ -69,7 +69,7 @@ function meta:GetNodes()
 		nodes[i] = {
 			planenum = planenum,
 			plane = planes[ planenum ],
-			children = { data:ReadLong(), data:ReadLong() },
+			children = { data:ReadLong(), ( data:ReadLong() ) },
 			mins = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ),
 			maxs = Vector( data:ReadShort(), data:ReadShort(), data:ReadShort() ),
 			firstFace = data:ReadUShort(),

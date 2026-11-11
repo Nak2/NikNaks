@@ -831,11 +831,11 @@ do
 			--- @field texdata number # Index of the texture data
 			local t           = {}
 			t.textureVects    = {}
-			t.textureVects[0] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
-			t.textureVects[1] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
+			t.textureVects[0] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), ( data:ReadFloat() ) }
+			t.textureVects[1] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), ( data:ReadFloat() ) }
 			t.lightmapVecs    = {}
-			t.lightmapVecs[0] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
-			t.lightmapVecs[1] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() }
+			t.lightmapVecs[0] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), ( data:ReadFloat() ) }
+			t.lightmapVecs[1] = { [0] = data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), ( data:ReadFloat() ) }
 			t.flags           = data:ReadLong()
 			t.texdata         = data:ReadLong()
 			self._tinfo[i]    = t
@@ -1255,8 +1255,8 @@ do
 			--- @field multiblend number[]  -- [1..4] blend weights (0 - 1) per texture layer
 			--- @field alphablend number[]  -- [1..4] alpha weights (0 - 1) per texture layer
 			local t = {
-				multiblend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
-				alphablend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), data:ReadFloat() },
+				multiblend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), ( data:ReadFloat() ) },
+				alphablend = { data:ReadFloat(), data:ReadFloat(), data:ReadFloat(), ( data:ReadFloat() ) },
 			}
 			self._dispMultiBlend[i] = t
 		end
@@ -1426,11 +1426,11 @@ do
 			t.texinfo                     = data:ReadShort()
 			t.dispinfo                    = data:ReadShort()
 			t.surfaceFogVolumeID          = data:ReadShort()
-			t.styles                      = { data:ReadByte(), data:ReadByte(), data:ReadByte(), data:ReadByte() }
+			t.styles                      = { data:ReadByte(), data:ReadByte(), data:ReadByte(), ( data:ReadByte() ) }
 			t.lightofs                    = data:ReadLong()
 			t.area                        = data:ReadFloat()
-			t.LightmapTextureMinsInLuxels = { data:ReadLong(), data:ReadLong() }
-			t.LightmapTextureSizeInLuxels = { data:ReadLong(), data:ReadLong() }
+			t.LightmapTextureMinsInLuxels = { data:ReadLong(), ( data:ReadLong() ) }
+			t.LightmapTextureSizeInLuxels = { data:ReadLong(), ( data:ReadLong() ) }
 			t.origFace                    = data:ReadLong()
 			t.numPrims                    = data:ReadUShort()
 			t.firstPrimID                 = data:ReadUShort()
