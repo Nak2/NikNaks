@@ -9,10 +9,46 @@ local format = string.format
 --- @field _isL4D2 boolean # If the map is from L4D2, this will be true.
 local meta = NikNaks.__metatables["BSP"]
 
+--- Opens the map file on a timer. It is closed on the next frame.
 --- @return File?
-local function openFile(self)
+local function openBSPFile(self)
 	if self._mapfile == nil then return end
-	return file.Open(self._mapfile, "rb", "GAME")
+
+	local f = self._file --[[@as File?]]
+	if f and f:IsValid() then return f end
+
+	f = file.Open(self._mapfile, "rb", "GAME")
+	if not f then return f end
+
+	self._file = f
+	timer.Simple(0, function()
+		local open = self._file
+		if open then
+			open:Close()
+			self._file = nil
+		end
+	end)
+
+	return f
+end
+
+--- Returns true if the map has an external lump file ( maps/<map>_l_<id>.lmp ) for the given lump.
+--- @param lump_id number
+--- @return boolean
+local function hasLumpFile(self, lump_id)
+	local found = self._lumpfiles
+	if not found then
+		found = {}
+		local files = file.Find("maps/" .. self._mapname .. "_l_*.lmp", "GAME")
+		if files then
+			for i = 1, #files do
+				local id = tonumber(string.match(files[i], "_l_(%d+)%.lmp$"))
+				if id then found[id] = true end
+			end
+		end
+		self._lumpfiles = found
+	end
+	return found[lump_id] == true
 end
 
 --- Reads the lump header.
@@ -195,12 +231,7 @@ do
 		---@return boolean
 		---@server
 		function meta:HasLumpFile(lump_id)
-			if self._lumpfile and self._lumpfile[lump_id] ~= nil then
-				return self._lumpfile[lump_id]
-			end
-			self._lumpfile = self._lumpfile or {}
-			self._lumpfile[lump_id] = file.Exists("maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp", "GAME")
-			return self._lumpfile[lump_id]
+			return hasLumpFile(self, lump_id)
 		end
 	end
 
@@ -222,14 +253,13 @@ do
 
 		-- Check for LUMPs
 		local lumpPath = "maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp"
-		if file.Exists(lumpPath, "GAME") then -- L4D has _s_ and _h_ files too. Depending on the gamemode.
+		if hasLumpFile(self, lump_id) then -- L4D has _s_ and _h_ files too. Depending on the gamemode.
 			data = file.Read(lumpPath, "GAME") or ""
 		elseif lump_h.filelen > 0 then
-			local f = openFile(self)
+			local f = openBSPFile(self)
 			if (f ~= nil) then
 				f:Seek(lump_h.fileofs)
 				data = f:Read(lump_h.filelen)
-				f:Close()
 			end
 		end
 
@@ -264,14 +294,13 @@ do
 		-- The raw lump data
 		local data = ""
 		local lumpPath = "maps/" .. self._mapname .. "_l_" .. lump_id .. ".lmp"
-		if file.Exists(lumpPath, "GAME") then
+		if hasLumpFile(self, lump_id) then
 			data = file.Read(lumpPath, "GAME") or ""
 		elseif lump_h.filelen > 0 then
-			local f = openFile(self)
+			local f = openBSPFile(self)
 			if (f ~= nil) then
 				f:Seek(lump_h.fileofs)
 				data = f:Read(lump_h.filelen)
-				f:Close()
 			end
 		end
 
@@ -353,7 +382,7 @@ do
 			self._gamelumps[gameLumpID] = gameLump
 			return gameLump
 		else
-			local f = openFile(self)
+			local f = openBSPFile(self)
 			if f ~= nil then
 				f:Seek(t.fileofs)
 				gameLump = {
