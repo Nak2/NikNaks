@@ -162,7 +162,9 @@ function meta:GetLeafWaterData()
 	local data = self:GetLump( 36 )
 	self._pLeafWaterData = {}
 
-	for i = 0, data:Size() / 80 - 1 do
+	-- dleafwaterdata_t is 12 bytes: two floats, one short and two
+	-- padding bytes. BitBuffer sizes and Skip offsets are in bits.
+	for i = 0, math.floor( data:Size() / 96 ) - 1 do
 		--- @class BSPLeafWaterData
 		--- @field surfaceZ number The height of the water surface
 		--- @field minZ number The minimum height of the water
@@ -177,7 +179,7 @@ function meta:GetLeafWaterData()
 			local texString = self:GetTexdataStringData()[ texInfo.texdata ]
 			t.material = Material( texString )
 		end
-		data:Skip( 2 ) -- A short that is always 0x00
+		data:Skip( 16 ) -- structure padding, not another water record
 		self._pLeafWaterData[i] = t
 	end
 
@@ -948,7 +950,9 @@ function meta_leaf:CalculateAmbientCube( position, hdr )
 		local r, g, b = 0, 0, 0
 		for i, sample in ipairs( samples ) do
 			local c = sample.cube[f]
-			local scale = 2 ^ c.exponent / 255 * ( weights[i] / total ) -- RGBExp32 to linear light
+			-- RGBExp32 stores a byte mantissa, not a normalized color channel.
+			-- Keep the linear irradiance used by Source's ambient-cube shaders.
+			local scale = 2 ^ c.exponent * ( weights[i] / total )
 			r, g, b = r + c.r * scale, g + c.g * scale, b + c.b * scale
 		end
 		cube[f] = Color(r, g, b)
