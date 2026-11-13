@@ -10,7 +10,8 @@ local format, clamp, min, max = string.format, math.Clamp, math.min, math.max
 local meta = NikNaks.__metatables["BSP"]
 
 --- @class BSPLeafObject
-local meta_leaf = {}
+-- PVS/PAS and trace modules extend this metatable. Retain those methods on refresh.
+local meta_leaf = NikNaks.__metatables["BSP Leaf"] or {}
 meta_leaf.__index = meta_leaf
 meta_leaf.__tostring = function( self ) return ( format( obj_tostring, "Leaf", self.__id ) ) end
 meta_leaf.MetaName = "BSP Leaf"
@@ -20,6 +21,40 @@ local MAX_MAP_NODES = 65536
 local TEST_EPSILON = 0.01
 local FLT_EPSILON = 1.192092896e-07
 local canGenerateParents = false
+
+---Returns face index -> visibility clusters from the BSP's leaf-face links.
+---False means a face touches a non-solid leaf with no valid cluster; absent faces have no links.
+---The BSP owns the cached table. Brush-model transforms are not applied.
+---@param pause function? # Optional cooperative yield, called every 256 leaves.
+---@return table<number, number[]|false>
+function meta:GetFaceClusters( pause )
+	if self._faceClusters then return self._faceClusters end
+	local result, count = {}, 0
+	local leafFaces = self:GetLeafFaces()
+	for _, leaf in pairs( self:GetLeafs() ) do
+		local cluster = leaf.cluster
+		for index = leaf.firstleafface + 1, leaf.firstleafface + leaf.numleaffaces do
+			local face = leafFaces[index]
+			if face then
+				local clusters = result[face]
+				if cluster < 0 and bit.band( leaf.contents or 0, CONTENTS_SOLID ) == 0 then
+					result[face] = false
+				elseif cluster >= 0 and clusters ~= false then
+					if not clusters then result[face] = { cluster }
+					else
+						local found = false
+						for i = 1, #clusters do if clusters[i] == cluster then found = true break end end
+						if not found then clusters[#clusters + 1] = cluster end
+					end
+				end
+			end
+		end
+		count = count + 1
+		if pause and count % 256 == 0 then pause() end
+	end
+	self._faceClusters = result
+	return result
+end
 
 --- Generates parentNodes for nodes and leafs.
 --- @param self BSPObject

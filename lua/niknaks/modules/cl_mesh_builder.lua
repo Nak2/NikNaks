@@ -123,15 +123,16 @@ local function buildChunks( material, verts, colors, out, us, vs, translucent, d
 end
 
 ---Creates a new MeshBuilder.
+---@param bounds boolean? # Accumulate triangle bounds while adding faces. Default false.
 ---@return MeshBuilder
-local function create()
-	return ( setmetatable( { _batches = {}, _lightVerts = {}, _lightColors = {}, _lightVertsT = {}, _lightColorsT = {} }, builder_meta ) )
+local function create( bounds )
+	return ( setmetatable( { _trackBounds = bounds, _batches = {}, _lightVerts = {}, _lightColors = {}, _lightVertsT = {}, _lightColorsT = {} }, builder_meta ) )
 end
 
 --- Creates a new MeshBuilder. Client only.
---- @overload fun(): MeshBuilder
+--- @overload fun(bounds: boolean?): MeshBuilder
 NikNaks.MeshBuilder = setmetatable( { Create = create, BlendsWithBackground = blendsWithBackground }, {
-	__call = function() return create() end
+	__call = function( _, bounds ) return create( bounds ) end
 } )
 
 ---@class MeshBuilderOptions
@@ -161,7 +162,24 @@ function builder_meta:AddFace( face, options )
 	end
 
 	local list, n = batch.verts, batch.n
-	for i = 1, #verts do list[n + i] = verts[i] end
+	local minX, minY, minZ = self._minX or math.huge, self._minY or math.huge, self._minZ or math.huge
+	local maxX, maxY, maxZ = self._maxX or -math.huge, self._maxY or -math.huge, self._maxZ or -math.huge
+	for i = 1, #verts do
+		local vertex = verts[i]
+		list[n + i] = vertex
+		if self._trackBounds then
+			local p = vertex.pos
+			local x, y, z = p.x, p.y, p.z
+			if x ~= x or y ~= y or z ~= z or math.abs( x ) == math.huge
+				or math.abs( y ) == math.huge or math.abs( z ) == math.huge then self._invalidBounds = true end
+			minX, minY, minZ = math.min( minX, x ), math.min( minY, y ), math.min( minZ, z )
+			maxX, maxY, maxZ = math.max( maxX, x ), math.max( maxY, y ), math.max( maxZ, z )
+		end
+	end
+	if self._trackBounds then
+		self._minX, self._minY, self._minZ = minX, minY, minZ
+		self._maxX, self._maxY, self._maxZ = maxX, maxY, maxZ
+	end
 
 	-- A displacement with a material that blends textures: the weights are in the color of its vertices, where the
 	-- shader of the material reads them
@@ -234,10 +252,27 @@ function builder_meta:AddFaces( faces, options )
 	return added
 end
 
+---Returns the accumulated triangle bounds, or nil when disabled, empty or invalid.
+---Shader deformation is not included. Enable accumulation with MeshBuilder( true ).
+---@return Vector? mins
+---@return Vector? maxs
+function builder_meta:GetBounds()
+	if not self._trackBounds or not self._minX or self._invalidBounds then return nil end
+	return Vector( self._minX, self._minY, self._minZ ), Vector( self._maxX, self._maxY, self._maxZ )
+end
+
+---Returns the triangle bounds retained when the mesh was built, if requested.
+---@return Vector? mins
+---@return Vector? maxs
+function object_meta:GetBounds()
+	return self._mins, self._maxs
+end
+
 ---Compiles everything added so far into meshes. The builder is empty again afterwards.
 ---@return MeshObject
 function builder_meta:Build()
-	local object = setmetatable( { _meshes = {}, _lightMeshes = {}, _triangles = 0 }, object_meta )
+	local mins, maxs = self:GetBounds()
+	local object = setmetatable( { _meshes = {}, _lightMeshes = {}, _triangles = 0, _mins = mins, _maxs = maxs }, object_meta )
 
 	for _, batch in pairs( self._batches ) do
 		buildChunks( batch.material, batch.verts, batch.colors, object._meshes, batch.us, batch.vs, nil, batch.dus, batch.dvs )
@@ -248,6 +283,7 @@ function builder_meta:Build()
 	buildChunks( colorMaterial, self._lightVertsT, self._lightColorsT, object._lightMeshes, nil, nil, true )
 
 	self._batches, self._lightVerts, self._lightColors, self._lightVertsT, self._lightColorsT = {}, {}, {}, {}, {}
+	self._minX, self._minY, self._minZ, self._maxX, self._maxY, self._maxZ, self._invalidBounds = nil, nil, nil, nil, nil, nil, nil
 	return object
 end
 
@@ -279,7 +315,7 @@ local function drawPass( self, translucent, options )
 		for i = 1, #meshes do
 			local m = meshes[i]
 			if m.translucent == translucent then
-				render.SetMaterial( options.material and options.material(m.material) or m.material )
+				render.SetMaterial( options.material and options.material( m.material ) or m.material )
 				m.mesh:Draw()
 			end
 		end
@@ -290,7 +326,7 @@ local function drawPass( self, translucent, options )
 		for i = 1, #meshes do
 			local m = meshes[i]
 			if m.translucent == translucent then
-				render.SetMaterial( options.material and options.material(m.material) or m.material )
+				render.SetMaterial( options.material and options.material( m.material ) or m.material )
 				m.mesh:Draw()
 			end
 		end

@@ -387,6 +387,39 @@ end
 -- loses the colored highlights. The 4096-entry vertex-light table rounds the
 -- input to 1/1024 and applies a half-overbright factor (handled by toPixel).
 local bumpColors = { {}, {}, {} }
+-- Up to the still styles and four animated combinations. Reuse a bounded workspace
+-- across faces; large lightmaps use the same decoder without retaining extra luxels.
+local BUMP_CACHE_LUXELS = 4096
+local bumpCaches = {}
+local function resetBumpCaches()
+	for _, cache in ipairs( bumpCaches ) do cache.slots = nil end
+end
+
+local function bumpCache( slots, count )
+	if count > BUMP_CACHE_LUXELS then return nil end
+	for _, cache in ipairs( bumpCaches ) do
+		if cache.slots == slots then return cache end
+		if not cache.slots then
+			cache.slots, cache.generation = slots, cache.generation + 1
+			return cache
+		end
+	end
+	if #bumpCaches == 5 then return nil end
+	local cache = { slots = slots, generation = 1, values = {}, stamps = {} }
+	bumpCaches[#bumpCaches + 1] = cache
+	return cache
+end
+
+local function bumpFactor( flat, sum )
+	local quantized = min( max( floor( flat * 1024 + 0.5 ), 0 ), 4095 ) / 1024
+	return sum > 0 and 3 * 255 * quantized ^ INV_GAMMA / sum or 0
+end
+
+local function bumpBrightness( direction )
+	local color = bumpColors[direction]
+	return max( color[1], color[2], color[3] )
+end
+
 local function readDisplaySet( raw, slots, index, count, set, hdr, desaturate )
 	local offset = index * 4
 	local r, g, b, present, valid = sumStyles( raw, slots, offset + set * count * 4 )
@@ -394,39 +427,58 @@ local function readDisplaySet( raw, slots, index, count, set, hdr, desaturate )
 		local dr, dg, db = toDisplayLight( r, g, b, desaturate )
 		return dr, dg, db, present, valid
 	end
+	local cache = bumpCache( slots, count )
+	local at = index * 9 + ( set - 1 ) * 3
+	if cache and cache.stamps[index] == cache.generation then
+		local values = cache.values
+		return values[at + 1], values[at + 2], values[at + 3], present, valid
+	end
 	local fr, fg, fb = sumStyles( raw, slots, offset )
-	local flat = { fr, fg, fb }
-	local sum = { 0, 0, 0 }
+	local sr, sg, sb = 0, 0, 0
 	for direction = 1, 3 do
 		local cr, cg, cb = sumStyles( raw, slots, offset + direction * count * 4 )
-		local c = bumpColors[direction]
-		c[1], c[2], c[3] = cr, cg, cb
-		sum[1], sum[2], sum[3] = sum[1] + cr, sum[2] + cg, sum[3] + cb
+		local color = bumpColors[direction]
+		color[1], color[2], color[3] = cr, cg, cb
+		sr, sg, sb = sr + cr, sg + cg, sb + cb
 	end
-	for channel = 1, 3 do
-		local quantized = min( max( floor( flat[channel] * 1024 + 0.5 ), 0 ), 4095 ) / 1024
-		local factor = sum[channel] > 0 and 3 * 255 * quantized ^ INV_GAMMA / sum[channel] or 0
-		for direction = 1, 3 do bumpColors[direction][channel] = bumpColors[direction][channel] * factor end
+	local rf, gf, bf = bumpFactor( fr, sr ), bumpFactor( fg, sg ), bumpFactor( fb, sb )
+	for direction = 1, 3 do
+		local color = bumpColors[direction]
+		color[1], color[2], color[3] = color[1] * rf, color[2] * gf, color[3] * bf
 	end
-	-- An over-range lobe gives its excess equally to the other two before
-	-- final hue-preserving clamping. This keeps bright surfaces from changing tint.
-	local order = { 1, 2, 3 }
-	local function brightest(direction) local c = bumpColors[direction] return max(c[1], c[2], c[3]) end
-	table.sort(order, function(a, b) return brightest(a) > brightest(b) end)
-	for _, direction in ipairs(order) do
-		local top = brightest(direction)
+	-- Match Lua's three-element sort, including equal-brightness ordering.
+	local first, second, third = 1, 2, 3
+	if bumpBrightness( third ) > bumpBrightness( first ) then first, third = third, first end
+	if bumpBrightness( second ) > bumpBrightness( first ) then first, second = second, first
+	elseif bumpBrightness( third ) > bumpBrightness( second ) then second, third = third, second end
+	for i = 1, 3 do
+		local direction = i == 1 and first or i == 2 and second or third
+		local top = bumpBrightness( direction )
 		if top > MAX_DISPLAY_LIGHT then
-			local c = bumpColors[direction]
-			local overflow = (top - MAX_DISPLAY_LIGHT) / top
+			local color = bumpColors[direction]
+			local overflow = ( top - MAX_DISPLAY_LIGHT ) / top
 			for channel = 1, 3 do
-				local excess = c[channel] * overflow
-				c[channel] = c[channel] - excess
-				for other = 1, 3 do if other ~= direction then bumpColors[other][channel] = bumpColors[other][channel] + excess * 0.5 end end
+				local excess = color[channel] * overflow
+				color[channel] = color[channel] - excess
+				for other = 1, 3 do
+					if other ~= direction then bumpColors[other][channel] = bumpColors[other][channel] + excess * 0.5 end
+				end
 			end
 		end
 	end
-	local c = bumpColors[set]
-	r, g, b = limitBrightness( c[1], c[2], c[3] )
+	if cache then
+		for direction = 1, 3 do
+			local color = bumpColors[direction]
+			local cr, cg, cb = limitBrightness( color[1], color[2], color[3] )
+			cr, cg, cb = fadeDarkToGray( cr, cg, cb, desaturate )
+			local base = index * 9 + ( direction - 1 ) * 3
+			cache.values[base + 1], cache.values[base + 2], cache.values[base + 3] = cr, cg, cb
+		end
+		cache.stamps[index] = cache.generation
+		return cache.values[at + 1], cache.values[at + 2], cache.values[at + 3], present, valid
+	end
+	local color = bumpColors[set]
+	r, g, b = limitBrightness( color[1], color[2], color[3] )
 	r, g, b = fadeDarkToGray( r, g, b, desaturate )
 	return r, g, b, present, valid
 end
@@ -514,9 +566,9 @@ local function decodeAnimatedFace( raw, entry, desaturate, set )
 	local combined = entry.displaySlots
 	if not combined then
 		combined = {}
-		for k, slot in ipairs(moving) do
+		for k, slot in ipairs( moving ) do
 			local slots = {}
-			for i, still in ipairs(entry.still) do slots[i] = still end
+			for i, still in ipairs( entry.still ) do slots[i] = still end
 			slots[#slots + 1] = { start = slot.start, style = slot.style, weight = 1 }
 			combined[k] = slots
 		end
@@ -649,6 +701,7 @@ end
 
 local function writeStaticEntry( raw, scale, desaturate, encode )
 	return function( entry )
+		resetBumpCaches()
 		for set = 0, entry.sets - 1 do
 			decodeStaticFace( raw, entry, desaturate, set )
 			writeImage( setRect( entry.rect, set, scale ), scale, baseImage, encode )
@@ -659,6 +712,7 @@ end
 
 local function writeLayersOfEntry( raw, scale, desaturate, encode )
 	return function( entry )
+		resetBumpCaches()
 		for set = 0, entry.sets - 1 do
 			decodeAnimatedFace( raw, entry, desaturate, set )
 			writeImage( setRect( entry.baseLayer, set, scale ), scale, baseImage, encode )
@@ -879,8 +933,8 @@ end
 ---@param layerRT (ITexture|false)? # GetLayerSize() big, for the faces of the animated styles. nil = one is made for you, false = none: the animated styles then stay at the weight they start at.
 ---@param srgbToLinear boolean? # Compensate gamma-decoded surface writes to a float target for native LDR sRGB lightmap sampling. Pass a float layerRT too when using animated styles.
 function atlas_meta:Write( rt, layerRT, srgbToLinear )
-	for _, entry in ipairs(self._static) do entry.hdr = self._hdr end
-	for _, entry in ipairs(self._animated) do entry.hdr = self._hdr end
+	for _, entry in ipairs( self._static ) do entry.hdr = self._hdr end
+	for _, entry in ipairs( self._animated ) do entry.hdr = self._hdr end
 	if #self._animated > 0 then
 		if layerRT == nil then layerRT = createLayerTarget( rt, self._layerWidth, self._layerHeight ) end
 		if not layerRT then makeAnimatedStatic( self ) end
