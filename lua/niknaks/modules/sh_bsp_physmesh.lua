@@ -53,8 +53,9 @@ function NikNaks.Physics.Load( model )
 	local path = string.StripExtension( model ) .. ".phy"
 	local known = cache[path]
 	if known then
-		if known.error then return nil, known.error end
-		return known
+		if not known.error then return known end
+		-- Packed BSP assets may mount after a model was first requested.
+		if known.error ~= "no .phy file" or not file.Exists( path, "GAME" ) then return nil, known.error end
 	end
 
 	local function fail( why )

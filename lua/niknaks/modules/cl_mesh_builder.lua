@@ -56,21 +56,34 @@ local function blendsTextures( material )
 end
 
 ---Builds one mesh from verts[first..last] (a multiple of 3 vertices).
-local function buildMesh( material, verts, colors, first, last, us, vs )
+local function buildMesh( material, verts, colors, first, last, us, vs, dus, dvs )
 	local m = Mesh( material )
 	mesh.Begin( m, MATERIAL_TRIANGLES, ( last - first + 1 ) / 3 )
+	local tangentS, tangentT
 	for i = first, last do
 		local v = verts[i]
+		if ( i - first ) % 3 == 0 then
+			local b, c = verts[i + 1], verts[i + 2]
+			local ab, ac = b.pos - v.pos, c.pos - v.pos
+			local bu, bv, cu, cv = b.u - v.u, b.v - v.v, c.u - v.u, c.v - v.v
+			local determinant = bu * cv - cu * bv
+			if determinant ~= 0 then
+				tangentS = ( ( ab * cv - ac * bv ) / determinant ):GetNormalized()
+				tangentT = ( ( ac * bu - ab * cu ) / determinant ):GetNormalized()
+			else
+				tangentS, tangentT = v.tangent, v.binormal
+			end
+		end
 		local c = colors and colors[i]
 		mesh.Normal( v.normal )
+		if tangentS and tangentT then mesh.TangentS( tangentS ) mesh.TangentT( tangentT ) end
 		mesh.Position( v.pos )
 		if c then mesh.Color( c.r, c.g, c.b, c.a or 255 ) else mesh.Color( 255, 255, 255, 255 ) end
 		mesh.TexCoord( 0, v.u, v.v )
 		if us then
-			-- Own lightmap coordinates (the faces are not changed). Stage 2 is the offset between the bump sets of the
-			-- lightmap: none, so a bumped material reads the same light for each.
+			-- Stage 2 advances from the flat lightmap to each directional bump set.
 			mesh.TexCoord( 1, us[i], vs[i] )
-			mesh.TexCoord( 2, 0, 0 )
+			mesh.TexCoord( 2, dus and dus[i] or 0, dvs and dvs[i] or 0 )
 		else
 			mesh.TexCoord( 1, v.u1, v.v1 )
 		end
@@ -98,27 +111,28 @@ end
 
 ---Builds the meshes for a list of triangle vertices, split into chunks a mesh can hold.
 ---translucent: which pass the meshes belong to. nil = decided by the material.
-local function buildChunks( material, verts, colors, out, us, vs, translucent )
+local function buildChunks( material, verts, colors, out, us, vs, translucent, dus, dvs )
 	local total = #verts
 	local pos = 1
 	if translucent == nil then translucent = blendsWithBackground( material ) end
 	while pos <= total do
 		local last = math.min( pos + MAX_VERTS - 1, total )
-		out[#out + 1] = { material = material, mesh = buildMesh( material, verts, colors, pos, last, us, vs ), translucent = translucent }
+		out[#out + 1] = { material = material, mesh = buildMesh( material, verts, colors, pos, last, us, vs, dus, dvs ), translucent = translucent }
 		pos = last + 1
 	end
 end
 
 ---Creates a new MeshBuilder.
+---@param bounds boolean? # Accumulate triangle bounds while adding faces. Default false.
 ---@return MeshBuilder
-local function create()
-	return ( setmetatable( { _batches = {}, _lightVerts = {}, _lightColors = {}, _lightVertsT = {}, _lightColorsT = {} }, builder_meta ) )
+local function create( bounds )
+	return ( setmetatable( { _trackBounds = bounds, _batches = {}, _lightVerts = {}, _lightColors = {}, _lightVertsT = {}, _lightColorsT = {} }, builder_meta ) )
 end
 
 --- Creates a new MeshBuilder. Client only.
---- @overload fun(): MeshBuilder
+--- @overload fun(bounds: boolean?): MeshBuilder
 NikNaks.MeshBuilder = setmetatable( { Create = create, BlendsWithBackground = blendsWithBackground }, {
-	__call = function() return create() end
+	__call = function( _, bounds ) return create( bounds ) end
 } )
 
 ---@class MeshBuilderOptions
@@ -127,7 +141,7 @@ NikNaks.MeshBuilder = setmetatable( { Create = create, BlendsWithBackground = bl
 ---@field lightToggle (boolean|table<number, number>|fun( style: number ): number)? # Which light styles of a face are added. A face has a lightmap per style: 0, the animated ones (1-31) and the lights with a name (32 and up, such as a light_environment called "sun_light", which an entity switches). nil / true = the defaults (0 and 32+ on, the animated at half), false = the first lightmap only, a table or function (style -> weight, 0 = off, 1 = on) = your own. Used with `light` and `lightColors` of this builder, not with `lightUV` (that light is yours).
 ---@field lightColors fun( face: BSPFaceObject, verts: PolygonMeshVertex[] ): table[]? # Your own light: a { r, g, b } (0-255) per vertex, used instead of the BSP lightmap. Return nil for no light on that face.
 ---@field material IMaterial? # Draw the faces with this material instead of their own, e.g. a flat material for a minimap.
----@field lightUV fun( face: BSPFaceObject, verts: PolygonMeshVertex[] ): number[], number[] # Your own lightmap coordinates, instead of the u1 / v1 of the vertices: returns two arrays (u and v), one number per vertex. For drawing with a lightmap of your own (MeshObjectDrawOptions.lightmap).
+---@field lightUV fun( face: BSPFaceObject, verts: PolygonMeshVertex[] ): number[], number[], number[]?, number[]? # Lightmap u/v arrays and optional directional-set offset u/v arrays, one number per vertex. For MeshObjectDrawOptions.lightmap.
 
 ---Adds a face. Returns true if it was added.
 ---@param face BSPFaceObject
@@ -148,7 +162,24 @@ function builder_meta:AddFace( face, options )
 	end
 
 	local list, n = batch.verts, batch.n
-	for i = 1, #verts do list[n + i] = verts[i] end
+	local minX, minY, minZ = self._minX or math.huge, self._minY or math.huge, self._minZ or math.huge
+	local maxX, maxY, maxZ = self._maxX or -math.huge, self._maxY or -math.huge, self._maxZ or -math.huge
+	for i = 1, #verts do
+		local vertex = verts[i]
+		list[n + i] = vertex
+		if self._trackBounds then
+			local p = vertex.pos
+			local x, y, z = p.x, p.y, p.z
+			if x ~= x or y ~= y or z ~= z or math.abs( x ) == math.huge
+				or math.abs( y ) == math.huge or math.abs( z ) == math.huge then self._invalidBounds = true end
+			minX, minY, minZ = math.min( minX, x ), math.min( minY, y ), math.min( minZ, z )
+			maxX, maxY, maxZ = math.max( maxX, x ), math.max( maxY, y ), math.max( maxZ, z )
+		end
+	end
+	if self._trackBounds then
+		self._minX, self._minY, self._minZ = minX, minY, minZ
+		self._maxX, self._maxY, self._maxZ = maxX, maxY, maxZ
+	end
 
 	-- A displacement with a material that blends textures: the weights are in the color of its vertices, where the
 	-- shader of the material reads them
@@ -171,18 +202,19 @@ function builder_meta:AddFace( face, options )
 	end
 	-- Own lightmap coordinates. The vertices are the face's cache and are not changed: the numbers are kept beside them.
 	if options.lightUV or batch.us then
-		local us, vs = batch.us, batch.vs
+		local us, vs, dus, dvs = batch.us, batch.vs, batch.dus, batch.dvs
 		if not us then
-			us, vs = {}, {}
-			for i = 1, n do us[i], vs[i] = list[i].u1, list[i].v1 end
-			batch.us, batch.vs = us, vs
+			us, vs, dus, dvs = {}, {}, {}, {}
+			for i = 1, n do us[i], vs[i], dus[i], dvs[i] = list[i].u1, list[i].v1, 0, 0 end
+			batch.us, batch.vs, batch.dus, batch.dvs = us, vs, dus, dvs
 		end
 
-		local fu, fv
-		if options.lightUV then fu, fv = options.lightUV( face, verts ) end
+		local fu, fv, fdu, fdv
+		if options.lightUV then fu, fv, fdu, fdv = options.lightUV( face, verts ) end
 		for i = 1, #verts do
 			us[n + i] = fu and fu[i] or verts[i].u1
 			vs[n + i] = fv and fv[i] or verts[i].v1
+			dus[n + i], dvs[n + i] = fdu and fdu[i] or 0, fdv and fdv[i] or 0
 		end
 	end
 	batch.n = n + #verts
@@ -220,13 +252,30 @@ function builder_meta:AddFaces( faces, options )
 	return added
 end
 
+---Returns the accumulated triangle bounds, or nil when disabled, empty or invalid.
+---Shader deformation is not included. Enable accumulation with MeshBuilder( true ).
+---@return Vector? mins
+---@return Vector? maxs
+function builder_meta:GetBounds()
+	if not self._trackBounds or not self._minX or self._invalidBounds then return nil end
+	return Vector( self._minX, self._minY, self._minZ ), Vector( self._maxX, self._maxY, self._maxZ )
+end
+
+---Returns the triangle bounds retained when the mesh was built, if requested.
+---@return Vector? mins
+---@return Vector? maxs
+function object_meta:GetBounds()
+	return self._mins, self._maxs
+end
+
 ---Compiles everything added so far into meshes. The builder is empty again afterwards.
 ---@return MeshObject
 function builder_meta:Build()
-	local object = setmetatable( { _meshes = {}, _lightMeshes = {}, _triangles = 0 }, object_meta )
+	local mins, maxs = self:GetBounds()
+	local object = setmetatable( { _meshes = {}, _lightMeshes = {}, _triangles = 0, _mins = mins, _maxs = maxs }, object_meta )
 
 	for _, batch in pairs( self._batches ) do
-		buildChunks( batch.material, batch.verts, batch.colors, object._meshes, batch.us, batch.vs )
+		buildChunks( batch.material, batch.verts, batch.colors, object._meshes, batch.us, batch.vs, nil, batch.dus, batch.dvs )
 		object._triangles = object._triangles + batch.n / 3
 	end
 	local colorMaterial = Material( "color" )
@@ -234,10 +283,12 @@ function builder_meta:Build()
 	buildChunks( colorMaterial, self._lightVertsT, self._lightColorsT, object._lightMeshes, nil, nil, true )
 
 	self._batches, self._lightVerts, self._lightColors, self._lightVertsT, self._lightColorsT = {}, {}, {}, {}, {}
+	self._minX, self._minY, self._minZ, self._maxX, self._maxY, self._maxZ, self._invalidBounds = nil, nil, nil, nil, nil, nil, nil
 	return object
 end
 
 ---@class MeshObjectDrawOptions
+---@field material fun(material: IMaterial): IMaterial # Optional material binding for this draw; meshes and source materials remain unchanged.
 ---@field light boolean? # Draw the light, if the object has any. Default true.
 ---@field fullbright boolean? # Draw the materials fullbright, so only the baked light shades them. Default true.
 ---@field ignoreZ boolean? # Draw on top of the world (clears the depth buffer first). Faces still sort against each other. Default false.
@@ -264,7 +315,7 @@ local function drawPass( self, translucent, options )
 		for i = 1, #meshes do
 			local m = meshes[i]
 			if m.translucent == translucent then
-				render.SetMaterial( m.material )
+				render.SetMaterial( options.material and options.material( m.material ) or m.material )
 				m.mesh:Draw()
 			end
 		end
@@ -275,7 +326,7 @@ local function drawPass( self, translucent, options )
 		for i = 1, #meshes do
 			local m = meshes[i]
 			if m.translucent == translucent then
-				render.SetMaterial( m.material )
+				render.SetMaterial( options.material and options.material( m.material ) or m.material )
 				m.mesh:Draw()
 			end
 		end

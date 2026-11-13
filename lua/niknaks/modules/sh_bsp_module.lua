@@ -1479,12 +1479,20 @@ do
 	--- @class BModel
 	local meta_bmodel = {}
 	meta_bmodel.__index = meta_bmodel
+	NikNaks.__metatables["BModel"] = meta_bmodel
 
 	--- Returns a list of BModels ( Brush Models )
 	--- @return BModel[]
 	function meta:GetBModels()
-		if self._bmodel then return self._bmodel end
+		if self._bmodel then
+			if self._bmodelMeta ~= meta_bmodel then
+				for _, model in pairs( self._bmodel ) do setmetatable( model, meta_bmodel ) end
+				self._bmodelMeta = meta_bmodel
+			end
+			return self._bmodel
+		end
 		self._bmodel = {}
+		self._bmodelMeta = meta_bmodel
 		local data = self:GetLump(14)
 		for i = 0, data:Size() / 384 - 1 do
 			--- @class BModel
@@ -1523,6 +1531,36 @@ do
 		end
 
 		return t
+	end
+
+	---Returns the unique collision brushes below this model's head node. The BSP owns the cached list.
+	---@return BSPBrushObject[]
+	function meta_bmodel:GetBrushes()
+		if self._brushes then return self._brushes end
+		local nodes, leafs = self.__map:GetNodes(), self.__map:GetLeafs()
+		local stack, seen, added, brushes = { self.headnode }, {}, {}, {}
+		while #stack > 0 do
+			local index = stack[#stack]
+			stack[#stack] = nil
+			if not seen[index] then
+				seen[index] = true
+				if index < 0 then
+					local leaf = leafs[-1 - index]
+					for _, brush in ipairs( leaf and leaf:GetBrushes() or {} ) do
+						if not added[brush] then
+							added[brush], brushes[#brushes + 1] = true, brush
+						end
+					end
+				else
+					local node = nodes[index]
+					if node then
+						stack[#stack + 1], stack[#stack + 2] = node.children[1], node.children[2]
+					end
+				end
+			end
+		end
+		self._brushes = brushes
+		return brushes
 	end
 
 	--- Locates the BModelIndex for the said faceIndex
