@@ -80,7 +80,7 @@ do
 
 	local function days_from_civil(y, m, d)
 		y = (m <= 2) and (y - 1) or y
-		local era = floor((y >= 0 and y or (y - 399)) / 400)
+		local era = floor(y / 400)
 		local yoe = y - era * 400                                                      -- [0, 399]
 		local doy = floor((153 * (m + (m > 2 and -3 or 9)) + 2) / 5) + d - 1            -- [0, 365]
 		local doe = yoe * 365 + floor(yoe / 4) - floor(yoe / 100) + doy                 -- [0, 146096]
@@ -89,7 +89,7 @@ do
 
 	local function civil_from_days(z)
 		z = z + 719468
-		local era = floor((z >= 0 and z or (z - 146096)) / 146097)
+		local era = floor(z / 146097)
 		local doe = z - era * 146097                                                    -- [0, 146096]
 		local yoe = floor((doe - floor(doe / 1460) + floor(doe / 36524) - floor(doe / 146096)) / 365) -- [0, 399]
 		local y = yoe + era * 400
@@ -377,6 +377,12 @@ local function displayTimezone(self)
 	return self.isLocal and NikNaks.DateTime.timezone_dst or (self.timezone or 0)
 end
 
+--- The calendar fields of the DateTime in its own timezone. The getters read these directly; they used to format
+--- the date as text and turn the text back into a number.
+local function components(self)
+	return NikNaks.DateTime.Components(self.unix + displayTimezone(self) * 3600)
+end
+
 local function zoneArg(self)
 	return self.isLocal and "L" or self.timezone
 end
@@ -568,43 +574,50 @@ end
 
 --- Returns the year
 ---@return number
-function datetime_obj:GetYear() return ( tonumber(self:ToDate("%Y")) ) --[[@as number]] end
+function datetime_obj:GetYear() return components(self).year end
 
 --- Returns the month (1-12).
 ---@return number 1-12.
-function datetime_obj:GetMonth() return ( tonumber(self:ToDate("%m")) ) --[[@as number]] end
+function datetime_obj:GetMonth() return components(self).month end
 
 --- Returns the day of the month (1-31).
 ---@return number 1-31.
-function datetime_obj:GetDay() return ( tonumber(self:ToDate("%d")) ) --[[@as number]] end
+function datetime_obj:GetDay() return components(self).day end
 
 --- Returns the hour (0-23).
 ---@return number 0-23.
-function datetime_obj:GetHour()	return ( tonumber(self:ToDate("%H")) ) --[[@as number]] end
+function datetime_obj:GetHour() return components(self).hour end
 
 --- Returns the hour in 12-hour format (1-12).
 ---@return number 1-12.
-function datetime_obj:GetHour12() return (tonumber(self:ToDate("%I")) --[[@as number]]) end
+function datetime_obj:GetHour12()
+	local h12 = components(self).hour % 12
+	return h12 == 0 and 12 or h12
+end
 
 --- Returns "AM" or "PM" depending on the hour.
 ---@return string "AM" or "PM".
-function datetime_obj:GetAMPM() return self:ToDate("%p") end
+function datetime_obj:GetAMPM() return components(self).hour < 12 and "AM" or "PM" end
 
 --- Returns the minute (0-59).
 ---@return number 0-59.
-function datetime_obj:GetMinute() return ( tonumber(self:ToDate("%M")) ) --[[@as number]] end
+function datetime_obj:GetMinute() return components(self).min end
 
 --- Returns the second (0-59).
 ---@return number 0-59.
-function datetime_obj:GetSecond() return ( tonumber(self:ToDate("%S")) ) --[[@as number]] end
+function datetime_obj:GetSecond() return components(self).sec end
 
 --- Returns the day of the week as a number, 0=Sunday..6=Saturday.
 ---@return number Weekday as a number, 0=Sunday..6=Saturday.
-function datetime_obj:GetDayOfWeek() return ( tonumber(self:ToDate("%w")) ) --[[@as number]] end
+function datetime_obj:GetDayOfWeek() return components(self).wday - 1 end
 
 --- Returns the day of the year as a number, 1-366.
 ---@return number Day of the year, 1-366.
-function datetime_obj:GetDayOfYear() return ( tonumber(self:ToDate("%j")) ) --[[@as number]] end
+function datetime_obj:GetDayOfYear()
+	local unix = self.unix + displayTimezone(self) * 3600
+	local yearStart = NikNaks.DateTime.ToUnix(NikNaks.DateTime.Components(unix).year, 1, 1, 0, 0, 0)
+	return math.floor((unix - yearStart) / 86400) + 1
+end
 
 --- Returns a new DateTime set to midnight of its timezone.
 --- @return DateTime
