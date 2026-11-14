@@ -219,7 +219,18 @@ end
 ---@param default any
 ---@return any
 function t:SingleOrDefault(predicate, default)
-    for _, v in pairs(self.tbl) do
+    local src = self.tbl
+    local len = seqLen(src)
+    if len then
+        for i = 1, len do
+            local v = src[i]
+            if predicate(v) then
+                return v
+            end
+        end
+        return default
+    end
+    for _, v in pairs(src) do
         if predicate(v) then
             return v
         end
@@ -415,12 +426,13 @@ end
 --- Removes duplicate elements, keeping only the first occurrence of each value.
 ---@return self
 function t:Distinct()
-    local tbl = {}
+    local tbl, n = {}, 0
     local seen = {}
     for _, v in pairs(self.tbl) do
         if not seen[v] then
             seen[v] = true
-            tbl[#tbl + 1] = v
+            n = n + 1
+            tbl[n] = v
         end
     end
     self.tbl = tbl
@@ -454,10 +466,11 @@ function t:Intersect(tbl)
     for _, v in pairs(tbl.tbl) do
         set[v] = true
     end
-    local newTbl = {}
+    local newTbl, n = {}, 0
     for _, v in pairs(self.tbl) do
         if set[v] then
-            newTbl[#newTbl + 1] = v
+            n = n + 1
+            newTbl[n] = v
         end
     end
     self.tbl = newTbl
@@ -481,14 +494,29 @@ end
 ---@return self
 function t:GroupBy(keySelector)
     local tbl = {}
-    for k, v in pairs(self.tbl) do
-        local key = keySelector(v, k)
-        local bucket = tbl[key]
-        if not bucket then
-            bucket = {}
-            tbl[key] = bucket
+    local src = self.tbl
+    local len = seqLen(src)
+    if len then
+        for k = 1, len do
+            local v = src[k]
+            local key = keySelector(v, k)
+            local bucket = tbl[key]
+            if not bucket then
+                bucket = {}
+                tbl[key] = bucket
+            end
+            bucket[#bucket + 1] = v
         end
-        bucket[#bucket + 1] = v
+    else
+        for k, v in pairs(src) do
+            local key = keySelector(v, k)
+            local bucket = tbl[key]
+            if not bucket then
+                bucket = {}
+                tbl[key] = bucket
+            end
+            bucket[#bucket + 1] = v
+        end
     end
     self.tbl = tbl
     return self
