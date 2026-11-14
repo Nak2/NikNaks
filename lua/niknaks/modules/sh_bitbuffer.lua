@@ -866,11 +866,12 @@ do
 		return self
 	end
 
-	-- pow2d[ex] is the weight of the lowest mantissa bit for the biased exponent ex
+	-- pow2d[ex] = 2^(ex-1023) for the biased exponent ex. Every entry is a normal number on purpose:
+	-- Garry's Mod runs with denormals-are-zero, so a table holding 2^(ex-1075) reads as 0 below 2^-1022.
 	local pow2d = {}
-	-- ldexp, not 2 ^ n: LuaJIT works x ^ -n out as 1 / x ^ n, which is 0 once 2 ^ n overflows
-	for ex = 1, 2046 do pow2d[ex] = ldexp(1, ex - 1075) end
-	local subnormal = ldexp(1, -1074)
+	for ex = 1, 2046 do pow2d[ex] = ldexp(1, ex - 1023) end
+	local _m52pow = ldexp(1, -52)
+	local _m1022pow = ldexp(1, -1022)
 
 	--- Reads an IEEE 754 little- or big-endian double.
 	---@return number
@@ -890,12 +891,12 @@ do
 
 		local v
 		if ex == 0 then
-			v = man * subnormal -- ± Zero and subnormals
+			v = man * _m52pow * _m1022pow -- ± Zero and subnormals
 		elseif ex == 0x7FF then
 			if man ~= 0 then return 0 / 0 end -- NaN
 			v = huge -- Infinity
 		else
-			v = (man + _52pow) * pow2d[ex] -- Normal: (1.mantissa) * 2^(ex-1023)
+			v = (man * _m52pow + 1) * pow2d[ex] -- Normal: (1.mantissa) * 2^(ex-1023)
 		end
 
 		if hi < 0 then return -v end
