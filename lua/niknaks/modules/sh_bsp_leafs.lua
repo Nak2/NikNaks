@@ -985,12 +985,12 @@ function meta_leaf:CalculateAmbientCube( position, hdr )
 		local r, g, b = 0, 0, 0
 		for i, sample in ipairs( samples ) do
 			local c = sample.cube[f]
-			-- RGBExp32 stores a byte mantissa, not a normalized color channel.
-			-- Keep the linear irradiance used by Source's ambient-cube shaders.
-			local scale = 2 ^ c.exponent * ( weights[i] / total )
+			-- Convert linear RGBExp32 irradiance to GMod's 0-255 Color range.
+			local scale = 255 * 2 ^ c.exponent * ( weights[i] / total )
 			r, g, b = r + c.r * scale, g + c.g * scale, b + c.b * scale
 		end
-		cube[f] = Color(r, g, b)
+		-- Clamp after interpolation so overbright samples keep their weight.
+		cube[f] = Color( clamp( r, 0, 255 ), clamp( g, 0, 255 ), clamp( b, 0, 255 ) )
 	end
 	return cube
 end
