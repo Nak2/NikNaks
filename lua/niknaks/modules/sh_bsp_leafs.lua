@@ -204,6 +204,7 @@ function meta:GetLeafWaterData()
 		--- @field surfaceZ number The height of the water surface
 		--- @field minZ number The minimum height of the water
 		--- @field surfaceTexInfoID number The texture info ID
+		--- @field texture string? The texture name of the water
 		--- @field material IMaterial? The material of the water
 		local t = {}
 		t.surfaceZ = data:ReadFloat()
@@ -212,6 +213,7 @@ function meta:GetLeafWaterData()
 		local texInfo = self:GetTexInfo()[ t.surfaceTexInfoID ]
 		if(texInfo ~= nil)then
 			local texString = self:GetTexdataStringData()[ texInfo.texdata ]
+			t.texture = texString
 			t.material = Material( texString )
 		end
 		data:Skip( 16 ) -- structure padding, not another water record
