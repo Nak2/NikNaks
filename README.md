@@ -23,7 +23,7 @@ In case you need NikNaks for your addon, add the [offical addon](https://steamco
 * [NodeGraph]
 * [Misc functions]()
 
-### 0.99 changes (unreleased)
+### Unreleased changes
 
 Additive BSP query and mesh APIs accompany the lighting and entity-data corrections below.
 
