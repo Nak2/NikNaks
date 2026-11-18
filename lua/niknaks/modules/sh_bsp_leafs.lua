@@ -143,6 +143,12 @@ function meta:GetLeafs()
 
 	size = size + 16
 
+	-- Some old maps (BSP v18, e.g. c4a1y) say "lump version 0" but only hold 32 byte leafs. When the size the
+	-- version implies does not divide the lump evenly and the other one does, trust the lump size instead.
+	local bits = data:Size()
+	if size == 448 and bits % 448 ~= 0 and bits % 256 == 0 then size = 256
+	elseif size == 256 and bits % 256 ~= 0 and bits % 448 == 0 then size = 448 end
+
 	local n = 0
 	for i = 0, data:Size() / size - 1 do
 		data:Seek( i * size )
@@ -389,7 +395,7 @@ end
 --- Returns true if the leaf has water within.
 --- @return boolean
 function meta_leaf:HasWater()
-	return self.leafWaterDataID > 0
+	return self.leafWaterDataID > -1
 end
 
 --- Returns the water data, if any.
