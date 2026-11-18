@@ -170,7 +170,7 @@ function meta:GetStaticProps()
 		return self._staticprops
 	end
 
-	if propVersion > 12 then
+	if propVersion > 12 or not version[propVersion] then
 		ErrorNoHalt( self._mapfile .. " has an unknown static-prop version (" .. propVersion .. ")!" )
 		self._staticprops = {}
 		self._staticprops_mdl = {}
@@ -266,23 +266,45 @@ function meta:GetStaticPropModels()
 	return self._staticprops_mdl
 end
 
-local function propMatchesModel( v, model )
-	return v.PropType == model
+local function staticIndex( self )
+	local index = self._staticprops_index
+	if index then return index end
+
+	local props = self:GetStaticProps()
+	local byModel, list, xs, ys, zs, n = {}, {}, {}, {}, {}, 0
+	local i = 0
+	local prop = props[0]
+	while prop do
+		local origin = prop.Origin
+		if origin then
+			n = n + 1
+			list[n], xs[n], ys[n], zs[n] = prop, origin.x, origin.y, origin.z
+		end
+		local model = prop.PropType
+		if model then
+			local t = byModel[model]
+			if not t then t = {} byModel[model] = t end
+			t[#t + 1] = prop
+		end
+		i = i + 1
+		prop = props[i]
+	end
+
+	index = { byModel = byModel, list = list, xs = xs, ys = ys, zs = zs, n = n }
+	self._staticprops_index = index
+	return index
 end
 
 --- Returns a list of all static-props, matching the model.
 --- @param model string # The model path to search for.
 --- @return StaticProp[] # List of static-props matching the model.
 function meta:FindStaticByModel( model )
-	return NikNaks.LINQ( self:GetStaticProps() )
-		:Where( propMatchesModel, model )
-		:ToTable()
-end
-
-
-local function propInBox( v, boxMins, boxMaxs )
-	local origin = v.Origin
-	return origin ~= nil and origin:WithinAABox( boxMins, boxMaxs )
+	local found = staticIndex( self ).byModel[model]
+	local t = {}
+	if found then
+		for i = 1, #found do t[i] = found[i] end
+	end
+	return t
 end
 
 --- Returns a list of all static-props, within the specified box.
@@ -290,14 +312,25 @@ end
 --- @param boxMaxs Vector # The maximum position of the box.
 --- @return StaticProp[]
 function meta:FindStaticInBox( boxMins, boxMaxs )
-	return NikNaks.LINQ( self:GetStaticProps() )
-		:Where( propInBox, boxMins, boxMaxs )
-		:ToTable()
-end
-
-local function propInSphere( v, origin, radiusSqr )
-	local spOrigin = v.Origin
-	return spOrigin ~= nil and spOrigin:DistToSqr( origin ) <= radiusSqr
+	local index = staticIndex( self )
+	local list, xs, ys, zs = index.list, index.xs, index.ys, index.zs
+	local minx, miny, minz = boxMins.x, boxMins.y, boxMins.z
+	local maxx, maxy, maxz = boxMaxs.x, boxMaxs.y, boxMaxs.z
+	local t, n = {}, 0
+	for i = 1, index.n do
+		local x = xs[i]
+		if x >= minx and x <= maxx then
+			local y = ys[i]
+			if y >= miny and y <= maxy then
+				local z = zs[i]
+				if z >= minz and z <= maxz then
+					n = n + 1
+					t[n] = list[i]
+				end
+			end
+		end
+	end
+	return t
 end
 
 --- Returns a list of all static-props, within the specified sphere.
@@ -305,11 +338,19 @@ end
 --- @param radius number # The radius of the sphere.
 --- @return StaticProp[]
 function meta:FindStaticInSphere( origin, radius )
-	local radiusSqr = radius ^ 2
-
-	return NikNaks.LINQ( self:GetStaticProps() )
-		:Where( propInSphere, origin, radiusSqr )
-		:ToTable()
+	local index = staticIndex( self )
+	local list, xs, ys, zs = index.list, index.xs, index.ys, index.zs
+	local ox, oy, oz = origin.x, origin.y, origin.z
+	local radiusSqr = radius * radius
+	local t, n = {}, 0
+	for i = 1, index.n do
+		local dx, dy, dz = xs[i] - ox, ys[i] - oy, zs[i] - oz
+		if dx * dx + dy * dy + dz * dz <= radiusSqr then
+			n = n + 1
+			t[n] = list[i]
+		end
+	end
+	return t
 end
 
 --- Returns the index of the static prop.
@@ -448,8 +489,9 @@ if CLIENT then
 	--- @return boolean
 	function meta_staticprop:HasDXLevel()
 		local num = render.GetDXLevel()
-		if self.MinDXLevel ~= 0 and num < self.MinDXLevel then return false end
-		if self.MaxDXLevel ~= 0 and num > self.MaxDXLevel then return false end
+		local minLevel, maxLevel = self.MinDXLevel or 0, self.MaxDXLevel or 0
+		if minLevel ~= 0 and num < minLevel then return false end
+		if maxLevel ~= 0 and num > maxLevel then return false end
 		return true
 	end
 end

@@ -174,6 +174,7 @@ do
 		return false
 	end
 
+	local DISP_BLOCK = 2 -- Cells per side of a culling block.
 	local rayLen = 0
 	local traceId = 0
 	local dispLeafs = nil
@@ -252,6 +253,35 @@ do
 				local e2x, e2y, e2z = xyz[c + 1] - ax, xyz[c + 2] - ay, xyz[c + 3] - az
 				local facing = ( e1y * e2z - e1z * e2y ) * n.x + ( e1z * e2x - e1x * e2z ) * n.y + ( e1x * e2y - e1y * e2x ) * n.z
 
+				-- Split anything larger than one block of cells into blocks, each with the box of its own points.
+				-- Per block: first row, last row, first column, last column, then mins and maxs.
+				local blocks, blockCount = nil, 0
+				local cells = width - 1
+				if cells > DISP_BLOCK then
+					blocks = {}
+					for bi = 1, cells, DISP_BLOCK do
+						for bj = 1, cells, DISP_BLOCK do
+							local i1, j1 = math.min( bi + DISP_BLOCK - 1, cells ), math.min( bj + DISP_BLOCK - 1, cells )
+							local bminx, bminy, bminz = math.huge, math.huge, math.huge
+							local bmaxx, bmaxy, bmaxz = -math.huge, -math.huge, -math.huge
+							for i = bi, i1 + 1 do
+								for j = bj, j1 + 1 do
+									local o = ( ( i - 1 ) * width + j - 1 ) * 3
+									local x, y, z = xyz[o + 1], xyz[o + 2], xyz[o + 3]
+									if x < bminx then bminx = x end if x > bmaxx then bmaxx = x end
+									if y < bminy then bminy = y end if y > bmaxy then bmaxy = y end
+									if z < bminz then bminz = z end if z > bmaxz then bmaxz = z end
+								end
+							end
+							local o = blockCount * 10
+							blocks[o + 1], blocks[o + 2], blocks[o + 3], blocks[o + 4] = bi, i1, bj, j1
+							blocks[o + 5], blocks[o + 6], blocks[o + 7] = bminx, bminy, bminz
+							blocks[o + 8], blocks[o + 9], blocks[o + 10] = bmaxx, bmaxy, bmaxz
+							blockCount = blockCount + 1
+						end
+					end
+				end
+
 				local record = {
 					face = face,
 					xyz = xyz,
@@ -260,6 +290,8 @@ do
 					flags = texinfo and texinfo.flags or 0,
 					minx = minx, miny = miny, minz = minz,
 					maxx = maxx, maxy = maxy, maxz = maxz,
+					blocks = blocks, -- nil for a small displacement
+					blockCount = blockCount,
 					traceId = 0, -- The trace this was last tested for, and what came out of it:
 					distance = false,
 					nx = 0, ny = 0, nz = 0,
@@ -278,6 +310,40 @@ do
 			end
 		end
 		return byLeaf
+	end
+
+	--- Slab test: does the ray reach the box before `limit` units along it?
+	--- @return boolean
+	local function rayHitsBox( minx, miny, minz, maxx, maxy, maxz, limit )
+		local tmin, tmax = 0, limit
+		if rdx > -1e-9 and rdx < 1e-9 then
+			if rsx < minx or rsx > maxx then return false end
+		else
+			local t1, t2 = ( minx - rsx ) / rdx, ( maxx - rsx ) / rdx
+			if t1 > t2 then t1, t2 = t2, t1 end
+			if t1 > tmin then tmin = t1 end
+			if t2 < tmax then tmax = t2 end
+			if tmin > tmax then return false end
+		end
+		if rdy > -1e-9 and rdy < 1e-9 then
+			if rsy < miny or rsy > maxy then return false end
+		else
+			local t1, t2 = ( miny - rsy ) / rdy, ( maxy - rsy ) / rdy
+			if t1 > t2 then t1, t2 = t2, t1 end
+			if t1 > tmin then tmin = t1 end
+			if t2 < tmax then tmax = t2 end
+			if tmin > tmax then return false end
+		end
+		if rdz > -1e-9 and rdz < 1e-9 then
+			if rsz < minz or rsz > maxz then return false end
+		else
+			local t1, t2 = ( minz - rsz ) / rdz, ( maxz - rsz ) / rdz
+			if t1 > t2 then t1, t2 = t2, t1 end
+			if t1 > tmin then tmin = t1 end
+			if t2 < tmax then tmax = t2 end
+			if tmin > tmax then return false end
+		end
+		return true
 	end
 
 	local function rayTriangle( v, a, b, c, winding, best )
@@ -301,67 +367,65 @@ do
 		return distance, ( e1y * e2z - e1z * e2y ) * winding, ( e1z * e2x - e1x * e2z ) * winding, ( e1x * e2y - e1y * e2x ) * winding
 	end
 
+	--- Tests the ray against the grid cells ( i0..i1, j0..j1 ) of a displacement. Same triangles as the mesh: every
+	--- cell is two triangles, the diagonal alternating like a checkerboard.
+	--- Returns the nearest distance below `best` and that triangle's normal, or nil.
+	local function rayCells( v, width, winding, i0, i1, j0, j1, best )
+		local found = false
+		local bnx, bny, bnz = 0, 0, 0
+		-- One flat loop over the cells. Two short nested loops are something LuaJIT handles poorly.
+		local columns = j1 - j0 + 1
+		for k = 0, ( i1 - i0 + 1 ) * columns - 1 do
+			local j = j0 + k % columns
+			local i = i0 + ( k - k % columns ) / columns
+			local a = ( ( i - 1 ) * width + j - 1 ) * 3
+			local b = a + width * 3
+			local c = b + 3
+			local e = a + 3
+			local d, nx, ny, nz
+			if ( i + j ) % 2 == 0 then
+				d, nx, ny, nz = rayTriangle( v, a, b, c, winding, best )
+				if d then found, best, bnx, bny, bnz = true, d, nx, ny, nz end
+				d, nx, ny, nz = rayTriangle( v, a, c, e, winding, best )
+				if d then found, best, bnx, bny, bnz = true, d, nx, ny, nz end
+			else
+				d, nx, ny, nz = rayTriangle( v, a, b, e, winding, best )
+				if d then found, best, bnx, bny, bnz = true, d, nx, ny, nz end
+				d, nx, ny, nz = rayTriangle( v, b, c, e, winding, best )
+				if d then found, best, bnx, bny, bnz = true, d, nx, ny, nz end
+			end
+		end
+		if found then return best, bnx, bny, bnz end
+	end
+
+	--- Finds the nearest point where the ray enters the displacement and stores it on the record.
 	local function rayDisplacement( rec, anyHit )
 		rec.traceId = traceId
 		rec.distance = false
 
-		-- Does the ray get anywhere near it? Slab test against the bounding box.
-		local tmin, tmax = 0, rayLen
-		if rdx > -1e-9 and rdx < 1e-9 then
-			if rsx < rec.minx or rsx > rec.maxx then return end
-		else
-			local t1, t2 = ( rec.minx - rsx ) / rdx, ( rec.maxx - rsx ) / rdx
-			if t1 > t2 then t1, t2 = t2, t1 end
-			if t1 > tmin then tmin = t1 end
-			if t2 < tmax then tmax = t2 end
-			if tmin > tmax then return end
-		end
-		if rdy > -1e-9 and rdy < 1e-9 then
-			if rsy < rec.miny or rsy > rec.maxy then return end
-		else
-			local t1, t2 = ( rec.miny - rsy ) / rdy, ( rec.maxy - rsy ) / rdy
-			if t1 > t2 then t1, t2 = t2, t1 end
-			if t1 > tmin then tmin = t1 end
-			if t2 < tmax then tmax = t2 end
-			if tmin > tmax then return end
-		end
-		if rdz > -1e-9 and rdz < 1e-9 then
-			if rsz < rec.minz or rsz > rec.maxz then return end
-		else
-			local t1, t2 = ( rec.minz - rsz ) / rdz, ( rec.maxz - rsz ) / rdz
-			if t1 > t2 then t1, t2 = t2, t1 end
-			if t1 > tmin then tmin = t1 end
-			if t2 < tmax then tmax = t2 end
-			if tmin > tmax then return end
-		end
+		-- Does the ray get anywhere near it?
+		if not rayHitsBox( rec.minx, rec.miny, rec.minz, rec.maxx, rec.maxy, rec.maxz, rayLen ) then return end
 
-		-- Same triangles as the mesh: every grid cell is two triangles, the diagonal alternating like a checkerboard.
 		local v, width, winding = rec.xyz, rec.width, rec.winding
 		local best = rayLen
 		local bnx, bny, bnz = 0, 0, 0
-		for i = 1, width - 1 do
-			for j = 1, width - 1 do
-				local i1 = ( ( i - 1 ) * width + j - 1 ) * 3
-				local i2 = ( i * width + j - 1 ) * 3
-				local i3 = i2 + 3
-				local i4 = i1 + 3
-				local d, nx, ny, nz
-				if ( i + j ) % 2 == 0 then
-					d, nx, ny, nz = rayTriangle( v, i1, i2, i3, winding, best )
-					if d and anyHit then rec.distance = d return end
-					if d then best, bnx, bny, bnz = d, nx, ny, nz end
-					d, nx, ny, nz = rayTriangle( v, i1, i3, i4, winding, best )
-					if d and anyHit then rec.distance = d return end
-					if d then best, bnx, bny, bnz = d, nx, ny, nz end
-				else
-					d, nx, ny, nz = rayTriangle( v, i1, i2, i4, winding, best )
-					if d and anyHit then rec.distance = d return end
-					if d then best, bnx, bny, bnz = d, nx, ny, nz end
-					d, nx, ny, nz = rayTriangle( v, i2, i3, i4, winding, best )
+
+		local blocks = rec.blocks
+		if blocks then
+			-- A large displacement is split into blocks of cells, each with its own box. Only the blocks the ray
+			-- passes through (before the nearest hit so far) have their triangles tested.
+			for k = 0, rec.blockCount - 1 do
+				local o = k * 10
+				if rayHitsBox( blocks[o + 5], blocks[o + 6], blocks[o + 7], blocks[o + 8], blocks[o + 9], blocks[o + 10], best ) then
+					local d, nx, ny, nz = rayCells( v, width, winding, blocks[o + 1], blocks[o + 2], blocks[o + 3], blocks[o + 4], best )
 					if d and anyHit then rec.distance = d return end
 					if d then best, bnx, bny, bnz = d, nx, ny, nz end
 				end
 			end
+		else
+			local d, nx, ny, nz = rayCells( v, width, winding, 1, width - 1, 1, width - 1, best )
+			if d and anyHit then rec.distance = d return end
+			if d then best, bnx, bny, bnz = d, nx, ny, nz end
 		end
 
 		if best < rayLen then

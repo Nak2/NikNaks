@@ -1136,7 +1136,7 @@ do
 		local planes = self:GetPlanes()
 		local px, py, pz = position.x, position.y, position.z
 
-		while node > 0 do
+		while node >= 0 do
 			--- @type MapNode
 			local n = nodes[node]
 			--- @type BSPPlane

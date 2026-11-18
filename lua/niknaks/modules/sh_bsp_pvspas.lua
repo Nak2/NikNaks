@@ -14,7 +14,29 @@ local meta_leaf = NikNaks.__metatables["BSP Leaf"]
 --[[The data is stored as an array of bit-vectors; for each cluster, a list of which other clusters are visible 
 	from it are stored as individual bits (1 if visible, 0 if occluded) in an array, with the nth bit position 
 	corresponding to the nth cluster. ]]
-local band, rshift = bit.band, bit.rshift
+local band, rshift, lshift = bit.band, bit.rshift, bit.lshift
+
+-- Tests a single cluster against a compressed visibility row, without building the whole set.
+local function clusterVisible( vis, offset, target )
+	if target < 0 or target >= vis.num_clusters then return false end
+	local c = 0
+	local v = offset
+	local pvs_buffer = vis._bytebuff
+	while c <= target do
+		local byte = pvs_buffer[v]
+		if byte == 0 then
+			v = v + 1
+			c = c + 8 * pvs_buffer[v]
+		else
+			if target < c + 8 then
+				return band( byte, lshift( 1, target - c ) ) ~= 0
+			end
+			c = c + 8
+		end
+		v = v + 1
+	end
+	return false
+end
 
 --- @param vis VisibilityInfo
 --- @param offset number
@@ -90,9 +112,12 @@ do
 	--- @param position2 Vector The second position
 	--- @return boolean
 	function meta:PVSCheck( position, position2 )
-		local PVS = self:PVSForOrigin( position )
-		local cluster = self:ClusterFromPoint( position2 )
-		return PVS[cluster] or false
+		local cluster = self:ClusterFromPoint( position )
+		if cluster < 0 then return false end
+		local vis = self:GetVisibility()
+		local visD = vis.VisData[cluster]
+		if not visD then return false end
+		return clusterVisible( vis, visD.PVS, self:ClusterFromPoint( position2 ) )
 	end
 
 
@@ -199,30 +224,28 @@ do
 	function meta:PASForOrigin( position, PAS )
 		PAS = PAS or self:CreatePAS()
 		PAS.__map = self
-
 		local cluster = self:ClusterFromPoint( position )
+		if cluster < 0 then return PAS end -- Empty cluster position.
 		local vis = self:GetVisibility()
-		if cluster < 0 then return end -- err
-
-		local visofs = vis.VisData[cluster].PAS
-
-		getClusters( vis, visofs, PAS )
-
+		local visD = vis.VisData[cluster]
+		if not visD then return PAS end -- Fallback
+		getClusters( vis, visD.PAS, PAS )
 		return PAS
 	end
 
-	--- Returns true if the two positions are in same PAS.
-	--- @param position Vector # The first position
-	--- @param position2 Vector # The second position
-	--- @return boolean
+	---Returns true if the two positions are in same PAS.
+	---@param position Vector
+	---@param position2 Vector
+	---@return boolean
 	function meta:PASCheck( position, position2 )
-		local PAS = self:PASForOrigin( position ) or {}
-		return PAS[self:ClusterFromPoint( position2 )] or false
+		local cluster = self:ClusterFromPoint( position )
+		if cluster < 0 then return false end
+		local vis = self:GetVisibility()
+		local visD = vis.VisData[cluster]
+		if not visD then return false end
+		return clusterVisible( vis, visD.PAS, self:ClusterFromPoint( position2 ) )
 	end
 
-	--- Adds the position to PAS
-	--- @param position Vector # The position to add to the PAS
-	--- @return self
 	function meta_pas:AddPAS( position )
 		self.__map:PASForOrigin( position, self )
 		return self
@@ -232,7 +255,7 @@ do
 	--- @param position Vector # The position to remove from the PAS
 	--- @return self
 	function meta_pas:RemovePAS( position )
-		for id in pairs( self.__map:PASForOrigin( position ) or {} ) do
+		for id in pairs( self.__map:PASForOrigin( position ) ) do
 			if id ~= "__map" then self[id] = nil end
 		end
 

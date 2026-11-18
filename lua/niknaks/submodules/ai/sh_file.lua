@@ -360,10 +360,10 @@ function meta:FindNearestNode(pos, type, maxDistance, zone)
                     end
                 end
                 local np = node:GetPos()
-                if not pvs:TestPosition(np) or not canSee(pos, np) then continue end
-                local dx = np.x - pos.x; local dy = np.y - pos.y; local dz = np.z - pos.z
-                local dist = dx*dx + dy*dy + dz*dz
-                if dist < bestDist then
+                local ox = np.x - pos.x; local oy = np.y - pos.y; local oz = np.z - pos.z
+                local dist = ox*ox + oy*oy + oz*oz
+                -- Distance first: the PVS test and the trace only run for nodes that would become the new best
+                if dist < bestDist and pvs:TestPosition(np) and canSee(pos, np) then
                     bestDist = dist
                     bestNode = node
                 end
