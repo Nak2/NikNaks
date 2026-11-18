@@ -27,7 +27,7 @@
 		end )
 ]]
 
-local byte, min, max, floor, abs = string.byte, math.min, math.max, math.floor, math.abs
+local byte, min, max, floor, ceil, abs = string.byte, math.min, math.max, math.floor, math.ceil, math.abs
 
 local LUMP_LIGHTING, LUMP_LIGHTING_HDR = 8, 53
 local SURF_BUMPLIGHT = 0x800
@@ -70,7 +70,7 @@ local atlas_meta = {}
 atlas_meta.__index = atlas_meta
 atlas_meta.MetaName = "LightmapAtlas"
 atlas_meta.__tostring = function( self )
-	return ( string.format( "LightmapAtlas [ %dx%d, %d faces, %d animated, x%d ]", self._width, self._height, self._count, #self._animated, self._scale ) )
+	return ( string.format( "LightmapAtlas [ %dx%d, %d faces, %d animated, x%g ]", self._width, self._height, self._count, #self._animated, self._scale ) )
 end
 
 ---@class LightmapAtlasOptions
@@ -78,6 +78,7 @@ end
 ---@field lightToggle (boolean|table<number, number>|fun( style: number ): number)? # Which light styles are added, as for MeshBuilderOptions.lightToggle. nil / true = the defaults, false = the first lightmap of a face only, a table or function (style -> weight, 0 = off, 1 = on) = your own. For the animated styles this is the weight they start at.
 ---@field animatedStyles (table<number, boolean>|fun( style: number ): boolean)? # The styles whose weight will change after the atlas is written (SetStyleWeights). Faces with one get a layer each and are redrawn when it changes. Default none.
 ---@field smoothing number? # Pixels a luxel is written as, interpolated between luxel centres so shadows have soft edges (1 = off, up to 4). A map that does not fit gets a smaller number. Default 2.
+---@field lowResolution boolean? # A map that does not fit even at one pixel per luxel is written at half resolution ( one pixel for 2x2 luxels, GetSize returns 0.5 ) instead of failing. Default true. Set it to false to get nil and a failure message as before.
 ---@field width number? # Width of the atlas. A map that does not fit at a height of maxHeight gets one twice as wide. Default 2048.
 ---@field maxHeight number? # Tallest the atlas may be. Default 4096.
 ---@field layerWidth number? # Width of the layers of the animated styles. Default 1024.
@@ -229,13 +230,16 @@ end
 ---@return number height
 local function packRects( infos, scale, maxWidth )
 	local sizes = {}
-	for i, info in ipairs( infos ) do sizes[i] = { w = info.w * scale * info.sets, h = info.h * scale } end
+	for i, info in ipairs( infos ) do
+		local sw, sh = ceil( info.w * scale ), ceil( info.h * scale )
+		sizes[i] = { w = sw * info.sets, h = sh, sw = sw, sh = sh }
+	end
 
 	local positions, height = shelfPack( sizes, maxWidth, 2 )
 	local rects, lit = {}, {}
 
 	for i, info in ipairs( infos ) do
-		local rect = { x = positions[i].x, y = positions[i].y, w = info.w, h = info.h, pw = sizes[i].w, ph = sizes[i].h, sets = info.sets }
+		local rect = { x = positions[i].x, y = positions[i].y, w = info.w, h = info.h, pw = sizes[i].w, ph = sizes[i].h, sw = sizes[i].sw, sh = sizes[i].sh, sets = info.sets }
 		rects[info.face.__id] = rect
 		lit[i] = { face = info.face, slots = info.slots, still = info.still, moving = info.moving, w = info.w, h = info.h, rect = rect, sets = info.sets }
 	end
@@ -243,11 +247,17 @@ local function packRects( infos, scale, maxWidth )
 	return rects, lit, height
 end
 
----The smoothing asked for, then smaller, and for a very big map a texture twice as wide.
-local function packingConfigs( smoothing, width )
+---The smoothing asked for, then smaller, and for a very big map a texture twice as wide. If even that does not fit,
+---half resolution: one pixel for 2x2 luxels. Soft light is better than none.
+local function packingConfigs( smoothing, width, lowResolution )
 	local configs = {}
 	for scale = smoothing, 1, -1 do configs[#configs + 1] = { scale, width } end
 	configs[#configs + 1] = { 1, width * 2 }
+
+	if lowResolution then
+		configs[#configs + 1] = { 0.5, width }
+		configs[#configs + 1] = { 0.5, width * 2 }
+	end
 	return configs
 end
 
@@ -256,14 +266,14 @@ end
 local function choosePacking( infos, options )
 	local failure
 
-	for _, config in ipairs( packingConfigs( options.smoothing, options.width ) ) do
+	for _, config in ipairs( packingConfigs( options.smoothing, options.width, options.lowResolution ) ) do
 		local scale, width = config[1], config[2]
 		local rects, lit, height = packRects( infos, scale, width )
 		if height <= options.maxHeight then
 			return { rects = rects, lit = lit, width = width, height = height, scale = scale }
 		end
 
-		failure = string.format( "%d lit faces need %dx%d at scale %d", #infos, width, height, scale )
+		failure = string.format( "%d lit faces need %dx%d at scale %g", #infos, width, height, scale )
 		pause()
 	end
 
@@ -271,7 +281,7 @@ local function choosePacking( infos, options )
 end
 
 local function layerRectOf( position, entry )
-	return { x = position.x, y = position.y, w = entry.w, h = entry.h, pw = entry.rect.pw, ph = entry.rect.ph }
+	return { x = position.x, y = position.y, w = entry.w, h = entry.h, pw = entry.rect.pw, ph = entry.rect.ph, sw = entry.rect.sw, sh = entry.rect.sh }
 end
 
 ---Each animated face gets a base (everything that never changes) and a delta per animated style in the layers, as big as its rectangle.
@@ -694,9 +704,9 @@ local function writeInSteps( rt, entries, drawEntry, onEntry )
 	end
 end
 
-local function setRect( rect, set, scale )
-	return { x = rect.x + set * rect.w * scale, y = rect.y, w = rect.w, h = rect.h,
-		pw = rect.w * scale, ph = rect.h * scale }
+---The part of a rectangle one set ( flat, or one of the three bump directions ) is written to. sw / sh are whole pixels, also at half resolution.
+local function setRect( rect, set )
+	return { x = rect.x + set * rect.sw, y = rect.y, w = rect.w, h = rect.h, pw = rect.sw, ph = rect.sh }
 end
 
 local function writeStaticEntry( raw, scale, desaturate, encode )
@@ -704,7 +714,7 @@ local function writeStaticEntry( raw, scale, desaturate, encode )
 		resetBumpCaches()
 		for set = 0, entry.sets - 1 do
 			decodeStaticFace( raw, entry, desaturate, set )
-			writeImage( setRect( entry.rect, set, scale ), scale, baseImage, encode )
+			writeImage( setRect( entry.rect, set ), scale, baseImage, encode )
 		end
 		return entry.rect.pw * entry.rect.ph
 	end
@@ -715,8 +725,8 @@ local function writeLayersOfEntry( raw, scale, desaturate, encode )
 		resetBumpCaches()
 		for set = 0, entry.sets - 1 do
 			decodeAnimatedFace( raw, entry, desaturate, set )
-			writeImage( setRect( entry.baseLayer, set, scale ), scale, baseImage, encode )
-			for k = 1, #entry.moving do writeImage( setRect( entry.deltaLayers[k], set, scale ), scale, slotImages[k], encode ) end
+			writeImage( setRect( entry.baseLayer, set ), scale, baseImage, encode )
+			for k = 1, #entry.moving do writeImage( setRect( entry.deltaLayers[k], set ), scale, slotImages[k], encode ) end
 		end
 
 		return ( 1 + #entry.moving ) * entry.rect.pw * entry.rect.ph
@@ -820,6 +830,7 @@ local function create( bsp, faces, options )
 	local packing, failure = choosePacking( infos, {
 		smoothing = math.Clamp( options.smoothing or DEFAULT_SMOOTHING, 1, 4 ),
 		width = options.width or DEFAULT_WIDTH,
+		lowResolution = options.lowResolution ~= false,
 		maxHeight = options.maxHeight or DEFAULT_MAX_HEIGHT,
 	} )
 	if not packing then return nil, failure end
@@ -858,7 +869,7 @@ end
 ---The size the render target needs to be.
 ---@return number width
 ---@return number height
----@return number smoothing # the pixels a luxel is written as: less than asked for if the map did not fit
+---@return number smoothing # the pixels a luxel is written as: less than asked for if the map did not fit. 0.5 = half resolution ( a pixel per 2x2 luxels )
 function atlas_meta:GetSize()
 	return self._width, self._height, self._scale
 end
@@ -899,7 +910,7 @@ function atlas_meta:GetLightUV()
 			else
 				us[i], vs[i] = whiteU, whiteV
 			end
-			du[i], dv[i] = rect and rect.sets == 4 and rect.w * scale / width or 0, 0
+			du[i], dv[i] = rect and rect.sets == 4 and rect.sw / width or 0, 0
 		end
 
 		return us, vs, du, dv
