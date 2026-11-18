@@ -77,6 +77,17 @@ local function postEntParse( t, index )
 	t.hammerId = t.mapCreationId -- Deprecated misnomer, kept for backwards compatibility.
 end
 
+local _stringKeys = {
+	["classname"] = true,
+	["targetname"] = true,
+	["parentname"] = true,
+	["target"] = true,
+	["globalname"] = true,
+	["model"] = true,
+	["filtername"] = true,
+	["damagefilter"] = true,
+}
+
 -- A list of data-keys that can have multiple entries.
 local _tableTypes = {
 	["OnMapSpawn"] = 	true,
@@ -95,7 +106,7 @@ local function ParseEntity( str, index )
 	local t = {}
 
 	for key, value in string.gmatch( str, [["(.-)".-"(.-)"]] ) do
-		value = tonumber( value ) or value
+		if not _stringKeys[key] then value = tonumber( value ) or value end
 		if t[key] then
 			if type( t[key] ) ~= "table" then
 				t[key] = { t[key], value }
@@ -223,7 +234,9 @@ function meta:FindByClass( class )
 end
 
 local function entMatchesField( v, field, value )
-	return v[field] == value
+	local x = v[field]
+	if x == value then return true end
+	return x ~= nil and value ~= nil and type( x ) ~= "table" and tostring( x ) == tostring( value )
 end
 
 --- Returns a list of BSPEntities, matching the given key/value pair. Works with any parsed
