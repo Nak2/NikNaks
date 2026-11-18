@@ -317,7 +317,7 @@ do
 
 		local lump = self:GetLump(35)
 		local lumpCount = lump:ReadLong()
-		for i = 0, lumpCount do
+		for i = 0, lumpCount - 1 do
 			--- @class BSPGameLumpHeader
 			--- @field id number # ID of the lump
 			--- @field flags number # Flags of the lump
@@ -563,6 +563,7 @@ do
 				t.size = 32
 			end
 
+			t.texture = t.texturePath
 			t.id = table.insert(self._cubemaps, t) - 1
 		end
 
@@ -797,8 +798,8 @@ do
 	function meta:GetTextures()
 		local c = {}
 		local q = self:GetTexdataStringData()
-		for i = 1, #q do
-			c[i] = q[i]
+		for i = 0, #q do
+			c[i + 1] = q[i]
 		end
 		return c
 	end
@@ -821,7 +822,7 @@ do
 		local b = self:GetLump(2)
 		local count = b:Size() / 256
 
-		for i = 0, count do
+		for i = 0, count - 1 do
 			--- @class BSPTextureData
 			--- @field reflectivity Vector
 			--- @field nameStringTableID string
@@ -1202,7 +1203,7 @@ do
 		self._clusters = {}
 		local leafs = self:GetLeafs()
 
-		for i = 0, #leafs - 1 do
+		for i = 0, #leafs do
 			local leaf = leafs[i]
 			local cluster = leaf.cluster
 			local arr = self._clusters[cluster]
