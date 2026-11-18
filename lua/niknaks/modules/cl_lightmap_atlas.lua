@@ -168,6 +168,7 @@ local function collectLitFaces( faces, hdrFaces, addStyles, weights, isAnimated 
 			local still, moving = splitSlots( slots, isAnimated )
 			infos[#infos + 1] = {
 				face = face, slots = slots, still = still, moving = moving,
+				sets = face:HasTexInfoFlag( SURF_BUMPLIGHT ) and 4 or 1,
 				w = face.LightmapTextureSizeInLuxels[1] + 1, h = face.LightmapTextureSizeInLuxels[2] + 1,
 			}
 		end
@@ -228,15 +229,15 @@ end
 ---@return number height
 local function packRects( infos, scale, maxWidth )
 	local sizes = {}
-	for i, info in ipairs( infos ) do sizes[i] = { w = info.w * scale, h = info.h * scale } end
+	for i, info in ipairs( infos ) do sizes[i] = { w = info.w * scale * info.sets, h = info.h * scale } end
 
 	local positions, height = shelfPack( sizes, maxWidth, 2 )
 	local rects, lit = {}, {}
 
 	for i, info in ipairs( infos ) do
-		local rect = { x = positions[i].x, y = positions[i].y, w = info.w, h = info.h, pw = sizes[i].w, ph = sizes[i].h }
+		local rect = { x = positions[i].x, y = positions[i].y, w = info.w, h = info.h, pw = sizes[i].w, ph = sizes[i].h, sets = info.sets }
 		rects[info.face.__id] = rect
-		lit[i] = { face = info.face, slots = info.slots, still = info.still, moving = info.moving, w = info.w, h = info.h, rect = rect }
+		lit[i] = { face = info.face, slots = info.slots, still = info.still, moving = info.moving, w = info.w, h = info.h, rect = rect, sets = info.sets }
 	end
 
 	return rects, lit, height
@@ -316,9 +317,10 @@ local function toPixel( light )
 	return ( min( floor( 127.5 * ( light / 255 ) + 0.5 ), 255 ) )
 end
 
----VRAD writes a luxel it has no sample for as black, or as a huge red with -rederrors.
+---Only the explicit -rederrors marker is invalid. Black is valid baked shadow,
+---including faces with no incident light and styles that are switched off.
 local function isVRADError( r, g, b, scale )
-	return ( r == 0 and g == 0 and b == 0 ) or ( g == 0 and b == 0 and r * scale > VRAD_ERROR_RED )
+	return g == 0 and b == 0 and r * scale > VRAD_ERROR_RED
 end
 
 ---A luxel is r, g, b and a signed exponent.
@@ -380,6 +382,107 @@ local function toDisplayLight( lr, lg, lb, desaturate )
 	return fadeDarkToGray( r, g, b, desaturate )
 end
 
+-- Source's LDR bumped-lightmap upload balances LINEAR directional ratios
+-- against the GAMMA-ENCODED flat sample. Gamma-encoding each direction first
+-- loses the colored highlights. The 4096-entry vertex-light table rounds the
+-- input to 1/1024 and applies a half-overbright factor (handled by toPixel).
+local bumpColors = { {}, {}, {} }
+-- Up to the still styles and four animated combinations. Reuse a bounded workspace
+-- across faces; large lightmaps use the same decoder without retaining extra luxels.
+local BUMP_CACHE_LUXELS = 4096
+local bumpCaches = {}
+local function resetBumpCaches()
+	for _, cache in ipairs( bumpCaches ) do cache.slots = nil end
+end
+
+local function bumpCache( slots, count )
+	if count > BUMP_CACHE_LUXELS then return nil end
+	for _, cache in ipairs( bumpCaches ) do
+		if cache.slots == slots then return cache end
+		if not cache.slots then
+			cache.slots, cache.generation = slots, cache.generation + 1
+			return cache
+		end
+	end
+	if #bumpCaches == 5 then return nil end
+	local cache = { slots = slots, generation = 1, values = {}, stamps = {} }
+	bumpCaches[#bumpCaches + 1] = cache
+	return cache
+end
+
+local function bumpFactor( flat, sum )
+	local quantized = min( max( floor( flat * 1024 + 0.5 ), 0 ), 4095 ) / 1024
+	return sum > 0 and 3 * 255 * quantized ^ INV_GAMMA / sum or 0
+end
+
+local function bumpBrightness( direction )
+	local color = bumpColors[direction]
+	return max( color[1], color[2], color[3] )
+end
+
+local function readDisplaySet( raw, slots, index, count, set, hdr, desaturate )
+	local offset = index * 4
+	local r, g, b, present, valid = sumStyles( raw, slots, offset + set * count * 4 )
+	if set == 0 or hdr then
+		local dr, dg, db = toDisplayLight( r, g, b, desaturate )
+		return dr, dg, db, present, valid
+	end
+	local cache = bumpCache( slots, count )
+	local at = index * 9 + ( set - 1 ) * 3
+	if cache and cache.stamps[index] == cache.generation then
+		local values = cache.values
+		return values[at + 1], values[at + 2], values[at + 3], present, valid
+	end
+	local fr, fg, fb = sumStyles( raw, slots, offset )
+	local sr, sg, sb = 0, 0, 0
+	for direction = 1, 3 do
+		local cr, cg, cb = sumStyles( raw, slots, offset + direction * count * 4 )
+		local color = bumpColors[direction]
+		color[1], color[2], color[3] = cr, cg, cb
+		sr, sg, sb = sr + cr, sg + cg, sb + cb
+	end
+	local rf, gf, bf = bumpFactor( fr, sr ), bumpFactor( fg, sg ), bumpFactor( fb, sb )
+	for direction = 1, 3 do
+		local color = bumpColors[direction]
+		color[1], color[2], color[3] = color[1] * rf, color[2] * gf, color[3] * bf
+	end
+	-- Match Lua's three-element sort, including equal-brightness ordering.
+	local first, second, third = 1, 2, 3
+	if bumpBrightness( third ) > bumpBrightness( first ) then first, third = third, first end
+	if bumpBrightness( second ) > bumpBrightness( first ) then first, second = second, first
+	elseif bumpBrightness( third ) > bumpBrightness( second ) then second, third = third, second end
+	for i = 1, 3 do
+		local direction = i == 1 and first or i == 2 and second or third
+		local top = bumpBrightness( direction )
+		if top > MAX_DISPLAY_LIGHT then
+			local color = bumpColors[direction]
+			local overflow = ( top - MAX_DISPLAY_LIGHT ) / top
+			for channel = 1, 3 do
+				local excess = color[channel] * overflow
+				color[channel] = color[channel] - excess
+				for other = 1, 3 do
+					if other ~= direction then bumpColors[other][channel] = bumpColors[other][channel] + excess * 0.5 end
+				end
+			end
+		end
+	end
+	if cache then
+		for direction = 1, 3 do
+			local color = bumpColors[direction]
+			local cr, cg, cb = limitBrightness( color[1], color[2], color[3] )
+			cr, cg, cb = fadeDarkToGray( cr, cg, cb, desaturate )
+			local base = index * 9 + ( direction - 1 ) * 3
+			cache.values[base + 1], cache.values[base + 2], cache.values[base + 3] = cr, cg, cb
+		end
+		cache.stamps[index] = cache.generation
+		return cache.values[at + 1], cache.values[at + 2], cache.values[at + 3], present, valid
+	end
+	local color = bumpColors[set]
+	r, g, b = limitBrightness( color[1], color[2], color[3] )
+	r, g, b = fadeDarkToGray( r, g, b, desaturate )
+	return r, g, b, present, valid
+end
+
 local function averageValidNeighbors( image, mask, x, y, w, h )
 	local sr, sg, sb, count = 0, 0, 0, 0
 
@@ -438,14 +541,14 @@ local function setLuxel( image, i, r, g, b )
 	image.r[i], image.g[i], image.b[i] = r, g, b
 end
 
-local function decodeStaticFace( raw, entry, desaturate )
+local function decodeStaticFace( raw, entry, desaturate, set )
 	local w, h = entry.w, entry.h
 
 	for i = 0, w * h - 1 do
-		local lr, lg, lb, present, valid = sumStyles( raw, entry.slots, i * 4 )
+		local r, g, b, present, valid = readDisplaySet( raw, entry.slots, i, w * h, set, entry.hdr, desaturate )
 
 		if present then
-			setLuxel( baseImage, i + 1, toDisplayLight( lr, lg, lb, desaturate ) )
+			setLuxel( baseImage, i + 1, r, g, b )
 		else
 			setLuxel( baseImage, i + 1, UNLIT, UNLIT, UNLIT )
 		end
@@ -458,24 +561,34 @@ end
 ---The base is everything that never changes. For each animated style the image holds the light with that style at full weight;
 ---the difference to the base is what is drawn, times the weight, on top of it. That is exact at weight 0 and 1, and in between it
 ---mixes the encoded values, which is close enough for a flicker.
-local function decodeAnimatedFace( raw, entry, desaturate )
+local function decodeAnimatedFace( raw, entry, desaturate, set )
 	local w, h, moving = entry.w, entry.h, entry.moving
+	local combined = entry.displaySlots
+	if not combined then
+		combined = {}
+		for k, slot in ipairs( moving ) do
+			local slots = {}
+			for i, still in ipairs( entry.still ) do slots[i] = still end
+			slots[#slots + 1] = { start = slot.start, style = slot.style, weight = 1 }
+			combined[k] = slots
+		end
+		entry.displaySlots = combined
+	end
 
 	for i = 0, w * h - 1 do
-		local offset = i * 4
-		local sr, sg, sb, present, valid = sumStyles( raw, entry.still, offset )
+		local sr, sg, sb, present, valid = readDisplaySet( raw, entry.still, i, w * h, set, entry.hdr, desaturate )
 
-		for k, slot in ipairs( moving ) do
-			local r, g, b, slotPresent, slotValid = readSlot( raw, slot.start, 1, offset )
+		for k, slots in ipairs( combined ) do
+			local r, g, b, slotPresent, slotValid = readDisplaySet( raw, slots, i, w * h, set, entry.hdr, desaturate )
 			slotR[k], slotG[k], slotB[k] = r, g, b
 			present = present or slotPresent
 			valid = valid or slotValid
 		end
 
 		if present then
-			setLuxel( baseImage, i + 1, toDisplayLight( sr, sg, sb, desaturate ) )
+			setLuxel( baseImage, i + 1, sr, sg, sb )
 			for k = 1, #moving do
-				setLuxel( slotImages[k], i + 1, toDisplayLight( sr + slotR[k], sg + slotG[k], sb + slotB[k], desaturate ) )
+				setLuxel( slotImages[k], i + 1, slotR[k], slotG[k], slotB[k] )
 			end
 		else
 			setLuxel( baseImage, i + 1, UNLIT, UNLIT, UNLIT )
@@ -518,7 +631,7 @@ local function samplePixel( image, x0, x1, tx, row0, row1, ty )
 end
 
 ---Equal pixels in a row are drawn as one rectangle.
-local function writeImage( rect, scale, image )
+local function writeImage( rect, scale, image, encode )
 	local w, h, pw, ph = rect.w, rect.h, rect.pw, rect.ph
 
 	for py = 0, ph - 1 do
@@ -535,7 +648,7 @@ local function writeImage( rect, scale, image )
 
 			if px == pw or r ~= runR or g ~= runG or b ~= runB then
 				if runR then
-					surface.SetDrawColor( runR, runG, runB, 255 )
+					surface.SetDrawColor( encode[runR], encode[runG], encode[runB], 255 )
 					surface.DrawRect( rect.x + runStart, rect.y + py, px - runStart, 1 )
 				end
 				runStart, runR, runG, runB = px, r, g, b
@@ -544,13 +657,13 @@ local function writeImage( rect, scale, image )
 	end
 end
 
-local function clearTarget( rt, whiteTile )
+local function clearTarget( rt, whiteTile, encode )
 	render.PushRenderTarget( rt )
 	cam.Start2D()
 
 	render.Clear( 0, 0, 0, 255 )
 	if whiteTile then
-		local white = toPixel( 255 )
+		local white = encode[toPixel( 255 )]
 		surface.SetDrawColor( white, white, white, 255 )
 		surface.DrawRect( 0, 0, 1, 1 )
 	end
@@ -581,19 +694,30 @@ local function writeInSteps( rt, entries, drawEntry, onEntry )
 	end
 end
 
-local function writeStaticEntry( raw, scale, desaturate )
+local function setRect( rect, set, scale )
+	return { x = rect.x + set * rect.w * scale, y = rect.y, w = rect.w, h = rect.h,
+		pw = rect.w * scale, ph = rect.h * scale }
+end
+
+local function writeStaticEntry( raw, scale, desaturate, encode )
 	return function( entry )
-		decodeStaticFace( raw, entry, desaturate )
-		writeImage( entry.rect, scale, baseImage )
+		resetBumpCaches()
+		for set = 0, entry.sets - 1 do
+			decodeStaticFace( raw, entry, desaturate, set )
+			writeImage( setRect( entry.rect, set, scale ), scale, baseImage, encode )
+		end
 		return entry.rect.pw * entry.rect.ph
 	end
 end
 
-local function writeLayersOfEntry( raw, scale, desaturate )
+local function writeLayersOfEntry( raw, scale, desaturate, encode )
 	return function( entry )
-		decodeAnimatedFace( raw, entry, desaturate )
-		writeImage( entry.baseLayer, scale, baseImage )
-		for k = 1, #entry.moving do writeImage( entry.deltaLayers[k], scale, slotImages[k] ) end
+		resetBumpCaches()
+		for set = 0, entry.sets - 1 do
+			decodeAnimatedFace( raw, entry, desaturate, set )
+			writeImage( setRect( entry.baseLayer, set, scale ), scale, baseImage, encode )
+			for k = 1, #entry.moving do writeImage( setRect( entry.deltaLayers[k], set, scale ), scale, slotImages[k], encode ) end
+		end
 
 		return ( 1 + #entry.moving ) * entry.rect.pw * entry.rect.ph
 	end
@@ -710,6 +834,7 @@ local function create( bsp, faces, options )
 	end
 
 	return setmetatable( {
+		_hdr = hdr,
 		_raw = raw,
 		_rects = packing.rects,
 		_static = static,
@@ -765,7 +890,7 @@ function atlas_meta:GetLightUV()
 
 	return function( face, verts )
 		local rect = rects[face.__id]
-		local us, vs = {}, {}
+		local us, vs, du, dv = {}, {}, {}, {}
 
 		for i, vertex in ipairs( verts ) do
 			if rect then
@@ -774,9 +899,10 @@ function atlas_meta:GetLightUV()
 			else
 				us[i], vs[i] = whiteU, whiteV
 			end
+			du[i], dv[i] = rect and rect.sets == 4 and rect.w * scale / width or 0, 0
 		end
 
-		return us, vs
+		return us, vs, du, dv
 	end
 end
 
@@ -805,24 +931,36 @@ end
 ---Writes the light into a render target. It is cleared first. Can be called once.
 ---@param rt ITexture # GetSize() big
 ---@param layerRT (ITexture|false)? # GetLayerSize() big, for the faces of the animated styles. nil = one is made for you, false = none: the animated styles then stay at the weight they start at.
-function atlas_meta:Write( rt, layerRT )
+---@param srgbToLinear boolean? # Compensate gamma-decoded surface writes to a float target for native LDR sRGB lightmap sampling. Pass a float layerRT too when using animated styles.
+function atlas_meta:Write( rt, layerRT, srgbToLinear )
+	for _, entry in ipairs( self._static ) do entry.hdr = self._hdr end
+	for _, entry in ipairs( self._animated ) do entry.hdr = self._hdr end
 	if #self._animated > 0 then
 		if layerRT == nil then layerRT = createLayerTarget( rt, self._layerWidth, self._layerHeight ) end
 		if not layerRT then makeAnimatedStatic( self ) end
 	end
 
 	local raw, scale, desaturate = self._raw, self._scale, self._desaturate
+	-- Surface vertex colors are decoded with gamma 2.2 when writing a float
+	-- target. LDR world lightmaps use the piecewise sRGB sampler instead.
+	-- Compensate before that write so the float target holds the native result.
+	local encode = {}
+	for value = 0, 255 do
+		local v = value / 255
+		local linear = v <= 0.04045 and v / 12.92 or ( ( v + 0.055 ) / 1.055 ) ^ 2.4
+		encode[value] = srgbToLinear and floor( 255 * linear ^ INV_GAMMA + 0.5 ) or value
+	end
 	local onEntry = progressReporter( self, #self._static + #self._animated * 2 )
 
-	clearTarget( rt, true )
+	clearTarget( rt, true, encode )
 	pause()
 
 	if layerRT and #self._animated > 0 then
-		clearTarget( layerRT, false )
-		writeInSteps( layerRT, self._animated, writeLayersOfEntry( raw, scale, desaturate ), onEntry )
+		clearTarget( layerRT, false, encode )
+		writeInSteps( layerRT, self._animated, writeLayersOfEntry( raw, scale, desaturate, encode ), onEntry )
 	end
 
-	writeInSteps( rt, self._static, writeStaticEntry( raw, scale, desaturate ), onEntry )
+	writeInSteps( rt, self._static, writeStaticEntry( raw, scale, desaturate, encode ), onEntry )
 	self._raw = nil
 
 	if layerRT and #self._animated > 0 then
@@ -842,7 +980,7 @@ function atlas_meta:Write( rt, layerRT )
 
 	-- Only what Flush needs is kept, not the faces and their slots
 	self._static = {}
-	for _, entry in ipairs( self._animated ) do entry.face, entry.slots, entry.still = nil, nil, nil end
+	for _, entry in ipairs( self._animated ) do entry.face, entry.slots, entry.still, entry.displaySlots = nil, nil, nil, nil end
 
 	if self._progress then self._progress( 1 ) end
 end

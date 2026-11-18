@@ -144,7 +144,7 @@ do
 	---@param plane BSPPlane
 	---@param trace table
 	---@return boolean
-	local function rayCastFace( face, plane, trace )
+	local function rayCastFace( face, plane, trace, anyHit )
 		local nx, ny, nz, dist = plane.nx, plane.ny, plane.nz, plane.dist
 		local dot1 = nx * rsx + ny * rsy + nz * rsz - dist
 		local dot2 = nx * rex + ny * rey + nz * rez - dist
@@ -159,6 +159,7 @@ do
 
 			local flat, count = flatVertexs( face )
 			if rayPolygonDistance( flat, count, rsx, rsy, rsz, rdx, rdy, rdz ) then
+				if anyHit then return true end
 				local startPos, endPos = trace.StartPos, trace.EndPos
 				trace.Fraction = t
 				trace.HitPos = startPos + (endPos - startPos) * t
@@ -300,7 +301,7 @@ do
 		return distance, ( e1y * e2z - e1z * e2y ) * winding, ( e1z * e2x - e1x * e2z ) * winding, ( e1x * e2y - e1y * e2x ) * winding
 	end
 
-	local function rayDisplacement( rec )
+	local function rayDisplacement( rec, anyHit )
 		rec.traceId = traceId
 		rec.distance = false
 
@@ -347,13 +348,17 @@ do
 				local d, nx, ny, nz
 				if ( i + j ) % 2 == 0 then
 					d, nx, ny, nz = rayTriangle( v, i1, i2, i3, winding, best )
+					if d and anyHit then rec.distance = d return end
 					if d then best, bnx, bny, bnz = d, nx, ny, nz end
 					d, nx, ny, nz = rayTriangle( v, i1, i3, i4, winding, best )
+					if d and anyHit then rec.distance = d return end
 					if d then best, bnx, bny, bnz = d, nx, ny, nz end
 				else
 					d, nx, ny, nz = rayTriangle( v, i1, i2, i4, winding, best )
+					if d and anyHit then rec.distance = d return end
 					if d then best, bnx, bny, bnz = d, nx, ny, nz end
 					d, nx, ny, nz = rayTriangle( v, i2, i3, i4, winding, best )
+					if d and anyHit then rec.distance = d return end
 					if d then best, bnx, bny, bnz = d, nx, ny, nz end
 				end
 			end
@@ -369,15 +374,16 @@ do
 	--- @param list table[]
 	--- @param trace table
 	--- @param mask number?
-	local function rayCastDisplacements( list, trace, mask )
+	local function rayCastDisplacements( list, trace, mask, anyHit )
 		for i = 1, #list do
 			local rec = list[i]
 			if not mask or band( rec.flags, mask ) ~= 0 then
-				if rec.traceId ~= traceId then rayDisplacement( rec ) end
+				if rec.traceId ~= traceId then rayDisplacement( rec, anyHit ) end
 				local distance = rec.distance
 				if distance then
 					local t = distance / rayLen
 					if t < trace.Fraction then
+						if anyHit then return true end
 						local startPos, endPos = trace.StartPos, trace.EndPos
 						local face = rec.face
 						local normal = Vector( rec.nx, rec.ny, rec.nz )
@@ -408,7 +414,7 @@ do
 	---@param ez number
 	---@param trace table
 	---@param mask number? The surface flags to check for. (SURF_*)
-	local function rayCastNode( nodeIndex, startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask )
+	local function rayCastNode( nodeIndex, startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask, anyHit )
 		local traceFraction = trace.Fraction
 		if traceFraction <= startFraction then return end
 
@@ -424,14 +430,14 @@ do
 				if plane.nx * rdx + plane.ny * rdy + plane.nz * rdz < 0 then
 					-- Check mask
 					if not mask or band(face:GetTexInfo().flags, mask) ~= 0 then
-						rayCastFace(face, plane, trace)
+						if rayCastFace( face, plane, trace, anyHit ) and anyHit then return true end
 					end
 				end
 			end
 
 			local displacements = dispLeafs and dispLeafs[ -nodeIndex - 1 ]
 			if displacements then
-				rayCastDisplacements( displacements, trace, mask )
+				if rayCastDisplacements( displacements, trace, mask, anyHit ) and anyHit then return true end
 			end
 			return
 		end
@@ -462,9 +468,9 @@ do
 		end
 
 		if start_dist >= 0 and end_dist >= 0 then
-			rayCastNode(node.children[1], startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask)
+			return rayCastNode( node.children[1], startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask, anyHit )
 		elseif start_dist < 0 and end_dist < 0 then
-			rayCastNode(node.children[2], startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask)
+			return rayCastNode( node.children[2], startFraction, endFraction, sx, sy, sz, ex, ey, ez, trace, mask, anyHit )
 		else
 			local side_id, fraction_first, fraction_second = 0, 0, 0
 			local inversed_distance = 1 / (start_dist - end_dist)
@@ -487,14 +493,15 @@ do
 			local difX, difY, difZ = ex - sx, ey - sy, ez - sz
 
 			local fraction_middle = startFraction + (endFraction - startFraction) * fraction_first
-			rayCastNode(node.children[side_id], startFraction, fraction_middle, sx, sy, sz,
-				sx + fraction_first * difX, sy + fraction_first * difY, sz + fraction_first * difZ, trace, mask)
+			local hit = rayCastNode( node.children[side_id], startFraction, fraction_middle, sx, sy, sz,
+				sx + fraction_first * difX, sy + fraction_first * difY, sz + fraction_first * difZ, trace, mask, anyHit )
+			if hit and anyHit then return true end
 
 			fraction_middle = startFraction + (endFraction - startFraction) * fraction_second
 			side_id = (side_id == 1) and 2 or 1
 
-			rayCastNode(node.children[side_id], fraction_middle, endFraction,
-				sx + fraction_second * difX, sy + fraction_second * difY, sz + fraction_second * difZ, ex, ey, ez, trace, mask)
+			return rayCastNode( node.children[side_id], fraction_middle, endFraction,
+				sx + fraction_second * difX, sy + fraction_second * difY, sz + fraction_second * difZ, ex, ey, ez, trace, mask, anyHit )
 		end
 	end
 
@@ -533,5 +540,36 @@ do
 			trace.Hit = true
 		end
 		return trace
+	end
+
+	--- Tests for any surface hit, with the same face winding, segment endpoints,
+	--- mask and displacement rules as SurfaceTraceLine. Does not find the nearest
+	--- hit or construct hit metadata. Sky-aware callers still need SurfaceTraceLine.
+	--- @param startPos Vector
+	--- @param endPos Vector
+	--- @param mask SURF?
+	--- @param ignoreDisplacements boolean?
+	--- @return boolean
+	function meta_bsp:SurfaceTraceBlocked( startPos, endPos, mask, ignoreDisplacements )
+		nodes = self:GetNodes()
+		leafs = self:GetLeafs()
+		-- Keep native Vector normalization identical to the full trace at edges.
+		local normal = ( endPos - startPos ):GetNormalized()
+		rsx, rsy, rsz = startPos.x, startPos.y, startPos.z
+		rex, rey, rez = endPos.x, endPos.y, endPos.z
+		rdx, rdy, rdz = normal.x, normal.y, normal.z
+		rayLen = startPos:Distance( endPos )
+		dispLeafs = nil
+		if not ignoreDisplacements and rayLen > 0 then
+			local byLeaf = self._dispTraceLeafs
+			if not byLeaf then
+				byLeaf = buildDisplacements( self )
+				self._dispTraceLeafs = byLeaf
+			end
+			dispLeafs = byLeaf
+			traceId = traceId + 1
+		end
+		return rayCastNode( 0, 0, 1, startPos.x, startPos.y, startPos.z,
+			endPos.x, endPos.y, endPos.z, { Fraction = 1 }, mask, true ) == true
 	end
 end

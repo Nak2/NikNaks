@@ -150,6 +150,43 @@ end
 --- @class BSPObject
 local meta = NikNaks.__metatables["BSP"]
 
+---Returns the first value of an entity key, ignoring the key's case. Raw entity data is left unchanged.
+---@param entity BSPEntity
+---@param name string
+---@return any
+function NikNaks.EntityValue( entity, name )
+	local value = entity[name]
+	if value == nil then
+		name = name:lower()
+		for key, other in pairs( entity ) do
+			if type( key ) == "string" and key:lower() == name then value = other break end
+		end
+	end
+	if type( value ) == "table" then return value[1] end
+	return value
+end
+
+---Parses a Hammer output action. ESC-delimited parameters may contain commas.
+---A missing input is Use; a missing or zero fire count means unlimited, as in Source.
+---@param value string
+---@return table? action # target, input, parameter, delay, remaining
+function NikNaks.ParseEntityOutput( value )
+	if type( value ) ~= "string" then return nil end
+	local delimiter = value:find( "\27", 1, true ) and "\27" or ","
+	local fields, first = {}, 1
+	for i = 1, 4 do
+		local at = value:find( delimiter, first, true )
+		fields[i] = value:sub( first, at and at - 1 or #value )
+		first = at and at + 1 or #value + 1
+	end
+	local remaining = tonumber( value:sub( first ):match( "^%s*([%+%-]?%d+)" ) ) or -1
+	return {
+		target = fields[1], input = fields[2] ~= "" and fields[2] or "Use",
+		parameter = fields[3], delay = tonumber( fields[4] ) or 0,
+		remaining = remaining == 0 and -1 or remaining,
+	}
+end
+
 --- Returns a list of all raw-entity data within the BSP.
 --- @return BSPEntity[]
 function meta:GetEntities()

@@ -10,7 +10,8 @@ local format, clamp, min, max = string.format, math.Clamp, math.min, math.max
 local meta = NikNaks.__metatables["BSP"]
 
 --- @class BSPLeafObject
-local meta_leaf = {}
+-- PVS/PAS and trace modules extend this metatable. Retain those methods on refresh.
+local meta_leaf = NikNaks.__metatables["BSP Leaf"] or {}
 meta_leaf.__index = meta_leaf
 meta_leaf.__tostring = function( self ) return ( format( obj_tostring, "Leaf", self.__id ) ) end
 meta_leaf.MetaName = "BSP Leaf"
@@ -20,6 +21,40 @@ local MAX_MAP_NODES = 65536
 local TEST_EPSILON = 0.01
 local FLT_EPSILON = 1.192092896e-07
 local canGenerateParents = false
+
+---Returns face index -> visibility clusters from the BSP's leaf-face links.
+---False means a face touches a non-solid leaf with no valid cluster; absent faces have no links.
+---The BSP owns the cached table. Brush-model transforms are not applied.
+---@param pause function? # Optional cooperative yield, called every 256 leaves.
+---@return table<number, number[]|false>
+function meta:GetFaceClusters( pause )
+	if self._faceClusters then return self._faceClusters end
+	local result, count = {}, 0
+	local leafFaces = self:GetLeafFaces()
+	for _, leaf in pairs( self:GetLeafs() ) do
+		local cluster = leaf.cluster
+		for index = leaf.firstleafface + 1, leaf.firstleafface + leaf.numleaffaces do
+			local face = leafFaces[index]
+			if face then
+				local clusters = result[face]
+				if cluster < 0 and bit.band( leaf.contents or 0, CONTENTS_SOLID ) == 0 then
+					result[face] = false
+				elseif cluster >= 0 and clusters ~= false then
+					if not clusters then result[face] = { cluster }
+					else
+						local found = false
+						for i = 1, #clusters do if clusters[i] == cluster then found = true break end end
+						if not found then clusters[#clusters + 1] = cluster end
+					end
+				end
+			end
+		end
+		count = count + 1
+		if pause and count % 256 == 0 then pause() end
+	end
+	self._faceClusters = result
+	return result
+end
 
 --- Generates parentNodes for nodes and leafs.
 --- @param self BSPObject
@@ -162,11 +197,14 @@ function meta:GetLeafWaterData()
 	local data = self:GetLump( 36 )
 	self._pLeafWaterData = {}
 
-	for i = 0, data:Size() / 80 - 1 do
+	-- dleafwaterdata_t is 12 bytes: two floats, one short and two
+	-- padding bytes. BitBuffer sizes and Skip offsets are in bits.
+	for i = 0, math.floor( data:Size() / 96 ) - 1 do
 		--- @class BSPLeafWaterData
 		--- @field surfaceZ number The height of the water surface
 		--- @field minZ number The minimum height of the water
 		--- @field surfaceTexInfoID number The texture info ID
+		--- @field texture string? The texture name of the water
 		--- @field material IMaterial? The material of the water
 		local t = {}
 		t.surfaceZ = data:ReadFloat()
@@ -175,9 +213,10 @@ function meta:GetLeafWaterData()
 		local texInfo = self:GetTexInfo()[ t.surfaceTexInfoID ]
 		if(texInfo ~= nil)then
 			local texString = self:GetTexdataStringData()[ texInfo.texdata ]
+			t.texture = texString
 			t.material = Material( texString )
 		end
-		data:Skip( 2 ) -- A short that is always 0x00
+		data:Skip( 16 ) -- structure padding, not another water record
 		self._pLeafWaterData[i] = t
 	end
 
@@ -916,13 +955,8 @@ end
 
 
 
---- Returns the ambient light cube at a position in the leaf: the light that arrives from each of the 6 directions.
---- This is what the engine lights models with.
---- @param position Vector
---- @param hdr boolean? # Use the HDR ambient light
---- @return Color[]?
-function meta_leaf:CalculateAmbientCube( position, hdr )
-	local samples = self:GetAmbientLighting( hdr )
+local function calculateAmbientCube( leaf, position, hdr, linear )
+	local samples = leaf:GetAmbientLighting( hdr )
 	if not samples or #samples == 0 then return nil end
 
 	-- How much each sample counts: all of the first if there is one, else inverse distance (in the 0-255 leaf space)
@@ -930,7 +964,7 @@ function meta_leaf:CalculateAmbientCube( position, hdr )
 	if #samples == 1 then
 		weights[1], total = 1, 1
 	else
-		local mins, maxs = self.mins, self.maxs
+		local mins, maxs = leaf.mins, leaf.maxs
 		local sx, sy, sz = maxs.x - mins.x, maxs.y - mins.y, maxs.z - mins.z
 		local px = sx > 0 and clamp( ( position.x - mins.x ) / sx, 0, 1 ) * 255 or 0
 		local py = sy > 0 and clamp( ( position.y - mins.y ) / sy, 0, 1 ) * 255 or 0
@@ -948,12 +982,34 @@ function meta_leaf:CalculateAmbientCube( position, hdr )
 		local r, g, b = 0, 0, 0
 		for i, sample in ipairs( samples ) do
 			local c = sample.cube[f]
-			local scale = 2 ^ c.exponent / 255 * ( weights[i] / total ) -- RGBExp32 to linear light
+			-- RGBExp32 byte mantissas contribute linear irradiance.
+			local scale = 2 ^ c.exponent * ( weights[i] / total )
 			r, g, b = r + c.r * scale, g + c.g * scale, b + c.b * scale
 		end
-		cube[f] = Color(r, g, b)
+		if linear then
+			cube[f] = { r = r, g = g, b = b }
+		else
+			-- Clamp after interpolation so overbright samples keep their weight.
+			cube[f] = Color( clamp( r * 255, 0, 255 ), clamp( g * 255, 0, 255 ), clamp( b * 255, 0, 255 ) )
+		end
 	end
 	return cube
+end
+
+--- Returns the ambient light arriving from each of the six directions in GMod's color range.
+--- @param position Vector
+--- @param hdr boolean? # Use the HDR ambient light
+--- @return Color[]?
+function meta_leaf:CalculateAmbientCube( position, hdr )
+	return calculateAmbientCube( self, position, hdr, false )
+end
+
+--- Returns the six directions as unclamped linear RGB for model lighting.
+--- @param position Vector
+--- @param hdr boolean? # Use the HDR ambient light
+--- @return {r: number, g: number, b: number}[]?
+function meta_leaf:CalculateAmbientCubeLinear( position, hdr )
+	return calculateAmbientCube( self, position, hdr, true )
 end
 
 --- Returns the ambient light cube at a position (see BSPLeafObject:CalculateAmbientCube).

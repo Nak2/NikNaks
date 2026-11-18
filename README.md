@@ -22,3 +22,18 @@ In case you need NikNaks for your addon, add the [offical addon](https://steamco
 * [TimeDelta](https://github.com/Nak2/NikNaks/wiki/TimeDelta)
 * [NodeGraph]
 * [Misc functions]()
+
+### Unreleased changes
+
+Additive BSP query and mesh APIs accompany the lighting and entity-data corrections below.
+
+* `NikNaks.EntityValue( entity, name )` reads the first value of a key without regard to case, leaving raw BSP records unchanged.
+* `NikNaks.ParseEntityOutput( value )` parses Hammer output actions, preserving commas inside ESC-delimited parameters. Missing inputs default to `Use`; a zero fire count means unlimited.
+* `BModel:GetBrushes()` returns the cached unique brushes beneath its BSP head node.
+* `BSP:GetFaceClusters( pause )` returns raw leaf-face visibility membership. Consumers must account for brush-model transforms; the cached table belongs to the BSP.
+* `NikNaks.MeshBuilder( true )` optionally accumulates triangle bounds while collecting vertices. `builder:GetBounds()` and the built mesh's `GetBounds()` return those bounds. Shader deformation is not included; ordinary builders retain their previous behavior.
+* `BSP:SurfaceTraceBlocked()` is an early-out boolean surface query with the same masks, winding, displacement and endpoint rules as `SurfaceTraceLine()`. Use the full trace when the nearest hit or sky flag matters.
+
+Mesh building and lightmap atlases preserve directional bump-light coordinates, tangents and valid black lighting. Optional material callbacks bind scaled material variants without mutating the source material. Atlas writes can explicitly convert to linear color for native LDR rendering into float targets.
+
+`CalculateAmbientCube()` returns RGBExp32 lighting scaled to GMod's 0–255 color range and clamped after interpolation. `BSPLeafObject:CalculateAmbientCubeLinear()` returns unclamped RGB for renderer inputs that accept overbright light.
