@@ -36,4 +36,4 @@ Additive BSP query and mesh APIs accompany the lighting and entity-data correcti
 
 Mesh building and lightmap atlases preserve directional bump-light coordinates, tangents and valid black lighting. Optional material callbacks bind scaled material variants without mutating the source material. Atlas writes can explicitly convert to linear color for native LDR rendering into float targets.
 
-`CalculateAmbientCube()` now returns linear RGBExp32 lighting scaled to GMod's 0-255 `Color` range, with each channel clamped after interpolation. This changes the numeric values returned by that public API. Consumers which compensated for the previous normalization must remove that compensation when upgrading. Display-oriented `CalculateAmbientColor()` retains its existing contract.
+`CalculateAmbientCube()` returns RGBExp32 lighting scaled to GMod's 0–255 color range and clamped after interpolation. `BSPLeafObject:CalculateAmbientCubeLinear()` returns unclamped RGB for renderer inputs that accept overbright light.

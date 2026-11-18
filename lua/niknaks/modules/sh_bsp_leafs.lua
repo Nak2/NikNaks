@@ -955,13 +955,8 @@ end
 
 
 
---- Returns the ambient light cube at a position in the leaf: the light that arrives from each of the 6 directions.
---- This is what the engine lights models with.
---- @param position Vector
---- @param hdr boolean? # Use the HDR ambient light
---- @return Color[]?
-function meta_leaf:CalculateAmbientCube( position, hdr )
-	local samples = self:GetAmbientLighting( hdr )
+local function calculateAmbientCube( leaf, position, hdr, linear )
+	local samples = leaf:GetAmbientLighting( hdr )
 	if not samples or #samples == 0 then return nil end
 
 	-- How much each sample counts: all of the first if there is one, else inverse distance (in the 0-255 leaf space)
@@ -969,7 +964,7 @@ function meta_leaf:CalculateAmbientCube( position, hdr )
 	if #samples == 1 then
 		weights[1], total = 1, 1
 	else
-		local mins, maxs = self.mins, self.maxs
+		local mins, maxs = leaf.mins, leaf.maxs
 		local sx, sy, sz = maxs.x - mins.x, maxs.y - mins.y, maxs.z - mins.z
 		local px = sx > 0 and clamp( ( position.x - mins.x ) / sx, 0, 1 ) * 255 or 0
 		local py = sy > 0 and clamp( ( position.y - mins.y ) / sy, 0, 1 ) * 255 or 0
@@ -987,14 +982,34 @@ function meta_leaf:CalculateAmbientCube( position, hdr )
 		local r, g, b = 0, 0, 0
 		for i, sample in ipairs( samples ) do
 			local c = sample.cube[f]
-			-- Convert linear RGBExp32 irradiance to GMod's 0-255 Color range.
-			local scale = 255 * 2 ^ c.exponent * ( weights[i] / total )
+			-- RGBExp32 byte mantissas contribute linear irradiance.
+			local scale = 2 ^ c.exponent * ( weights[i] / total )
 			r, g, b = r + c.r * scale, g + c.g * scale, b + c.b * scale
 		end
-		-- Clamp after interpolation so overbright samples keep their weight.
-		cube[f] = Color( clamp( r, 0, 255 ), clamp( g, 0, 255 ), clamp( b, 0, 255 ) )
+		if linear then
+			cube[f] = { r = r, g = g, b = b }
+		else
+			-- Clamp after interpolation so overbright samples keep their weight.
+			cube[f] = Color( clamp( r * 255, 0, 255 ), clamp( g * 255, 0, 255 ), clamp( b * 255, 0, 255 ) )
+		end
 	end
 	return cube
+end
+
+--- Returns the ambient light arriving from each of the six directions in GMod's color range.
+--- @param position Vector
+--- @param hdr boolean? # Use the HDR ambient light
+--- @return Color[]?
+function meta_leaf:CalculateAmbientCube( position, hdr )
+	return calculateAmbientCube( self, position, hdr, false )
+end
+
+--- Returns the six directions as unclamped linear RGB for model lighting.
+--- @param position Vector
+--- @param hdr boolean? # Use the HDR ambient light
+--- @return {r: number, g: number, b: number}[]?
+function meta_leaf:CalculateAmbientCubeLinear( position, hdr )
+	return calculateAmbientCube( self, position, hdr, true )
 end
 
 --- Returns the ambient light cube at a position (see BSPLeafObject:CalculateAmbientCube).
