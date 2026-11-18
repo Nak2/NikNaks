@@ -100,12 +100,13 @@ local version = {}
 		return 576
 	end
 
-	-- This version is for TF2 and some CS:S maps. 
-	-- Was build on version 6. Guess they where never meant to be released on consoles and only PC ( Since they use DXLevel )
+	-- Source 2013 v10 keeps the v6 offsets but moves the flags to a
+	-- 32-bit field after the DX levels. Byte 31 is struct padding.
 	version[10] = function( f, obj, m )
 		version[6]( f, obj, m )
-		obj.lightmapResolutionX = f:ReadLong()
-		obj.lightmapResolutionY = f:ReadLong()
+		obj.Flags = f:ReadULong()
+		obj.lightmapResolutionX = f:ReadUShort()
+		obj.lightmapResolutionY = f:ReadUShort()
 		return 576
 	end
 
@@ -194,8 +195,15 @@ function meta:GetStaticProps()
 		self._staticprops_mdl[i] = ( gsub( b:ReadData( 128 ), "[^%w_%-%.%/]+", "" ) )
 	end
 
-	-- Read the leaf-array. (Unused atm). Prob an index for the static props. However each static-prop already hold said data.
-	b:Skip( 16 * b:ReadLong() )
+	-- Each prop references a range of zero-based BSP leaf indices.
+	local leafCount = b:ReadLong()
+	if leafCount < 0 or leafCount * 16 > b:Size() - b:Tell() - 32 then
+		self._staticprops = {}
+		return self._staticprops
+	end
+	local leafIndices = {}
+	for i = 0, leafCount - 1 do leafIndices[i] = b:ReadUShort() end
+	self._staticprops_leaf_indices = leafIndices
 
 	-- Read static props
 	local count = b:ReadLong()
@@ -233,6 +241,13 @@ function meta:GetStaticProps()
 	end
 
 	return self._staticprops
+end
+
+--- Returns the BSP leaf indices referenced by StaticProp.First_leaf and LeafCount.
+---@return table<number, number>? # Zero-based index in the sprp leaf array -> BSP leaf index.
+function meta:GetStaticPropLeafIndices()
+	self:GetStaticProps()
+	return self._staticprops_leaf_indices
 end
 
 --- Returns the static-prop object from said index.
