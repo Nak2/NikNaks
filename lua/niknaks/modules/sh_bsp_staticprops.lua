@@ -476,6 +476,16 @@ end
 	95 = DirectX 9+ ( 9.3 )
 	98 = DirectX 9Ex
 ]]
+--- Returns true if a client running the given DirectX level is allowed to render the static prop.
+--- @param level number # The DirectX level to test. For example 90.
+--- @return boolean
+function meta_staticprop:SupportsDXLevel( level )
+	local minLevel, maxLevel = self.MinDXLevel or 0, self.MaxDXLevel or 0
+	if minLevel ~= 0 and level < minLevel then return false end
+	if maxLevel ~= 0 and level > maxLevel then return false end
+	return true
+end
+
 --- Returns the minimum and maximum DXLevel to render the static prop.
 ---@return number MinDXLevel # The minimum DXLevel
 ---@return number MaxDXLevel # The maximum DXLevel
@@ -488,11 +498,7 @@ if CLIENT then
 	--- Returns true if the static prop has a DXLevel required to render.
 	--- @return boolean
 	function meta_staticprop:HasDXLevel()
-		local num = render.GetDXLevel()
-		local minLevel, maxLevel = self.MinDXLevel or 0, self.MaxDXLevel or 0
-		if minLevel ~= 0 and num < minLevel then return false end
-		if maxLevel ~= 0 and num > maxLevel then return false end
-		return true
+		return self:SupportsDXLevel( render.GetDXLevel() )
 	end
 end
 
