@@ -96,6 +96,8 @@ end
 -- Bits of $flags (MATERIAL_VAR_ADDITIVE = 1 << 7, MATERIAL_VAR_TRANSLUCENT = 1 << 21)
 local MATERIAL_VAR_ADDITIVE_BIT = 0x80
 local MATERIAL_VAR_TRANSLUCENT_BIT = 0x200000
+local MATERIAL_VAR_VERTEXALPHA_BIT = 0x20
+local MATERIAL_VAR_ALPHATEST_BIT = 0x100
 
 ---Does the material blend with what is behind it ($translucent or $additive)? Those must not write depth when drawn:
 ---a window would otherwise cut out everything behind it that is drawn later. Alpha tested materials (fences, leaves)
@@ -106,6 +108,16 @@ local function blendsWithBackground( material )
 	-- $translucent and $additive are material flags: they are in $flags, and $translucent isn't always readable by name
 	local flags = material:GetInt( "$flags" ) or 0
 	if bit.band( flags, MATERIAL_VAR_TRANSLUCENT_BIT + MATERIAL_VAR_ADDITIVE_BIT ) ~= 0 then return true end
+	if bit.band( flags, MATERIAL_VAR_VERTEXALPHA_BIT + MATERIAL_VAR_ALPHATEST_BIT ) == MATERIAL_VAR_VERTEXALPHA_BIT then
+		local shader = material:GetShader():gsub( "_DX%d+$", "" )
+		if shader == "LightmappedGeneric" or shader == "UnlitGeneric" then return true end
+		-- Single-texture transitions can use displacement alpha as opacity.
+		-- A second texture uses that same channel as its blend weight.
+		if shader == "WorldVertexTransition" then
+			local second = material:GetTexture( "$basetexture2" )
+			if not second or second:IsError() or second:GetName() == "error" then return true end
+		end
+	end
 	return ( material:GetInt( "$translucent" ) or 0 ) ~= 0 or ( material:GetInt( "$additive" ) or 0 ) ~= 0
 end
 
@@ -188,7 +200,8 @@ function builder_meta:AddFace( face, options )
 	local blends = blendsTextures( material )
 	local blend = blends and face:IsDisplacement()
 	local flat = ( blends and string.gsub( material:GetShader(), "_DX%d+$", "" ) == "WorldVertexTransition" ) and FLAT_BLEND or color_white
-	if blends or batch.colors then
+	local vertexAlpha = bit.band( material:GetInt( "$flags" ) or 0, MATERIAL_VAR_VERTEXALPHA_BIT ) ~= 0
+	if blends or vertexAlpha or batch.colors then
 		local colors = batch.colors
 		if not colors then
 			colors = {}
@@ -197,7 +210,7 @@ function builder_meta:AddFace( face, options )
 		end
 
 		for i = 1, #verts do
-			colors[n + i] = blend and verts[i].color or flat
+			colors[n + i] = ( blend or vertexAlpha ) and verts[i].color or flat
 		end
 	end
 	-- Own lightmap coordinates. The vertices are the face's cache and are not changed: the numbers are kept beside them.
